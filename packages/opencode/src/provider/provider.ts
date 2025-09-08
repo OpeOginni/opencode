@@ -17,7 +17,7 @@ export namespace Provider {
 
   type CustomLoader = (
     provider: ModelsDev.Provider,
-    api?: string,
+    auth?: Auth.Info,
   ) => Promise<{
     autoload: boolean
     getModel?: (sdk: any, modelID: string) => Promise<any>
@@ -141,6 +141,18 @@ export namespace Provider {
         },
       }
     },
+    "cloudflare-workers-ai": async (_provider, auth) => {
+      if (!auth || auth.type !== "api" || !auth.customBaseUrl) {
+        return { autoload: false, options: {} }
+      }
+
+      return {
+        autoload: true,
+        options: {
+          baseURL: auth.customBaseUrl,
+        },
+      }
+    },
   }
 
   const state = Instance.state(async () => {
@@ -253,18 +265,23 @@ export namespace Provider {
       )
     }
 
-    // load apikeys
+    // load apikeys and customBaseUrl
     for (const [providerID, provider] of Object.entries(await Auth.all())) {
       if (disabled.has(providerID)) continue
       if (provider.type === "api") {
-        mergeProvider(providerID, { apiKey: provider.key }, "api")
+        const options: Record<string, any> = { apiKey: provider.key }
+        if (provider.customBaseUrl) {
+          options["baseURL"] = provider.customBaseUrl
+        }
+        mergeProvider(providerID, options, "api")
       }
     }
 
     // load custom
     for (const [providerID, fn] of Object.entries(CUSTOM_LOADERS)) {
       if (disabled.has(providerID)) continue
-      const result = await fn(database[providerID])
+      const auth = await Auth.get(providerID)
+      const result = await fn(database[providerID], auth)
       if (result && (result.autoload || providers[providerID])) {
         mergeProvider(providerID, result.options ?? {}, "custom", result.getModel)
       }

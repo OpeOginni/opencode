@@ -253,6 +253,23 @@ export const AuthLoginCommand = cmd({
         prompts.log.info("You can create an api key at https://vercel.link/ai-gateway-token")
       }
 
+      let customBaseUrl: string | undefined
+      if (provider === "cloudflare-workers-ai") {
+
+        if(!providers[provider].api) {
+          UI.error("Cloudflare API URL not found")
+          return
+        }
+
+        const accountIdInput = await prompts.text({
+          message: "Enter your Cloudflare Account ID",
+          validate: (x) => (x && x.length > 0 ? undefined : "Required"),
+        })
+        if (prompts.isCancel(accountIdInput)) throw new UI.CancelledError()
+
+        customBaseUrl = providers[provider].api?.replace("{CLOUDFLARE_ACCOUNT_ID}", accountIdInput)
+      }
+
       const key = await prompts.password({
         message: "Enter your API key",
         validate: (x) => (x && x.length > 0 ? undefined : "Required"),
@@ -261,6 +278,7 @@ export const AuthLoginCommand = cmd({
       await Auth.set(provider, {
         type: "api",
         key,
+        ...(customBaseUrl && { customBaseUrl }),
       })
 
       prompts.outro("Done")

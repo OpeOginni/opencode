@@ -17,6 +17,7 @@ export namespace Auth {
     .object({
       type: z.literal("api"),
       key: z.string(),
+      customBaseUrl: z.string().optional(),
     })
     .openapi({ ref: "ApiAuth" })
 
