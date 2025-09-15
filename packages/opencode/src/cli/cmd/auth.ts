@@ -255,8 +255,7 @@ export const AuthLoginCommand = cmd({
 
       let customBaseUrl: string | undefined
       if (provider === "cloudflare-workers-ai") {
-
-        if(!providers[provider].api) {
+        if (!providers[provider].api) {
           UI.error("Cloudflare API URL not found")
           return
         }
