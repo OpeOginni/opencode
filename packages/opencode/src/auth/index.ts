@@ -1,7 +1,7 @@
 import path from "path"
 import { Global } from "../global"
 import fs from "fs/promises"
-import { z } from "zod"
+import z from "zod/v4"
 
 export namespace Auth {
   export const Oauth = z
@@ -11,7 +11,7 @@ export namespace Auth {
       access: z.string(),
       expires: z.number(),
     })
-    .openapi({ ref: "OAuth" })
+    .meta({ ref: "OAuth" })
 
   export const Api = z
     .object({
@@ -19,7 +19,7 @@ export namespace Auth {
       key: z.string(),
       customBaseUrl: z.string().optional(),
     })
-    .openapi({ ref: "ApiAuth" })
+    .meta({ ref: "ApiAuth" })
 
   export const WellKnown = z
     .object({
@@ -27,9 +27,9 @@ export namespace Auth {
       key: z.string(),
       token: z.string(),
     })
-    .openapi({ ref: "WellKnownAuth" })
+    .meta({ ref: "WellKnownAuth" })
 
-  export const Info = z.discriminatedUnion("type", [Oauth, Api, WellKnown]).openapi({ ref: "Auth" })
+  export const Info = z.discriminatedUnion("type", [Oauth, Api, WellKnown]).meta({ ref: "Auth" })
   export type Info = z.infer<typeof Info>
 
   const filepath = path.join(Global.Path.data, "auth.json")

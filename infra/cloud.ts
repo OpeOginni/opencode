@@ -7,7 +7,7 @@ import { domain } from "./stage"
 
 const cluster = planetscale.getDatabaseOutput({
   name: "opencode",
-  organization: "sst",
+  organization: "anomalyco",
 })
 
 const branch =
@@ -100,8 +100,10 @@ export const stripeWebhook = new WebhookEndpoint("StripeWebhookEndpoint", {
 })
 
 const ANTHROPIC_API_KEY = new sst.Secret("ANTHROPIC_API_KEY")
+const OPENAI_API_KEY = new sst.Secret("OPENAI_API_KEY")
 const XAI_API_KEY = new sst.Secret("XAI_API_KEY")
 const BASETEN_API_KEY = new sst.Secret("BASETEN_API_KEY")
+const FIREWORKS_API_KEY = new sst.Secret("FIREWORKS_API_KEY")
 const STRIPE_SECRET_KEY = new sst.Secret("STRIPE_SECRET_KEY")
 const AUTH_API_URL = new sst.Linkable("AUTH_API_URL", {
   properties: { value: auth.url.apply((url) => url!) },
@@ -114,6 +116,15 @@ const STRIPE_WEBHOOK_SECRET = new sst.Linkable("STRIPE_WEBHOOK_SECRET", {
 // CONSOLE
 ////////////////
 
+let logProcessor
+if ($app.stage === "production" || $app.stage === "frank") {
+  const HONEYCOMB_API_KEY = new sst.Secret("HONEYCOMB_API_KEY")
+  logProcessor = new sst.cloudflare.Worker("LogProcessor", {
+    handler: "cloud/function/src/log-processor.ts",
+    link: [HONEYCOMB_API_KEY],
+  })
+}
+
 new sst.cloudflare.x.SolidStart("Console", {
   domain,
   path: "cloud/app",
@@ -123,8 +134,10 @@ new sst.cloudflare.x.SolidStart("Console", {
     STRIPE_WEBHOOK_SECRET,
     STRIPE_SECRET_KEY,
     ANTHROPIC_API_KEY,
+    OPENAI_API_KEY,
     XAI_API_KEY,
     BASETEN_API_KEY,
+    FIREWORKS_API_KEY,
   ],
   environment: {
     //VITE_DOCS_URL: web.url.apply((url) => url!),
@@ -135,9 +148,8 @@ new sst.cloudflare.x.SolidStart("Console", {
     server: {
       transform: {
         worker: {
-          placement: {
-            mode: "smart",
-          },
+          placement: { mode: "smart" },
+          tailConsumers: logProcessor ? [{ service: logProcessor.nodes.worker.scriptName }] : [],
         },
       },
     },
