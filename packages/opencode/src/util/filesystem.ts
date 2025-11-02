@@ -1,5 +1,5 @@
 import { exists } from "fs/promises"
-import { dirname, join, relative } from "path"
+import path, { dirname, join, relative } from "path"
 
 export namespace Filesystem {
   export function overlaps(a: string, b: string) {
@@ -65,5 +65,14 @@ export namespace Filesystem {
       current = parent
     }
     return result
+  }
+
+  export function getFullExt(filename: string): string {
+    const base = path.basename(filename);
+    const parts = base.split(".");
+  
+    if (parts.length <= 1) return "";
+  
+    return "." + parts.slice(1).join(".");
   }
 }

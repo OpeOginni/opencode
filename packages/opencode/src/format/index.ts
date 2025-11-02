@@ -1,13 +1,14 @@
 import { Bus } from "../bus"
 import { File } from "../file"
 import { Log } from "../util/log"
-import path from "path"
 import z from "zod"
 
 import * as Formatter from "./formatter"
 import { Config } from "../config/config"
 import { mergeDeep } from "remeda"
 import { Instance } from "../project/instance"
+import { Wildcard } from "../util/wildcard"
+import { Filesystem } from "@/util/filesystem"
 
 export namespace Format {
   const log = Log.create({ service: "format" })
@@ -67,7 +68,7 @@ export namespace Format {
     const result = []
     for (const item of Object.values(formatters)) {
       log.info("checking", { name: item.name, ext })
-      if (!item.extensions.includes(ext)) continue
+      if (!item.extensions.some(pattern => Wildcard.match(ext, pattern))) continue
       if (!(await isEnabled(item))) continue
       result.push(item)
     }
@@ -93,7 +94,7 @@ export namespace Format {
     Bus.subscribe(File.Event.Edited, async (payload) => {
       const file = payload.properties.file
       log.info("formatting", { file })
-      const ext = path.extname(file)
+      const ext = Filesystem.getFullExt(file)
 
       for (const item of await getFormatter(ext)) {
         log.info("running", { command: item.command })
