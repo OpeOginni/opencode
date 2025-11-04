@@ -63,16 +63,33 @@ export namespace Format {
     return status
   }
 
-  async function getFormatter(ext: string) {
+  async function getFormatter(ext: string, fullExt: string) {
     const formatters = await state().then((x) => x.formatters)
-    const result = []
+    const possibleFormatters = []
+
     for (const item of Object.values(formatters)) {
-      log.info("checking", { name: item.name, ext })
-      if (!item.extensions.some(pattern => Wildcard.match(ext, pattern))) continue
+      log.info("checking", { name: item.name, ext, fullExt })
+      
+      const matches = item.extensions.some(pattern => {
+        if (pattern.includes("*") || pattern.includes("?")) {
+          return Wildcard.match(fullExt, pattern)
+        }
+        return pattern === ext
+      })
+      
+      if (!matches) continue
       if (!(await isEnabled(item))) continue
-      result.push(item)
+      possibleFormatters.push(item)
     }
-    return result
+
+    const strongFormatters = possibleFormatters.filter(formatter =>
+      formatter.extensions.some(pattern => 
+        (pattern.includes("*") || pattern.includes("?")) && 
+        Wildcard.match(fullExt, pattern)
+      )
+    )
+    if (strongFormatters.length) return strongFormatters
+    return possibleFormatters
   }
 
   export async function status() {
@@ -94,9 +111,9 @@ export namespace Format {
     Bus.subscribe(File.Event.Edited, async (payload) => {
       const file = payload.properties.file
       log.info("formatting", { file })
-      const ext = Filesystem.getFullExt(file)
+      const { ext, fullExt } = Filesystem.getFullExt(file)
 
-      for (const item of await getFormatter(ext)) {
+      for (const item of await getFormatter(ext, fullExt)) {
         log.info("running", { command: item.command })
         try {
           const proc = Bun.spawn({

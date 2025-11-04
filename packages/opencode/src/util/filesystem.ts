@@ -67,12 +67,13 @@ export namespace Filesystem {
     return result
   }
 
-  export function getFullExt(filename: string): string {
+  export function getFullExt(filename: string): { ext: string, fullExt: string } {
     const base = path.basename(filename);
+    const ext = path.extname(filename);
     const parts = base.split(".");
   
-    if (parts.length <= 1) return "";
+    if (parts.length <= 1) return { ext: "", fullExt: "" };
   
-    return "." + parts.slice(1).join(".");
+    return { ext: ext, fullExt: "." + parts.slice(1).join(".") };
   }
 }
