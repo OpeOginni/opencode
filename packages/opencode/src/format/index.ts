@@ -8,7 +8,7 @@ import { Config } from "../config/config"
 import { mergeDeep } from "remeda"
 import { Instance } from "../project/instance"
 import { Wildcard } from "../util/wildcard"
-import { Filesystem } from "@/util/filesystem"
+import { Filesystem } from "../util/filesystem"
 
 export namespace Format {
   const log = Log.create({ service: "format" })
