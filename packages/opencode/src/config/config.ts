@@ -473,7 +473,17 @@ export namespace Config {
         .default("shift+return,ctrl+j")
         .describe("Insert newline in input"),
       history_previous: z.string().optional().default("up").describe("Previous history item"),
-      history_next: z.string().optional().default("down").describe("Previous history item"),
+      history_next: z.string().optional().default("down").describe("Next history item"),
+      session_child_cycle: z
+        .string()
+        .optional()
+        .default("ctrl+right")
+        .describe("Next child session"),
+      session_child_cycle_reverse: z
+        .string()
+        .optional()
+        .default("ctrl+left")
+        .describe("Previous child session"),
     })
     .strict()
     .meta({
