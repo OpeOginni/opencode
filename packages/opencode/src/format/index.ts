@@ -65,7 +65,7 @@ export namespace Format {
 
   async function getFormatter(ext: string, fullExt: string) {
     const formatters = await state().then((x) => x.formatters)
-    const possibleFormatters = []
+    const result = []
 
     for (const item of Object.values(formatters)) {
       log.info("checking", { name: item.name, ext, fullExt })
@@ -83,14 +83,14 @@ export namespace Format {
       result.push(item)
     }
 
-    const strongFormatters = possibleFormatters.filter(formatter =>
+    const strongFormatters = result.filter(formatter =>
       formatter.extensions.some(pattern => 
         (pattern.includes("*") || pattern.includes("?")) && 
         Wildcard.match(fullExt, pattern)
       )
     )
     if (strongFormatters.length) return strongFormatters
-    return possibleFormatters
+    return result
   }
 
   export async function status() {
