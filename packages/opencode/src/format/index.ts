@@ -79,7 +79,8 @@ export namespace Format {
       
       if (!matches) continue
       if (!(await isEnabled(item))) continue
-      possibleFormatters.push(item)
+      log.info("enabled", { name: item.name, ext })
+      result.push(item)
     }
 
     const strongFormatters = possibleFormatters.filter(formatter =>
