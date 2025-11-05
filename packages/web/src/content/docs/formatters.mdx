@@ -108,3 +108,43 @@ You can override the built-in formatters or add new ones by specifying the comma
 ```
 
 The **`$FILE` placeholder** in the command will be replaced with the path to the file being formatted.
+
+---
+
+### Pattern-based formatting
+
+You can use wildcard patterns in extensions to apply different formatters based on full file extensions. This is useful when you have special file types that share a base extension but need different formatting.
+
+For example, your PHP projects might have both `.php` files and `.blade.php` template files that require different formatters:
+
+```json title="opencode.json" {4-11}
+{
+  "$schema": "https://opencode.ai/config.json",
+  "formatter": {
+    "php-cs-fixer": {
+      "command": ["php-cs-fixer", "fix", "$FILE"],
+      "extensions": [".php"]
+    },
+    "blade-formatter": {
+      "command": ["blade-formatter", "--write", "$FILE"],
+      "extensions": ["*.blade.php"]
+    }
+  }
+}
+```
+With this configuration:
+- `User.blade.php` → Uses `blade-formatter` (wildcard match takes precedence)
+- `UserController.php` → Uses `php-cs-fixer` (base extension match)
+
+**How it works:**
+
+When OpenCode formats a file, it:
+
+1. Collects formatters that match either the full extension (via wildcard) or base extension (exact match)
+2. If any formatter has a wildcard pattern matching the full extension, only those formatters run
+3. Otherwise, all matching formatters run (backward compatible)
+
+This pattern-based approach works with any file type. Other common examples:
+- `*.test.ts` for test files vs `.ts` for regular TypeScript
+- `*.config.js` for config files vs `.js` for regular JavaScript
+- `*.spec.rb` for spec files vs `.rb` for regular Ruby
