@@ -17,6 +17,8 @@ import { useSDK } from "@tui/context/sdk"
 import { Binary } from "@/util/binary"
 import { createSimpleContext } from "./helper"
 import type { Snapshot } from "@/snapshot"
+import { FormatError } from "@/cli/error"
+import { createSignal } from "solid-js"
 
 export const { use: useSync, provider: SyncProvider } = createSimpleContext({
   name: "Sync",
@@ -215,29 +217,37 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
       }
     })
 
+    const [initError, setInitError] = createSignal<string | null>(null)
+
     // blocking
     Promise.all([
       sdk.client.config.providers({ throwOnError: true }).then((x) => setStore("provider", x.data!.providers)),
       sdk.client.app.agents({ throwOnError: true }).then((x) => setStore("agent", x.data ?? [])),
       sdk.client.config.get({ throwOnError: true }).then((x) => setStore("config", x.data!)),
-    ]).then(() => {
-      setStore("status", "partial")
-      // non-blocking
-      Promise.all([
-        sdk.client.session.list().then((x) =>
-          setStore(
-            "session",
-            (x.data ?? []).toSorted((a, b) => a.id.localeCompare(b.id)),
+    ])
+      .then(() => {
+        setStore("status", "partial")
+        // non-blocking
+        Promise.all([
+          sdk.client.session.list().then((x) =>
+            setStore(
+              "session",
+              (x.data ?? []).toSorted((a, b) => a.id.localeCompare(b.id)),
+            ),
           ),
-        ),
-        sdk.client.command.list().then((x) => setStore("command", x.data ?? [])),
-        sdk.client.lsp.status().then((x) => setStore("lsp", x.data!)),
-        sdk.client.mcp.status().then((x) => setStore("mcp", x.data!)),
-        sdk.client.formatter.status().then((x) => setStore("formatter", x.data!)),
-      ]).then(() => {
-        setStore("status", "complete")
+          sdk.client.command.list().then((x) => setStore("command", x.data ?? [])),
+          sdk.client.lsp.status().then((x) => setStore("lsp", x.data!)),
+          sdk.client.mcp.status().then((x) => setStore("mcp", x.data!)),
+          sdk.client.formatter.status().then((x) => setStore("formatter", x.data!)),
+        ]).then(() => {
+          setStore("status", "complete")
+        })
       })
-    })
+      .catch((error) => {
+        const formatted = FormatError(error)
+        const message = formatted || (error instanceof Error ? error.message : String(error))
+        setInitError(message)
+      })
 
     const result = {
       data: store,
@@ -246,7 +256,11 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
         return store.status
       },
       get ready() {
-        return store.status !== "loading"
+        // Allow rendering when there's an error so error screen can show
+        return store.status !== "loading" || initError() !== null
+      },
+      get initError() {
+        return initError()
       },
       session: {
         get(sessionID: string) {

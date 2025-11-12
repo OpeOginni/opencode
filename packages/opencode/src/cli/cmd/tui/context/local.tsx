@@ -50,6 +50,24 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
 
     const agent = iife(() => {
       const agents = createMemo(() => sync.data.agent.filter((x) => x.mode !== "subagent"))
+
+      // If there's an init error, return a safe dummy object
+      if (sync.initError) {
+        return {
+          list() {
+            return []
+          },
+          current() {
+            return { name: "Error", mode: "agent" } as any
+          },
+          set() {},
+          move() {},
+          color() {
+            return "#565f89"
+          },
+        }
+      }
+
       const [agentStore, setAgentStore] = createStore<{
         current: string
       }>({
@@ -99,6 +117,20 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
     })
 
     const model = iife(() => {
+      // If there's an init error, return a safe dummy object
+      if (sync.initError) {
+        return {
+          list() {
+            return []
+          },
+          current() {
+            return { providerID: "", modelID: "" }
+          },
+          set() {},
+          cycle() {},
+        }
+      }
+
       const [modelStore, setModelStore] = createStore<{
         ready: boolean
         model: Record<
