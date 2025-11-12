@@ -119,12 +119,22 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
     const model = iife(() => {
       // If there's an init error, return a safe dummy object
       if (sync.initError) {
+        const emptyModel = { providerID: "", modelID: "" }
         return {
           list() {
             return []
           },
           current() {
-            return { providerID: "", modelID: "" }
+            return emptyModel
+          },
+          get ready() {
+            return false
+          },
+          recent() {
+            return []
+          },
+          parsed() {
+            return { provider: "", model: "" }
           },
           set() {},
           cycle() {},
