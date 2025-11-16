@@ -69,7 +69,7 @@ export function Sidebar(props: { sessionID: string }) {
                   <text fg={theme.text}>{mcpExpanded() ? "▼" : "▶"}</text>
                 </Show>
                 <text fg={theme.text}>
-                  <b>MCP</b>
+                  <b>MCP ({Object.keys(sync.data.mcp).length})</b>
                 </text>
               </box>
               <Show when={Object.keys(sync.data.mcp).length <= 2 || mcpExpanded()}>
@@ -115,7 +115,7 @@ export function Sidebar(props: { sessionID: string }) {
                   <text fg={theme.text}>{lspExpanded() ? "▼" : "▶"}</text>
                 </Show>
                 <text fg={theme.text}>
-                  <b>LSP</b>
+                  <b>LSP ({sync.data.lsp.length})</b>
                 </text>
               </box>
               <Show when={sync.data.lsp.length <= 2 || lspExpanded()}>
@@ -153,7 +153,7 @@ export function Sidebar(props: { sessionID: string }) {
                   <text fg={theme.text}>{todoExpanded() ? "▼" : "▶"}</text>
                 </Show>
                 <text fg={theme.text}>
-                  <b>Todo</b>
+                  <b>Todo ({todo().length})</b>
                 </text>
               </box>
               <Show when={todo().length <= 2 || todoExpanded()}>
@@ -178,7 +178,7 @@ export function Sidebar(props: { sessionID: string }) {
                   <text fg={theme.text}>{diffExpanded() ? "▼" : "▶"}</text>
                 </Show>
                 <text fg={theme.text}>
-                  <b>Modified Files</b>
+                  <b>Modified Files ({diff().length})</b>
                 </text>
               </box>
               <Show when={diff().length <= 2 || diffExpanded()}>
