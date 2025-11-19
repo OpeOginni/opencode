@@ -32,5 +32,9 @@ export function FormatError(input: unknown) {
     return `Theme "${input.data.theme}" not found. Please check your theme configuration.`
   }
 
+  if (Theme.ThemeANSIReferenceError.isInstance(input)) {
+    return `Theme has an invalid ANSI color reference: "${input.data.color}". Please check your theme configuration.`
+  }
+
   if (UI.CancelledError.isInstance(input)) return ""
 }

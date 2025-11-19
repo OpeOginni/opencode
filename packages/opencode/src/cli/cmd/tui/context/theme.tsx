@@ -34,6 +34,8 @@ import { Global } from "@/global"
 import { Filesystem } from "@/util/filesystem"
 import { NamedError } from "@/util/error"
 import z from "zod"
+import { useExit } from "./exit"
+import { FormatError } from "@/cli/error"
 
 type Theme = {
   primary: RGBA
@@ -94,10 +96,11 @@ type Variant = {
   dark: HexColor | RefName
   light: HexColor | RefName
 }
-type ColorValue = HexColor | RefName | Variant | RGBA
+type ColorValue = HexColor | RefName | Variant | RGBA | number
+type AnsiColor = number
 type ThemeJson = {
   $schema?: string
-  defs?: Record<string, HexColor | RefName>
+  defs?: Record<string, HexColor | RefName | AnsiColor>
   theme: Record<keyof Theme, ColorValue>
 }
 
@@ -113,6 +116,13 @@ export namespace Theme {
     "ThemeNotFoundError",
     z.object({
       theme: z.string(),
+    }),
+  )
+
+  export const ThemeANSIReferenceError = NamedError.create(
+    "ThemeANSIReferenceError",
+    z.object({
+      color: z.string(),
     }),
   )
 }
@@ -144,6 +154,64 @@ export const DEFAULT_THEMES: Record<string, ThemeJson> = {
   zenburn,
 }
 
+function usesAnsiColors(theme: ThemeJson): boolean {
+  const checkValue = (v: any): boolean => {
+    if (typeof v === "number") return true
+    if (typeof v === "object" && v !== null && "dark" in v && "light" in v) {
+      return typeof v.dark === "number" || typeof v.light === "number"
+    }
+    return false
+  }
+  
+  if (theme.defs) {
+    for (const value of Object.values(theme.defs)) {
+      if (checkValue(value)) return true
+    }
+  }
+  
+  for (const value of Object.values(theme.theme)) {
+    if (checkValue(value)) return true
+  }
+  
+  return false
+}
+
+function normalizeTheme(theme: ThemeJson, palette: string[]): ThemeJson {
+  const normalizeValue = (v: any): any => {
+    if (typeof v === "number") {
+      if (!palette[v]) {
+        throw new Theme.ThemeANSIReferenceError({
+          color: v.toString(),
+        })
+      }
+      return RGBA.fromHex(palette[v].toString())
+    }
+    if (typeof v === "object" && v !== null && "dark" in v && "light" in v) {
+      return {
+        dark: typeof v.dark === "number" ? (palette[v.dark] ? RGBA.fromHex(palette[v.dark].toString()) : v.dark) : v.dark,
+        light: typeof v.light === "number" ? (palette[v.light] ? RGBA.fromHex(palette[v.light].toString()) : v.light) : v.light,
+      }
+    }
+    return v
+  }
+
+  const normalizedDefs = theme.defs
+    ? Object.fromEntries(
+        Object.entries(theme.defs).map(([key, value]) => [key, normalizeValue(value)]),
+      )
+    : undefined
+
+  const normalizedTheme = Object.fromEntries(
+    Object.entries(theme.theme).map(([key, value]) => [key, normalizeValue(value)]),
+  ) as Record<keyof Theme, ColorValue>
+
+  return {
+    ...theme,
+    defs: normalizedDefs,
+    theme: normalizedTheme,
+  }
+}
+
 function resolveTheme(theme: ThemeJson, mode: "dark" | "light") {
   const defs = theme.defs ?? {}
   function resolveColor(c: ColorValue): RGBA {
@@ -163,7 +231,15 @@ function resolveTheme(theme: ThemeJson, mode: "dark" | "light") {
         })
       }
     }
-    return resolveColor(c[mode])
+
+    // Handle variant objects
+    if (typeof c === "object" && "dark" in c && "light" in c) {
+      return resolveColor(c[mode])
+    }
+
+    throw new Theme.ColorReferenceError({
+      color: String(c),
+    })
   }
   return Object.fromEntries(
     Object.entries(theme.theme).map(([key, value]) => {
@@ -184,17 +260,42 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
       ready: false,
     })
 
+    const renderer = useRenderer()
+
+    const exit = useExit()
+
     createEffect(async () => {
+      try {
       const custom = await getCustomThemes()
+      const normalizedCustom: Record<string, ThemeJson> = {}
+      
+      for (const [name, theme] of Object.entries(custom)) {
+        if (usesAnsiColors(theme)) {
+          const colors = await renderer.getPalette({ size: 256 })
+          if (colors.palette[0]) {
+            const palette = colors.palette.filter((x) => x !== null)
+            normalizedCustom[name] = normalizeTheme(theme, palette)
+          } else {
+            normalizedCustom[name] = theme
+          }
+        } else {
+          normalizedCustom[name] = theme
+        }
+      }
+      
       setStore(
         produce((draft) => {
-          Object.assign(draft.themes, custom)
+          Object.assign(draft.themes, normalizedCustom)
           draft.ready = true
         }),
       )
-    })
+    } catch (error) {
+      const formatted = FormatError(error)
+      // Prefered quick exit as main error component isnt rendered yet (init error)
+      exit(formatted)
+    }
+  })
 
-    const renderer = useRenderer()
     renderer
       .getPalette({
         size: 16,
