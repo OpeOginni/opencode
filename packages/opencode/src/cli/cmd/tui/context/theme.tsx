@@ -162,17 +162,17 @@ function usesAnsiColors(theme: ThemeJson): boolean {
     }
     return false
   }
-  
+
   if (theme.defs) {
     for (const value of Object.values(theme.defs)) {
       if (checkValue(value)) return true
     }
   }
-  
+
   for (const value of Object.values(theme.theme)) {
     if (checkValue(value)) return true
   }
-  
+
   return false
 }
 
@@ -188,17 +188,21 @@ function normalizeTheme(theme: ThemeJson, palette: string[]): ThemeJson {
     }
     if (typeof v === "object" && v !== null && "dark" in v && "light" in v) {
       return {
-        dark: typeof v.dark === "number" ? (palette[v.dark] ? RGBA.fromHex(palette[v.dark].toString()) : v.dark) : v.dark,
-        light: typeof v.light === "number" ? (palette[v.light] ? RGBA.fromHex(palette[v.light].toString()) : v.light) : v.light,
+        dark:
+          typeof v.dark === "number" ? (palette[v.dark] ? RGBA.fromHex(palette[v.dark].toString()) : v.dark) : v.dark,
+        light:
+          typeof v.light === "number"
+            ? palette[v.light]
+              ? RGBA.fromHex(palette[v.light].toString())
+              : v.light
+            : v.light,
       }
     }
     return v
   }
 
   const normalizedDefs = theme.defs
-    ? Object.fromEntries(
-        Object.entries(theme.defs).map(([key, value]) => [key, normalizeValue(value)]),
-      )
+    ? Object.fromEntries(Object.entries(theme.defs).map(([key, value]) => [key, normalizeValue(value)]))
     : undefined
 
   const normalizedTheme = Object.fromEntries(
@@ -266,35 +270,35 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
 
     createEffect(async () => {
       try {
-      const custom = await getCustomThemes()
-      const normalizedCustom: Record<string, ThemeJson> = {}
-      
-      for (const [name, theme] of Object.entries(custom)) {
-        if (usesAnsiColors(theme)) {
-          const colors = await renderer.getPalette({ size: 256 })
-          if (colors.palette[0]) {
-            const palette = colors.palette.filter((x) => x !== null)
-            normalizedCustom[name] = normalizeTheme(theme, palette)
+        const custom = await getCustomThemes()
+        const normalizedCustom: Record<string, ThemeJson> = {}
+
+        for (const [name, theme] of Object.entries(custom)) {
+          if (usesAnsiColors(theme)) {
+            const colors = await renderer.getPalette({ size: 256 })
+            if (colors.palette[0]) {
+              const palette = colors.palette.filter((x) => x !== null)
+              normalizedCustom[name] = normalizeTheme(theme, palette)
+            } else {
+              normalizedCustom[name] = theme
+            }
           } else {
             normalizedCustom[name] = theme
           }
-        } else {
-          normalizedCustom[name] = theme
         }
+
+        setStore(
+          produce((draft) => {
+            Object.assign(draft.themes, normalizedCustom)
+            draft.ready = true
+          }),
+        )
+      } catch (error) {
+        const formatted = FormatError(error)
+        // Prefered quick exit as main error component isnt rendered yet (init error)
+        exit(formatted)
       }
-      
-      setStore(
-        produce((draft) => {
-          Object.assign(draft.themes, normalizedCustom)
-          draft.ready = true
-        }),
-      )
-    } catch (error) {
-      const formatted = FormatError(error)
-      // Prefered quick exit as main error component isnt rendered yet (init error)
-      exit(formatted)
-    }
-  })
+    })
 
     renderer
       .getPalette({
