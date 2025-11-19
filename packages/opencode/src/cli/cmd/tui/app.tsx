@@ -508,29 +508,17 @@ function ErrorComponent(props: { error: Error; reset: () => void; onExit: () => 
       </text>
       <text fg="#c0caf5">A fatal error occurred. Please report this issue or try resetting the TUI:</text>
       <box marginTop={1} flexDirection="row" gap={2} paddingBottom={1} alignItems="center" flexWrap="wrap">
-        <box
-          onMouseDown={copyIssueURL}
-          backgroundColor="#565f89"
-          padding={1}
-        >
+        <box onMouseDown={copyIssueURL} backgroundColor="#565f89" padding={1}>
           <text attributes={copied() ? undefined : TextAttributes.BOLD}>
             {copied() ? "Successfully copied" : "Copy issue URL (exception info pre-filled)"}
           </text>
         </box>
-        <box
-          onMouseDown={props.reset}
-          backgroundColor="#565f89"
-          padding={1}
-        >
+        <box onMouseDown={props.reset} backgroundColor="#565f89" padding={1}>
           <text>Reset TUI</text>
         </box>
       </box>
       <box flexDirection="row" gap={2} alignItems="center">
-        <box
-          onMouseDown={props.onExit}
-          backgroundColor="#565f89"
-          padding={1}
-        >
+        <box onMouseDown={props.onExit} backgroundColor="#565f89" padding={1}>
           <text>Exit</text>
         </box>
         <box>
