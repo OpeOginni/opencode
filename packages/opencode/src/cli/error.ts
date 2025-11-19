@@ -2,6 +2,7 @@ import { ConfigMarkdown } from "@/config/markdown"
 import { Config } from "../config/config"
 import { MCP } from "../mcp"
 import { UI } from "./ui"
+import { Theme } from "./cmd/tui/context/theme"
 
 export function FormatError(input: unknown) {
   if (MCP.Failed.isInstance(input))
@@ -22,6 +23,14 @@ export function FormatError(input: unknown) {
       `Config file at ${input.data.path} is invalid` + (input.data.message ? `: ${input.data.message}` : ""),
       ...(input.data.issues?.map((issue) => "↳ " + issue.message + " " + issue.path.join(".")) ?? []),
     ].join("\n")
+
+  if (Theme.ColorReferenceError.isInstance(input)) {
+    return `Theme has an invalid color reference: "${input.data.color}"`
+  }
+
+  if (Theme.NotFoundError.isInstance(input)) {
+    return `Theme "${input.data.theme}" not found. Please check your theme configuration.`
+  }
 
   if (UI.CancelledError.isInstance(input)) return ""
 }

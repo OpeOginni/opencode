@@ -32,6 +32,8 @@ import { useRenderer } from "@opentui/solid"
 import { createStore, produce } from "solid-js/store"
 import { Global } from "@/global"
 import { Filesystem } from "@/util/filesystem"
+import { NamedError } from "@/util/error"
+import z from "zod"
 
 type Theme = {
   primary: RGBA
@@ -99,6 +101,22 @@ type ThemeJson = {
   theme: Record<keyof Theme, ColorValue>
 }
 
+export namespace Theme {
+  export const ColorReferenceError = NamedError.create(
+    "ThemeColorReferenceError",
+    z.object({
+      color: z.string(),
+    }),
+  )
+
+  export const NotFoundError = NamedError.create(
+    "ThemeNotFoundError",
+    z.object({
+      theme: z.string(),
+    }),
+  )
+}
+
 export const DEFAULT_THEMES: Record<string, ThemeJson> = {
   aura,
   ayu,
@@ -140,7 +158,9 @@ function resolveTheme(theme: ThemeJson, mode: "dark" | "light") {
       } else if (theme.theme[c as keyof Theme]) {
         return resolveColor(theme.theme[c as keyof Theme])
       } else {
-        throw new Error(`Color reference "${c}" not found in defs or theme`)
+        throw new Theme.ColorReferenceError({
+          color: c,
+        })
       }
     }
     return resolveColor(c[mode])

@@ -29,6 +29,7 @@ import { TuiEvent } from "./event"
 import { KVProvider, useKV } from "./context/kv"
 import { Provider } from "@/provider/provider"
 import { ArgsProvider, useArgs, type Args } from "./context/args"
+import { FormatError } from "@/cli/error"
 
 async function getTerminalBackgroundColor(): Promise<"dark" | "light"> {
   // can't set raw mode if not a TTY
@@ -468,12 +469,13 @@ function App() {
 
 function ErrorComponent(props: { error: Error; reset: () => void; onExit: () => Promise<void> }) {
   const term = useTerminalDimensions()
+  const [copied, setCopied] = createSignal(false)
+
   useKeyboard((evt) => {
-    if (evt.ctrl && evt.name === "c") {
+    if ((evt.ctrl && evt.name === "c") || evt.name === "return") {
       props.onExit()
     }
   })
-  const [copied, setCopied] = createSignal(false)
 
   const issueURL = new URL("https://github.com/sst/opencode/issues/new?template=bug-report.yml")
 
@@ -496,28 +498,50 @@ function ErrorComponent(props: { error: Error; reset: () => void; onExit: () => 
     })
   }
 
+  const formattedError = FormatError(props.error) || props.error.message
+  const errorText = formattedError || props.error.stack || "An unknown error occurred"
+
   return (
-    <box flexDirection="column" gap={1}>
-      <box flexDirection="row" gap={1} alignItems="center">
-        <text attributes={TextAttributes.BOLD}>Please report an issue.</text>
-        <box onMouseUp={copyIssueURL} backgroundColor="#565f89" padding={1}>
-          <text attributes={TextAttributes.BOLD}>Copy issue URL (exception info pre-filled)</text>
+    <box flexDirection="column" gap={1} padding={2}>
+      <text attributes={TextAttributes.BOLD} fg="#f7768e">
+        Fatal Error
+      </text>
+      <text fg="#c0caf5">A fatal error occurred. Please report this issue or try resetting the TUI:</text>
+      <box marginTop={1} flexDirection="row" gap={2} paddingBottom={1} alignItems="center" flexWrap="wrap">
+        <box
+          onMouseDown={copyIssueURL}
+          backgroundColor="#565f89"
+          padding={1}
+        >
+          <text attributes={copied() ? undefined : TextAttributes.BOLD}>
+            {copied() ? "Successfully copied" : "Copy issue URL (exception info pre-filled)"}
+          </text>
         </box>
-        {copied() && <text>Successfully copied</text>}
-      </box>
-      <box flexDirection="row" gap={2} alignItems="center">
-        <text>A fatal error occurred!</text>
-        <box onMouseUp={props.reset} backgroundColor="#565f89" padding={1}>
+        <box
+          onMouseDown={props.reset}
+          backgroundColor="#565f89"
+          padding={1}
+        >
           <text>Reset TUI</text>
         </box>
-        <box onMouseUp={props.onExit} backgroundColor="#565f89" padding={1}>
+      </box>
+      <box flexDirection="row" gap={2} alignItems="center">
+        <box
+          onMouseDown={props.onExit}
+          backgroundColor="#565f89"
+          padding={1}
+        >
           <text>Exit</text>
         </box>
+        <box>
+          <text fg="#565f89">or press Ctrl+C / Enter</text>
+        </box>
       </box>
-      <scrollbox height={Math.floor(term().height * 0.7)}>
-        <text>{props.error.stack}</text>
-      </scrollbox>
-      <text>{props.error.message}</text>
+      <box marginTop={1}>
+        <scrollbox height={Math.floor(term().height * 0.7)}>
+          <text fg="#ff9e64">{errorText}</text>
+        </scrollbox>
+      </box>
     </box>
   )
 }
