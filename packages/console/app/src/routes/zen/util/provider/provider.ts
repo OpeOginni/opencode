@@ -24,23 +24,26 @@ import {
   toOaCompatibleResponse,
 } from "./openai-compatible"
 
+export type UsageInfo = {
+  inputTokens: number
+  outputTokens: number
+  reasoningTokens?: number
+  cacheReadTokens?: number
+  cacheWrite5mTokens?: number
+  cacheWrite1hTokens?: number
+}
+
 export type ProviderHelper = {
   format: ZenData.Format
-  modifyUrl: (providerApi: string) => string
+  modifyUrl: (providerApi: string, model?: string, isStream?: boolean) => string
   modifyHeaders: (headers: Headers, body: Record<string, any>, apiKey: string) => void
   modifyBody: (body: Record<string, any>) => Record<string, any>
+  streamSeparator: string
   createUsageParser: () => {
     parse: (chunk: string) => void
     retrieve: () => any
   }
-  normalizeUsage: (usage: any) => {
-    inputTokens: number
-    outputTokens: number
-    reasoningTokens?: number
-    cacheReadTokens?: number
-    cacheWrite5mTokens?: number
-    cacheWrite1hTokens?: number
-  }
+  normalizeUsage: (usage: any) => UsageInfo
 }
 
 export interface CommonMessage {

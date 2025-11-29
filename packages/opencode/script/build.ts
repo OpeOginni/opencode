@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 
+import solidPlugin from "../node_modules/@opentui/solid/scripts/solid-plugin"
 import path from "path"
 import fs from "fs"
 import { $ } from "bun"
@@ -8,9 +9,6 @@ import { fileURLToPath } from "url"
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const dir = path.resolve(__dirname, "..")
-
-const solidPluginPath = path.resolve(dir, "node_modules/@opentui/solid/scripts/solid-plugin.ts")
-const solidPlugin = (await import(solidPluginPath)).default
 
 process.chdir(dir)
 
@@ -110,9 +108,11 @@ for (const item of targets) {
     plugins: [solidPlugin],
     sourcemap: "external",
     compile: {
+      autoloadBunfig: false,
+      autoloadDotenv: false,
       target: name.replace(pkg.name, "bun") as any,
       outfile: `dist/${name}/bin/opencode`,
-      execArgv: [`--user-agent=opencode/${Script.version}`, `--env-file=""`, `--`],
+      execArgv: [`--user-agent=opencode/${Script.version}`, "--"],
       windows: {},
     },
     entrypoints: ["./src/index.ts", parserWorker, workerPath],

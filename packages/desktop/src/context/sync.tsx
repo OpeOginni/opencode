@@ -1,133 +1,16 @@
-import type {
-  Message,
-  Agent,
-  Provider,
-  Session,
-  Part,
-  Config,
-  Path,
-  File,
-  FileNode,
-  Project,
-  FileDiff,
-  Todo,
-} from "@opencode-ai/sdk"
-import { createStore, produce, reconcile } from "solid-js/store"
+import { produce } from "solid-js/store"
 import { createMemo } from "solid-js"
-import { Binary } from "@/utils/binary"
-import { createSimpleContext } from "./helper"
+import { Binary } from "@opencode-ai/util/binary"
+import { createSimpleContext } from "@opencode-ai/ui/context"
+import { useGlobalSync } from "./global-sync"
 import { useSDK } from "./sdk"
 
 export const { use: useSync, provider: SyncProvider } = createSimpleContext({
   name: "Sync",
   init: () => {
-    const [store, setStore] = createStore<{
-      ready: boolean
-      provider: Provider[]
-      agent: Agent[]
-      project: Project
-      config: Config
-      path: Path
-      session: Session[]
-      session_diff: {
-        [sessionID: string]: FileDiff[]
-      }
-      todo: {
-        [sessionID: string]: Todo[]
-      }
-      limit: number
-      message: {
-        [sessionID: string]: Message[]
-      }
-      part: {
-        [messageID: string]: Part[]
-      }
-      node: FileNode[]
-      changes: File[]
-    }>({
-      project: { id: "", worktree: "", time: { created: 0, initialized: 0 } },
-      config: {},
-      path: { state: "", config: "", worktree: "", directory: "" },
-      ready: false,
-      agent: [],
-      provider: [],
-      session: [],
-      session_diff: {},
-      todo: {},
-      limit: 10,
-      message: {},
-      part: {},
-      node: [],
-      changes: [],
-    })
-
+    const globalSync = useGlobalSync()
     const sdk = useSDK()
-    sdk.event.listen((e) => {
-      const event = e.details
-      switch (event.type) {
-        case "session.updated": {
-          const result = Binary.search(store.session, event.properties.info.id, (s) => s.id)
-          if (result.found) {
-            setStore("session", result.index, reconcile(event.properties.info))
-            break
-          }
-          setStore(
-            "session",
-            produce((draft) => {
-              draft.splice(result.index, 0, event.properties.info)
-            }),
-          )
-          break
-        }
-        case "session.diff":
-          setStore("session_diff", event.properties.sessionID, event.properties.diff)
-          break
-        case "todo.updated":
-          setStore("todo", event.properties.sessionID, event.properties.todos)
-          break
-        case "message.updated": {
-          const messages = store.message[event.properties.info.sessionID]
-          if (!messages) {
-            setStore("message", event.properties.info.sessionID, [event.properties.info])
-            break
-          }
-          const result = Binary.search(messages, event.properties.info.id, (m) => m.id)
-          if (result.found) {
-            setStore("message", event.properties.info.sessionID, result.index, reconcile(event.properties.info))
-            break
-          }
-          setStore(
-            "message",
-            event.properties.info.sessionID,
-            produce((draft) => {
-              draft.splice(result.index, 0, event.properties.info)
-            }),
-          )
-          break
-        }
-        case "message.part.updated": {
-          const part = sanitizePart(event.properties.part)
-          const parts = store.part[part.messageID]
-          if (!parts) {
-            setStore("part", part.messageID, [part])
-            break
-          }
-          const result = Binary.search(parts, part.id, (p) => p.id)
-          if (result.found) {
-            setStore("part", part.messageID, result.index, reconcile(part))
-            break
-          }
-          setStore(
-            "part",
-            part.messageID,
-            produce((draft) => {
-              draft.splice(result.index, 0, part)
-            }),
-          )
-          break
-        }
-      }
-    })
+    const [store, setStore] = globalSync.child(sdk.directory)
 
     const load = {
       project: () => sdk.client.project.current().then((x) => setStore("project", x.data!)),
@@ -142,6 +25,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
             .slice(0, store.limit)
           setStore("session", sessions)
         }),
+      status: () => sdk.client.session.status().then((x) => setStore("session_status", x.data!)),
       config: () => sdk.client.config.get().then((x) => setStore("config", x.data!)),
       changes: () => sdk.client.file.status().then((x) => setStore("changes", x.data!)),
       node: () => sdk.client.file.list({ query: { path: "/" } }).then((x) => setStore("node", x.data!)),
@@ -149,29 +33,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
 
     Promise.all(Object.values(load).map((p) => p())).then(() => setStore("ready", true))
 
-    const sanitizer = createMemo(() => new RegExp(`${store.path.directory}/`, "g"))
-    const sanitize = (text: string) => text.replace(sanitizer(), "")
     const absolute = (path: string) => (store.path.directory + "/" + path).replace("//", "/")
-    const sanitizePart = (part: Part) => {
-      if (part.type === "tool") {
-        if (part.state.status === "completed" || part.state.status === "error") {
-          for (const key in part.state.metadata) {
-            if (typeof part.state.metadata[key] === "string") {
-              part.state.metadata[key] = sanitize(part.state.metadata[key] as string)
-            }
-          }
-          for (const key in part.state.input) {
-            if (typeof part.state.input[key] === "string") {
-              part.state.input[key] = sanitize(part.state.input[key] as string)
-            }
-          }
-          if ("error" in part.state) {
-            part.state.error = sanitize(part.state.error as string)
-          }
-        }
-      }
-      return part
-    }
 
     return {
       data: store,
@@ -203,10 +65,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
                 .slice()
                 .sort((a, b) => a.id.localeCompare(b.id))
               for (const message of messages.data!) {
-                draft.part[message.info.id] = message.parts
-                  .slice()
-                  .map(sanitizePart)
-                  .sort((a, b) => a.id.localeCompare(b.id))
+                draft.part[message.info.id] = message.parts.slice().sort((a, b) => a.id.localeCompare(b.id))
               }
               draft.session_diff[sessionID] = diff.data ?? []
             }),
@@ -220,7 +79,9 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
       },
       load,
       absolute,
-      sanitize,
+      get directory() {
+        return store.path.directory
+      },
     }
   },
 })
