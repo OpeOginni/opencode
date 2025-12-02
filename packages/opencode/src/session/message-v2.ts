@@ -1,6 +1,6 @@
 import z from "zod"
 import { Bus } from "../bus"
-import { NamedError } from "../util/error"
+import { NamedError } from "@opencode-ai/util/error"
 import { Message } from "./message"
 import { APICallError, convertToModelMessages, LoadAPIKeyError, type ModelMessage, type UIMessage } from "ai"
 import { Identifier } from "../id/id"
@@ -8,6 +8,9 @@ import { LSP } from "../lsp"
 import { Snapshot } from "@/snapshot"
 import { fn } from "@/util/fn"
 import { Storage } from "@/storage/storage"
+import { ProviderTransform } from "@/provider/transform"
+import { STATUS_CODES } from "http"
+import { iife } from "@/util/iife"
 
 export namespace MessageV2 {
   export const OutputLengthError = NamedError.create("MessageOutputLengthError", z.object({}))
@@ -145,6 +148,7 @@ export namespace MessageV2 {
 
   export const CompactionPart = PartBase.extend({
     type: z.literal("compaction"),
+    auto: z.boolean(),
   }).meta({
     ref: "CompactionPart",
   })
@@ -664,7 +668,7 @@ export namespace MessageV2 {
       }
     }
 
-    return convertToModelMessages(result)
+    return convertToModelMessages(result.filter((msg) => msg.parts.length > 0))
   }
 
   export const stream = fn(Identifier.schema("session"), async function* (sessionID) {
@@ -737,9 +741,31 @@ export namespace MessageV2 {
           { cause: e },
         ).toObject()
       case APICallError.isInstance(e):
+        const message = iife(() => {
+          let msg = e.message
+          const transformed = ProviderTransform.error(ctx.providerID, e)
+          if (transformed !== msg) {
+            return transformed
+          }
+          if (!e.responseBody || (e.statusCode && msg !== STATUS_CODES[e.statusCode])) {
+            return msg
+          }
+
+          try {
+            const body = JSON.parse(e.responseBody)
+            // try to extract common error message fields
+            const errMsg = body.message || body.error
+            if (errMsg && typeof errMsg === "string") {
+              return `${msg}: ${errMsg}`
+            }
+          } catch {}
+
+          return `${msg}: ${e.responseBody}`
+        })
+
         return new MessageV2.APIError(
           {
-            message: e.message,
+            message,
             statusCode: e.statusCode,
             isRetryable: e.isRetryable,
             responseHeaders: e.responseHeaders,

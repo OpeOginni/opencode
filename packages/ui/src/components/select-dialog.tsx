@@ -14,6 +14,7 @@ interface SelectDialogProps<T>
   emptyMessage?: string
   children: (item: T) => JSX.Element
   onSelect?: (value: T | undefined) => void
+  onKeyEvent?: (event: KeyboardEvent, item: T | undefined) => void
 }
 
 export function SelectDialog<T>(props: SelectDialogProps<T>) {
@@ -65,9 +66,12 @@ export function SelectDialog<T>(props: SelectDialogProps<T>) {
     setStore("mouseActive", false)
     if (e.key === "Escape") return
 
+    const all = flat()
+    const selected = all.find((x) => others.key(x) === active())
+    props.onKeyEvent?.(e, selected)
+
     if (e.key === "Enter") {
       e.preventDefault()
-      const selected = flat().find((x) => others.key(x) === active())
       if (selected) handleSelect(selected)
     } else {
       onKeyDown(e)
@@ -87,7 +91,7 @@ export function SelectDialog<T>(props: SelectDialogProps<T>) {
       </Dialog.Header>
       <div data-component="select-dialog-input">
         <div data-slot="select-dialog-input-container">
-          <Icon data-slot="select-dialog-icon" name="magnifying-glass" />
+          <Icon name="magnifying-glass" />
           <Input
             data-slot="select-dialog-input"
             type="text"
@@ -104,7 +108,6 @@ export function SelectDialog<T>(props: SelectDialogProps<T>) {
         </div>
         <Show when={filter()}>
           <IconButton
-            data-slot="select-dialog-clear-button"
             icon="circle-x"
             variant="ghost"
             onClick={() => {

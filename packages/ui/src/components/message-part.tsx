@@ -1,4 +1,4 @@
-import { Component, createMemo, For, Match, Show, Switch } from "solid-js"
+import { Component, createMemo, For, Match, Show, Switch, ValidComponent } from "solid-js"
 import { Dynamic } from "solid-js/web"
 import {
   AssistantMessage,
@@ -13,37 +13,30 @@ import { GenericTool } from "./basic-tool"
 import { Card } from "./card"
 import { Icon } from "./icon"
 import { Checkbox } from "./checkbox"
-import { Diff } from "./diff"
 import { DiffChanges } from "./diff-changes"
 import { Markdown } from "./markdown"
+import { getDirectory, getFilename } from "@opencode-ai/util/path"
+import { sanitizePart } from "@opencode-ai/util/sanitize"
+import { unwrap } from "solid-js/store"
 
 export interface MessageProps {
   message: MessageType
   parts: PartType[]
+  diffComponent: ValidComponent
+  sanitize?: RegExp
 }
 
 export interface MessagePartProps {
   part: PartType
   message: MessageType
+  diffComponent: ValidComponent
   hideDetails?: boolean
+  sanitize?: RegExp
 }
 
 export type PartComponent = Component<MessagePartProps>
 
 export const PART_MAPPING: Record<string, PartComponent | undefined> = {}
-
-function getFilename(path: string) {
-  if (!path) return ""
-  const trimmed = path.replace(/[\/]+$/, "")
-  const parts = trimmed.split("/")
-  return parts[parts.length - 1] ?? ""
-}
-
-function getDirectory(path: string) {
-  const parts = path.split("/")
-  const dir = parts.slice(0, parts.length - 1).join("/")
-  return dir ? dir + "/" : ""
-}
 
 export function registerPartComponent(type: string, component: PartComponent) {
   PART_MAPPING[type] = component
@@ -57,21 +50,37 @@ export function Message(props: MessageProps) {
       </Match>
       <Match when={props.message.role === "assistant" && props.message}>
         {(assistantMessage) => (
-          <AssistantMessageDisplay message={assistantMessage() as AssistantMessage} parts={props.parts} />
+          <AssistantMessageDisplay
+            message={assistantMessage() as AssistantMessage}
+            parts={props.parts}
+            sanitize={props.sanitize}
+            diffComponent={props.diffComponent}
+          />
         )}
       </Match>
     </Switch>
   )
 }
 
-export function AssistantMessageDisplay(props: { message: AssistantMessage; parts: PartType[] }) {
+export function AssistantMessageDisplay(props: {
+  message: AssistantMessage
+  parts: PartType[]
+  sanitize?: RegExp
+  diffComponent: ValidComponent
+}) {
   const filteredParts = createMemo(() => {
     return props.parts?.filter((x) => {
       if (x.type === "reasoning") return false
       return x.type !== "tool" || (x as ToolPart).tool !== "todoread"
     })
   })
-  return <For each={filteredParts()}>{(part) => <Part part={part} message={props.message} />}</For>
+  return (
+    <For each={filteredParts()}>
+      {(part) => (
+        <Part part={part} message={props.message} sanitize={props.sanitize} diffComponent={props.diffComponent} />
+      )}
+    </For>
+  )
 }
 
 export function UserMessageDisplay(props: { message: UserMessage; parts: PartType[] }) {
@@ -86,9 +95,16 @@ export function UserMessageDisplay(props: { message: UserMessage; parts: PartTyp
 
 export function Part(props: MessagePartProps) {
   const component = createMemo(() => PART_MAPPING[props.part.type])
+  const part = createMemo(() => sanitizePart(unwrap(props.part), props.sanitize))
   return (
     <Show when={component()}>
-      <Dynamic component={component()} part={props.part} message={props.message} hideDetails={props.hideDetails} />
+      <Dynamic
+        component={component()}
+        part={part()}
+        message={props.message}
+        diffComponent={props.diffComponent}
+        hideDetails={props.hideDetails}
+      />
     </Show>
   )
 }
@@ -97,6 +113,7 @@ export interface ToolProps {
   input: Record<string, any>
   metadata: Record<string, any>
   tool: string
+  diffComponent: ValidComponent
   output?: string
   hideDetails?: boolean
 }
@@ -141,7 +158,7 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
             return (
               <Card variant="error">
                 <div data-component="tool-error">
-                  <Icon name="circle-ban-sign" size="small" data-slot="message-part-tool-error-icon" />
+                  <Icon name="circle-ban-sign" size="small" />
                   <Switch>
                     <Match when={title && title.length < 30}>
                       <div data-slot="message-part-tool-error-content">
@@ -163,6 +180,7 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
             component={render}
             input={input}
             tool={part.tool}
+            diffComponent={props.diffComponent}
             metadata={metadata}
             output={part.state.status === "completed" ? part.state.output : undefined}
             hideDetails={props.hideDetails}
@@ -177,10 +195,11 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
 
 PART_MAPPING["text"] = function TextPartDisplay(props) {
   const part = props.part as TextPart
+  const sanitized = createMemo(() => (props.sanitize ? (sanitizePart(unwrap(part), props.sanitize) as TextPart) : part))
   return (
     <Show when={part.text.trim()}>
       <div data-component="text-part">
-        <Markdown text={part.text.trim()} />
+        <Markdown text={sanitized().text.trim()} />
       </div>
     </Show>
   )
@@ -321,12 +340,14 @@ ToolRegistry.register({
         icon="console"
         trigger={{
           title: "Shell",
-          subtitle: "Ran " + props.input.command,
+          subtitle: props.input.description,
         }}
       >
-        <Show when={false && props.output}>
-          <div data-component="tool-output">{props.output}</div>
-        </Show>
+        <div data-component="tool-output">
+          <Markdown
+            text={`\`\`\`command\n$ ${props.input.command}${props.output ? "\n\n" + props.output : ""}\n\`\`\``}
+          />
+        </div>
       </BasicTool>
     )
   },
@@ -359,7 +380,8 @@ ToolRegistry.register({
       >
         <Show when={props.metadata.filediff}>
           <div data-component="edit-content">
-            <Diff
+            <Dynamic
+              component={props.diffComponent}
               before={{
                 name: getFilename(props.metadata.filediff.path),
                 contents: props.metadata.filediff.before,

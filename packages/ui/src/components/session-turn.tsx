@@ -2,7 +2,18 @@ import { AssistantMessage } from "@opencode-ai/sdk"
 import { useData } from "../context"
 import { Binary } from "@opencode-ai/util/binary"
 import { getDirectory, getFilename } from "@opencode-ai/util/path"
-import { createEffect, createMemo, createSignal, For, Match, ParentProps, Show, Switch } from "solid-js"
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  For,
+  Match,
+  onMount,
+  ParentProps,
+  Show,
+  Switch,
+  ValidComponent,
+} from "solid-js"
 import { DiffChanges } from "./diff-changes"
 import { Typewriter } from "./typewriter"
 import { Message } from "./message-part"
@@ -11,10 +22,10 @@ import { Accordion } from "./accordion"
 import { StickyAccordionHeader } from "./sticky-accordion-header"
 import { FileIcon } from "./file-icon"
 import { Icon } from "./icon"
-import { Diff } from "./diff"
 import { Card } from "./card"
 import { MessageProgress } from "./message-progress"
 import { Collapsible } from "./collapsible"
+import { Dynamic } from "solid-js/web"
 
 export function SessionTurn(
   props: ParentProps<{
@@ -25,13 +36,15 @@ export function SessionTurn(
       content?: string
       container?: string
     }
+    diffComponent: ValidComponent
   }>,
 ) {
   const data = useData()
-  const match = Binary.search(data.session, props.sessionID, (s) => s.id)
+  const match = Binary.search(data.store.session, props.sessionID, (s) => s.id)
   if (!match.found) throw new Error(`Session ${props.sessionID} not found`)
 
-  const messages = createMemo(() => (props.sessionID ? (data.message[props.sessionID] ?? []) : []))
+  const sanitizer = createMemo(() => (data.directory ? new RegExp(`${data.directory}/`, "g") : undefined))
+  const messages = createMemo(() => (props.sessionID ? (data.store.message[props.sessionID] ?? []) : []))
   const userMessages = createMemo(() =>
     messages()
       .filter((m) => m.role === "user")
@@ -44,7 +57,7 @@ export function SessionTurn(
 
   const status = createMemo(
     () =>
-      data.session_status[props.sessionID] ?? {
+      data.store.session_status[props.sessionID] ?? {
         type: "idle",
       },
   )
@@ -55,31 +68,48 @@ export function SessionTurn(
       <div data-slot="session-turn-content" class={props.classes?.content}>
         <Show when={message()}>
           {(msg) => {
-            const titleSeen = createMemo(() => true)
-            const contentSeen = createMemo(() => true)
+            const titleKey = `app:seen:session:${props.sessionID}:${msg().id}:title`
+            const contentKey = `app:seen:session:${props.sessionID}:${msg().id}:content`
+            const [detailsExpanded, setDetailsExpanded] = createSignal(false)
+            const [titled, setTitled] = createSignal(true)
+            const [faded, setFaded] = createSignal(true)
 
-            const [titled, setTitled] = createSignal(titleSeen())
             const assistantMessages = createMemo(() => {
               return messages()?.filter((m) => m.role === "assistant" && m.parentID == msg().id) as AssistantMessage[]
             })
+            const assistantMessageParts = createMemo(() => assistantMessages()?.flatMap((m) => data.store.part[m.id]))
             const error = createMemo(() => assistantMessages().find((m) => m?.error)?.error)
-            const [detailsExpanded, setDetailsExpanded] = createSignal(false)
-            const parts = createMemo(() => data.part[msg().id])
-            const hasToolPart = createMemo(() =>
-              assistantMessages()
-                ?.flatMap((m) => data.part[m.id])
-                .some((p) => p?.type === "tool"),
+            const parts = createMemo(() => data.store.part[msg().id])
+            const lastTextPart = createMemo(() =>
+              assistantMessageParts()
+                .filter((p) => p?.type === "text")
+                ?.at(-1),
             )
+            const hasToolPart = createMemo(() => assistantMessageParts().some((p) => p?.type === "tool"))
             const messageWorking = createMemo(() => msg().id === lastUserMessage()?.id && working())
             const initialCompleted = !(msg().id === lastUserMessage()?.id && working())
             const [completed, setCompleted] = createSignal(initialCompleted)
+            const summary = createMemo(() => msg().summary?.body ?? lastTextPart()?.text)
+            const lastTextPartShown = createMemo(() => !msg().summary?.body && (lastTextPart()?.text?.length ?? 0) > 0)
 
             // allowing time for the animations to finish
-            createEffect(() => {
-              if (titleSeen()) return
-              const title = msg().summary?.title
-              if (title) setTimeout(() => setTitled(true), 10_000)
+            onMount(() => {
+              const titleSeen = sessionStorage.getItem(titleKey) === "true"
+              const contentSeen = sessionStorage.getItem(contentKey) === "true"
+
+              if (!titleSeen) {
+                setTitled(false)
+                const title = msg().summary?.title
+                if (title) setTimeout(() => setTitled(true), 10_000)
+                setTimeout(() => sessionStorage.setItem(titleKey, "true"), 1000)
+              }
+
+              if (!contentSeen) {
+                setFaded(false)
+                setTimeout(() => sessionStorage.setItem(contentKey, "true"), 1000)
+              }
             })
+
             createEffect(() => {
               const completed = !messageWorking()
               setTimeout(() => setCompleted(completed), 1200)
@@ -99,7 +129,7 @@ export function SessionTurn(
                   </div>
                 </div>
                 <div data-slot="session-turn-message-content">
-                  <Message message={msg()} parts={parts()} />
+                  <Message message={msg()} parts={parts()} sanitize={sanitizer()} diffComponent={props.diffComponent} />
                 </div>
                 {/* Summary */}
                 <Show when={completed()}>
@@ -111,12 +141,12 @@ export function SessionTurn(
                           <Match when={true}>Response</Match>
                         </Switch>
                       </h2>
-                      <Show when={msg().summary?.body}>
+                      <Show when={summary()}>
                         {(summary) => (
                           <Markdown
                             data-slot="session-turn-markdown"
                             data-diffs={!!msg().summary?.diffs?.length}
-                            data-fade={!msg().summary?.diffs?.length && !contentSeen()}
+                            data-fade={!msg().summary?.diffs?.length && !faded()}
                             text={summary()}
                           />
                         )}
@@ -149,7 +179,8 @@ export function SessionTurn(
                               </Accordion.Trigger>
                             </StickyAccordionHeader>
                             <Accordion.Content data-slot="session-turn-accordion-content">
-                              <Diff
+                              <Dynamic
+                                component={props.diffComponent}
                                 before={{
                                   name: diff.file!,
                                   contents: diff.before!,
@@ -175,7 +206,11 @@ export function SessionTurn(
                 <div data-slot="session-turn-response-section">
                   <Switch>
                     <Match when={!completed()}>
-                      <MessageProgress assistantMessages={assistantMessages} done={!messageWorking()} />
+                      <MessageProgress
+                        assistantMessages={assistantMessages}
+                        done={!messageWorking()}
+                        diffComponent={props.diffComponent}
+                      />
                     </Match>
                     <Match when={completed() && hasToolPart()}>
                       <Collapsible variant="ghost" open={detailsExpanded()} onOpenChange={setDetailsExpanded}>
@@ -194,8 +229,30 @@ export function SessionTurn(
                           <div data-slot="session-turn-collapsible-content-inner">
                             <For each={assistantMessages()}>
                               {(assistantMessage) => {
-                                const parts = createMemo(() => data.part[assistantMessage.id])
-                                return <Message message={assistantMessage} parts={parts()} />
+                                const parts = createMemo(() => data.store.part[assistantMessage.id])
+                                const last = createMemo(() =>
+                                  parts()
+                                    .filter((p) => p?.type === "text")
+                                    .at(-1),
+                                )
+                                if (lastTextPartShown() && lastTextPart()?.id === last()?.id) {
+                                  return (
+                                    <Message
+                                      message={assistantMessage}
+                                      parts={parts().filter((p) => p?.id !== last()?.id)}
+                                      sanitize={sanitizer()}
+                                      diffComponent={props.diffComponent}
+                                    />
+                                  )
+                                }
+                                return (
+                                  <Message
+                                    message={assistantMessage}
+                                    parts={parts()}
+                                    sanitize={sanitizer()}
+                                    diffComponent={props.diffComponent}
+                                  />
+                                )
                               }}
                             </For>
                             <Show when={error()}>

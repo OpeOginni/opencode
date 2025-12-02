@@ -267,9 +267,10 @@ function resolveTheme(theme: ThemeJson, mode: "dark" | "light") {
       return resolveColor(c[mode])
     }
 
-    throw new Theme.ColorReferenceError({
-      color: String(c),
-    })
+    if (typeof c === "number") {
+      return ansiToRgba(c)
+    }
+    return resolveColor(c[mode])
   }
 
   const resolved = Object.fromEntries(
@@ -303,6 +304,51 @@ function resolveTheme(theme: ThemeJson, mode: "dark" | "light") {
   } as Theme
 }
 
+function ansiToRgba(code: number): RGBA {
+  // Standard ANSI colors (0-15)
+  if (code < 16) {
+    const ansiColors = [
+      "#000000", // Black
+      "#800000", // Red
+      "#008000", // Green
+      "#808000", // Yellow
+      "#000080", // Blue
+      "#800080", // Magenta
+      "#008080", // Cyan
+      "#c0c0c0", // White
+      "#808080", // Bright Black
+      "#ff0000", // Bright Red
+      "#00ff00", // Bright Green
+      "#ffff00", // Bright Yellow
+      "#0000ff", // Bright Blue
+      "#ff00ff", // Bright Magenta
+      "#00ffff", // Bright Cyan
+      "#ffffff", // Bright White
+    ]
+    return RGBA.fromHex(ansiColors[code] ?? "#000000")
+  }
+
+  // 6x6x6 Color Cube (16-231)
+  if (code < 232) {
+    const index = code - 16
+    const b = index % 6
+    const g = Math.floor(index / 6) % 6
+    const r = Math.floor(index / 36)
+
+    const val = (x: number) => (x === 0 ? 0 : x * 40 + 55)
+    return RGBA.fromInts(val(r), val(g), val(b))
+  }
+
+  // Grayscale Ramp (232-255)
+  if (code < 256) {
+    const gray = (code - 232) * 10 + 8
+    return RGBA.fromInts(gray, gray, gray)
+  }
+
+  // Fallback for invalid codes
+  return RGBA.fromInts(0, 0, 0)
+}
+
 export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
   name: "Theme",
   init: (props: { mode: "dark" | "light" }) => {
@@ -310,7 +356,7 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
     const kv = useKV()
     const [store, setStore] = createStore({
       themes: DEFAULT_THEMES,
-      mode: props.mode,
+      mode: kv.get("theme_mode", props.mode),
       active: (sync.data.config.theme ?? kv.get("theme", "opencode")) as string,
       ready: false,
     })
@@ -387,6 +433,7 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
       },
       setMode(mode: "dark" | "light") {
         setStore("mode", mode)
+        kv.set("theme_mode", mode)
       },
       set(theme: string) {
         setStore("active", theme)
