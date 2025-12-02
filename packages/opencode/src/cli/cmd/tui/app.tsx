@@ -157,7 +157,7 @@ function App() {
   const command = useCommandDialog()
   const { event } = useSDK()
   const toast = useToast()
-  const { theme, mode, setMode } = useTheme()
+  const { theme, mode, setMode, customThemeError } = useTheme()
   const sync = useSync()
   const exit = useExit()
 
@@ -388,6 +388,16 @@ function App() {
           "Warning",
           "While openrouter is a convenient way to access LLMs your request will often be routed to subpar providers that do not work well in our testing.\n\nFor reliable access to models check out OpenCode Zen\nhttps://opencode.ai/zen",
         ).then(() => kv.set("openrouter_warning", true))
+      })
+    }
+  })
+
+  createEffect(() => {
+    if (customThemeError) {
+      toast.show({
+        variant: "error",
+        message: customThemeError,
+        duration: 5000,
       })
     }
   })
