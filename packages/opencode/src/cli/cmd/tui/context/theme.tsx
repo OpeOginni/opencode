@@ -221,7 +221,7 @@ type ColorValue = string | number | Variant | RGBA
 type ThemeJson = {
   $schema?: string
   defs?: Record<string, ColorValue>
-  theme: Record<string, ColorValue | undefined>
+  theme: Record<string, ColorValue>
 }
 
 export const DEFAULT_THEMES: Record<string, ThemeJson> = {
@@ -253,22 +253,22 @@ export const DEFAULT_THEMES: Record<string, ThemeJson> = {
 
 function isAnsiColor(value: ColorValue): boolean {
   if (typeof value === "number") return true
+  
   if (typeof value === "object" && "dark" in value && "light" in value) {
     return typeof value.dark === "number" || typeof value.light === "number"
   }
+  
   return false
 }
 
 function usesAnsiColors(theme: ThemeJson): boolean {
-  if (theme.defs) {
-    for (const value of Object.values(theme.defs)) {
-      if (isAnsiColor(value)) return true
-    }
+  // Check defs
+  if (theme.defs && Object.values(theme.defs).some(isAnsiColor)) {
+    return true
   }
-  for (const value of Object.values(theme.theme)) {
-    if (value && isAnsiColor(value)) return true
-  }
-  return false
+  
+  // Check theme colors
+  return Object.values(theme.theme).some(value => value && isAnsiColor(value))
 }
 
 function parseThemeJson(json: unknown, themeName: string): ThemeJson | { error: string } {
@@ -288,14 +288,38 @@ function normalizeColorValue(
   themeColors: Record<string, ColorValue>,
   themeName: string,
 ): ColorValue | { error: string } {
-  if (value instanceof RGBA) return value
+  // Already normalized
+  if (value instanceof RGBA) {
+    return value
+  }
+
+  // Handle variant objects by recursing on each mode
+  if (typeof value === "object" && "dark" in value && "light" in value) {
+    const dark = normalizeColorValue(value.dark, palette, defs, themeColors, themeName)
+    if (typeof dark === "object" && "error" in dark) return dark
+    
+    const light = normalizeColorValue(value.light, palette, defs, themeColors, themeName)
+    if (typeof light === "object" && "error" in light) return light
+    
+    return { dark: dark as string | RGBA, light: light as string | RGBA }
+  }
+
+  // Handle string values (hex, special colors, or references)
   if (typeof value === "string") {
-    // Hex or special colors pass through
-    if (value.startsWith("#") || value === "transparent" || value === "none") return value
-    // Check if it's a valid reference
-    if (value in defs || value in themeColors) return value
+    // Pass through hex and special colors
+    if (value.startsWith("#") || value === "transparent" || value === "none") {
+      return value
+    }
+
+    // Validate references exist
+    if (value in defs || value in themeColors) {
+      return value
+    }
+
     return { error: `Theme "${themeName}.json" has an invalid color reference: "${value}"` }
   }
+
+  // Handle ANSI color codes
   if (typeof value === "number") {
     const ansiColor = palette[value] ? RGBA.fromHex(palette[value]) : ansiToRgba(value)
     if (!ansiColor || ansiColor.a === 0) {
@@ -303,28 +327,26 @@ function normalizeColorValue(
     }
     return ansiColor
   }
-  if (typeof value === "object" && "dark" in value && "light" in value) {
-    const dark = normalizeColorValue(value.dark, palette, defs, themeColors, themeName)
-    if (typeof dark === "object" && "error" in dark) return dark
-    const light = normalizeColorValue(value.light, palette, defs, themeColors, themeName)
-    if (typeof light === "object" && "error" in light) return light
-    return { dark: dark as string | RGBA, light: light as string | RGBA }
-  }
+
+  // Shouldn't reach here
   return value
 }
 
 function normalizeTheme(theme: ThemeJson, palette: string[], themeName: string): ThemeJson | { error: string } {
   const defs = theme.defs ?? {}
-  const themeColors = theme.theme as Record<string, ColorValue>
+  const themeColors = theme.theme
 
   const normalizedDefs: Record<string, ColorValue> = {}
+  const normalizedTheme: Record<string, ColorValue> = {}
+
+  // Normalize defs
   for (const [key, value] of Object.entries(defs)) {
     const result = normalizeColorValue(value, palette, defs, themeColors, themeName)
     if (typeof result === "object" && "error" in result) return result
     normalizedDefs[key] = result
   }
 
-  const normalizedTheme: Record<string, ColorValue> = {}
+  // Normalize theme colors
   for (const [key, value] of Object.entries(themeColors)) {
     if (value === undefined) continue
     const result = normalizeColorValue(value, palette, normalizedDefs, themeColors, themeName)
@@ -335,7 +357,7 @@ function normalizeTheme(theme: ThemeJson, palette: string[], themeName: string):
   return {
     ...theme,
     defs: Object.keys(normalizedDefs).length > 0 ? normalizedDefs : undefined,
-    theme: normalizedTheme as ThemeJson["theme"],
+    theme: normalizedTheme,
   }
 }
 
@@ -346,22 +368,43 @@ function resolveColor(
   themeColors: Record<string, ColorValue | undefined>,
   themeName: string,
 ): RGBA | { error: string } {
-  if (value instanceof RGBA) return value
-  if (typeof value === "string") {
-    if (value === "transparent" || value === "none") return RGBA.fromInts(0, 0, 0, 0)
-    if (value.startsWith("#")) return RGBA.fromHex(value)
-    // Reference resolution
-    if (defs[value]) return resolveColor(defs[value], mode, defs, themeColors, themeName)
-    if (themeColors[value] !== undefined) return resolveColor(themeColors[value]!, mode, defs, themeColors, themeName)
-    return { error: `Theme "${themeName}.json" has an invalid color reference: "${value}"` }
+  // Already resolved
+  if (value instanceof RGBA) {
+    return value
   }
-  if (typeof value === "number") {
-    // Shouldn't happen after normalization, but handle it anyway
-    return ansiToRgba(value)
-  }
+
+  // Handle variant objects by recursing with the mode-specific value
   if (typeof value === "object" && "dark" in value && "light" in value) {
     return resolveColor(value[mode], mode, defs, themeColors, themeName)
   }
+
+  // Handle string values
+  if (typeof value === "string") {
+    // Special color keywords
+    if (value === "transparent" || value === "none") {
+      return RGBA.fromInts(0, 0, 0, 0)
+    }
+
+    // Hex colors
+    if (value.startsWith("#")) {
+      return RGBA.fromHex(value)
+    }
+
+    // Reference resolution - check defs first, then themeColors
+    const referenced = defs[value] ?? themeColors[value]
+    if (referenced !== undefined) {
+      return resolveColor(referenced, mode, defs, themeColors, themeName)
+    }
+
+    return { error: `Theme "${themeName}.json" has an invalid color reference: "${value}"` }
+  }
+
+  // Handle number values (ANSI codes - shouldn't happen after normalization)
+  if (typeof value === "number") {
+    return ansiToRgba(value)
+  }
+
+  // Fallback for unexpected types
   return { error: `Theme "${themeName}.json" has an invalid color value "${value}"` }
 }
 
@@ -370,35 +413,29 @@ function resolveTheme(theme: ThemeJson, mode: "dark" | "light", themeName: strin
   const themeColors = theme.theme as Record<string, ColorValue | undefined>
   const transparent = RGBA.fromInts(0, 0, 0, 0)
 
+  // Helper to resolve a color value or return transparent
+  const resolveOrTransparent = (value: ColorValue | undefined): RGBA => {
+    if (value === undefined) return transparent
+    const result = resolveColor(value, mode, defs, themeColors, themeName)
+    return result instanceof RGBA ? result : transparent
+  }
+
   // Resolve all standard color keys, defaulting to transparent if missing
   const resolved: Partial<ThemeColors> = {}
   for (const key of themeColorKeys) {
-    const value = themeColors[key]
-    if (value !== undefined) {
-      const result = resolveColor(value, mode, defs, themeColors, themeName)
-      resolved[key] = result instanceof RGBA ? result : transparent
-    } else {
-      resolved[key] = transparent
-    }
+    resolved[key] = resolveOrTransparent(themeColors[key])
   }
 
-  // Handle selectedListItemText separately since it has special fallback behavior
+  // Handle selectedListItemText with backward compatibility
   const hasSelectedListItemText = themeColors.selectedListItemText !== undefined
-  if (hasSelectedListItemText) {
-    const result = resolveColor(themeColors.selectedListItemText!, mode, defs, themeColors, themeName)
-    resolved.selectedListItemText = result instanceof RGBA ? result : transparent
-  } else {
-    // Backward compatibility: if selectedListItemText is not defined, use background color
-    resolved.selectedListItemText = resolved.background
-  }
+  resolved.selectedListItemText = hasSelectedListItemText
+    ? resolveOrTransparent(themeColors.selectedListItemText)
+    : resolved.background!
 
-  // Handle backgroundMenu - optional with fallback to backgroundElement
-  if (themeColors.backgroundMenu !== undefined) {
-    const result = resolveColor(themeColors.backgroundMenu, mode, defs, themeColors, themeName)
-    resolved.backgroundMenu = result instanceof RGBA ? result : transparent
-  } else {
-    resolved.backgroundMenu = resolved.backgroundElement
-  }
+  // Handle backgroundMenu with fallback to backgroundElement
+  resolved.backgroundMenu = themeColors.backgroundMenu !== undefined
+    ? resolveOrTransparent(themeColors.backgroundMenu)
+    : resolved.backgroundElement!
 
   return {
     ...resolved,
