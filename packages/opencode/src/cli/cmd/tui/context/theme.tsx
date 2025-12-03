@@ -636,7 +636,7 @@ async function getCustomThemes(): Promise<CustomThemesResult> {
 function generateSystem(colors: TerminalColors, mode: "dark" | "light"): ThemeJson {
   const bg = RGBA.fromHex(colors.defaultBackground ?? colors.palette[0]!)
   const fg = colors.defaultForeground ?? colors.palette[7]!
-  const palette = colors.palette.filter((x) => x !== null)
+  const palette = colors.palette.filter((x: string | null) => x !== null)
   const isDark = mode == "dark"
 
   // Generate gray scale based on terminal background
