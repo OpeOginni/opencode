@@ -383,6 +383,13 @@ function resolveColor(
     // Special color keywords
     if (value === "transparent" || value === "none") {
       return RGBA.fromInts(0, 0, 0, 0)
+      if (defs[c] != null) {
+        return resolveColor(defs[c])
+      } else if (theme.theme[c as keyof ThemeColors] !== undefined) {
+        return resolveColor(theme.theme[c as keyof ThemeColors]!)
+      } else {
+        throw new Error(`Color reference "${c}" not found in defs or theme`)
+      }
     }
 
     // Hex colors
