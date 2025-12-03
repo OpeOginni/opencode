@@ -32,6 +32,7 @@ import { useRenderer } from "@opentui/solid"
 import { createStore, produce } from "solid-js/store"
 import { Global } from "@/global"
 import { Filesystem } from "@/util/filesystem"
+import { z } from "zod"
 
 type ThemeColors = {
   primary: RGBA
@@ -109,20 +110,118 @@ export function selectedForeground(theme: Theme): RGBA {
   return theme.background
 }
 
-type HexColor = `#${string}`
-type RefName = string
-type Variant = {
-  dark: HexColor | RefName
-  light: HexColor | RefName
-}
-type ColorValue = HexColor | RefName | Variant | RGBA
+// Zod schemas for color values
+const HexColorSchema = z.string().regex(/^#[0-9a-fA-F]{3,8}$/, "Invalid hex color")
+const SpecialColorSchema = z.enum(["transparent", "none"])
+const AnsiColorSchema = z.number().int().min(0).max(255)
+const RefNameSchema = z.string()
+
+// Base color value (without variant) - order matters for union parsing
+const BaseColorValueSchema = z.union([HexColorSchema, SpecialColorSchema, AnsiColorSchema, RefNameSchema])
+
+// Variant with dark/light modes
+const VariantSchema = z.object({
+  dark: BaseColorValueSchema,
+  light: BaseColorValueSchema,
+})
+
+// Full color value - check variant first since it's an object
+const ColorValueSchema = z.union([VariantSchema, BaseColorValueSchema])
+
+// Defs schema - map of color definitions
+const DefsSchema = z.record(z.string(), ColorValueSchema)
+
+// All theme color keys - missing keys will default to "none" (transparent)
+const themeColorKeys = [
+  "primary",
+  "secondary",
+  "accent",
+  "error",
+  "warning",
+  "success",
+  "info",
+  "text",
+  "textMuted",
+  "selectedListItemText",
+  "background",
+  "backgroundPanel",
+  "backgroundElement",
+  "backgroundMenu",
+  "border",
+  "borderActive",
+  "borderSubtle",
+  "diffAdded",
+  "diffRemoved",
+  "diffContext",
+  "diffHunkHeader",
+  "diffHighlightAdded",
+  "diffHighlightRemoved",
+  "diffAddedBg",
+  "diffRemovedBg",
+  "diffContextBg",
+  "diffLineNumber",
+  "diffAddedLineNumberBg",
+  "diffRemovedLineNumberBg",
+  "markdownText",
+  "markdownHeading",
+  "markdownLink",
+  "markdownLinkText",
+  "markdownCode",
+  "markdownBlockQuote",
+  "markdownEmph",
+  "markdownStrong",
+  "markdownHorizontalRule",
+  "markdownListItem",
+  "markdownListEnumeration",
+  "markdownImage",
+  "markdownImageText",
+  "markdownCodeBlock",
+  "syntaxComment",
+  "syntaxKeyword",
+  "syntaxFunction",
+  "syntaxVariable",
+  "syntaxString",
+  "syntaxNumber",
+  "syntaxType",
+  "syntaxOperator",
+  "syntaxPunctuation",
+] as const
+
+// All valid theme keys
+const validThemeKeys: Set<string> = new Set(themeColorKeys)
+
+// Theme colors schema - all keys optional, but no extra keys allowed
+const ThemeColorsSchema = z
+  .record(z.string(), ColorValueSchema)
+  .superRefine((obj, ctx) => {
+    for (const key of Object.keys(obj)) {
+      if (!validThemeKeys.has(key)) {
+        ctx.addIssue({
+          code: "invalid_key",
+          origin: "record",
+          issues: [],
+          message: `Unknown color key "${key}"`,
+          path: [key],
+        })
+      }
+    }
+  })
+
+// Full theme JSON schema
+const ThemeJsonSchema = z.object({
+  $schema: z.string().optional(),
+  defs: DefsSchema.optional(),
+  theme: ThemeColorsSchema,
+})
+
+// Type aliases - use manual types for better compatibility with JSON imports
+// ColorValue can include RGBA after normalization (when ANSI codes are resolved)
+type Variant = { dark: string | number | RGBA; light: string | number | RGBA }
+type ColorValue = string | number | Variant | RGBA
 type ThemeJson = {
   $schema?: string
-  defs?: Record<string, HexColor | RefName>
-  theme: Omit<Record<keyof ThemeColors, ColorValue>, "selectedListItemText" | "backgroundMenu"> & {
-    selectedListItemText?: ColorValue
-    backgroundMenu?: ColorValue
-  }
+  defs?: Record<string, ColorValue>
+  theme: Record<string, ColorValue | undefined>
 }
 
 export const DEFAULT_THEMES: Record<string, ThemeJson> = {
@@ -152,138 +251,151 @@ export const DEFAULT_THEMES: Record<string, ThemeJson> = {
   zenburn,
 }
 
-function usesAnsiColors(theme: ThemeJson): boolean {
-  const checkValue = (v: any): boolean => {
-    if (typeof v === "number") return true
-    if (typeof v === "object" && v !== null && "dark" in v && "light" in v) {
-      return typeof v.dark === "number" || typeof v.light === "number"
-    }
-    return false
+function isAnsiColor(value: ColorValue): boolean {
+  if (typeof value === "number") return true
+  if (typeof value === "object" && "dark" in value && "light" in value) {
+    return typeof value.dark === "number" || typeof value.light === "number"
   }
-
-  if (theme.defs) {
-    for (const value of Object.values(theme.defs)) {
-      if (checkValue(value)) return true
-    }
-  }
-
-  for (const value of Object.values(theme.theme)) {
-    if (checkValue(value)) return true
-  }
-
   return false
 }
 
-function normalizeTheme(theme: ThemeJson, palette: string[], themeName: string): ThemeJson | { error: string } {
-  const normalizeValue = (v: any): any => {
-    if (typeof v === "string") {
-      if (v.startsWith("#") || v === "transparent" || v === "none") return v
-      if (theme.defs && v in theme.defs) return v
-      if (v in theme.theme) return v
-      return { error: `Theme "${themeName}.json" has an invalid color reference: "${v}"` }
-    }
-    if (typeof v === "number") {
-      if (!palette[v]) {
-        return { error: `Theme "${themeName}.json" has an invalid ANSI color reference: "${v.toString()}"` }
-      }
-      return RGBA.fromHex(palette[v].toString())
-    }
-    if (typeof v === "object" && v !== null && "dark" in v && "light" in v) {
-      // Recursively check nested values
-      const dark = normalizeValue(v.dark)
-      if (dark && typeof dark === "object" && "error" in dark) return dark
-      
-      const light = normalizeValue(v.light)
-      if (light && typeof light === "object" && "error" in light) return light
-
-      return {
-        dark,
-        light,
-      }
-    }
-    return v
-  }
-
-  const normalizedDefs: Record<string, any> = {}
+function usesAnsiColors(theme: ThemeJson): boolean {
   if (theme.defs) {
-    for (const [key, value] of Object.entries(theme.defs)) {
-      const result = normalizeValue(value)
-      if (result && typeof result === "object" && "error" in result) return result
-      normalizedDefs[key] = result
+    for (const value of Object.values(theme.defs)) {
+      if (isAnsiColor(value)) return true
     }
   }
+  for (const value of Object.values(theme.theme)) {
+    if (value && isAnsiColor(value)) return true
+  }
+  return false
+}
 
-  const normalizedTheme: Record<keyof ThemeColors, any> = {} as any
-  for (const [key, value] of Object.entries(theme.theme)) {
-    const result = normalizeValue(value)
-    if (result && typeof result === "object" && "error" in result) return result
-    normalizedTheme[key as keyof ThemeColors] = result
+function parseThemeJson(json: unknown, themeName: string): ThemeJson | { error: string } {
+  const result = ThemeJsonSchema.safeParse(json)
+  if (!result.success) {
+    const issue = result.error.issues[0]
+    const path = issue?.path.join(".") || "unknown"
+    return { error: `Theme "${themeName}.json" is invalid at "${path}": ${issue?.message}` }
+  }
+  return result.data
+}
+
+function normalizeColorValue(
+  value: ColorValue,
+  palette: string[],
+  defs: Record<string, ColorValue>,
+  themeColors: Record<string, ColorValue>,
+  themeName: string,
+): ColorValue | { error: string } {
+  if (value instanceof RGBA) return value
+  if (typeof value === "string") {
+    // Hex or special colors pass through
+    if (value.startsWith("#") || value === "transparent" || value === "none") return value
+    // Check if it's a valid reference
+    if (value in defs || value in themeColors) return value
+    return { error: `Theme "${themeName}.json" has an invalid color reference: "${value}"` }
+  }
+  if (typeof value === "number") {
+    const ansiColor = palette[value] ? RGBA.fromHex(palette[value]) : ansiToRgba(value)
+    if (!ansiColor || ansiColor.a === 0) {
+      return { error: `Theme "${themeName}.json" has an invalid ANSI color reference: "${value}"` }
+    }
+    return ansiColor
+  }
+  if (typeof value === "object" && "dark" in value && "light" in value) {
+    const dark = normalizeColorValue(value.dark, palette, defs, themeColors, themeName)
+    if (typeof dark === "object" && "error" in dark) return dark
+    const light = normalizeColorValue(value.light, palette, defs, themeColors, themeName)
+    if (typeof light === "object" && "error" in light) return light
+    return { dark: dark as string | RGBA, light: light as string | RGBA }
+  }
+  return value
+}
+
+function normalizeTheme(theme: ThemeJson, palette: string[], themeName: string): ThemeJson | { error: string } {
+  const defs = theme.defs ?? {}
+  const themeColors = theme.theme as Record<string, ColorValue>
+
+  const normalizedDefs: Record<string, ColorValue> = {}
+  for (const [key, value] of Object.entries(defs)) {
+    const result = normalizeColorValue(value, palette, defs, themeColors, themeName)
+    if (typeof result === "object" && "error" in result) return result
+    normalizedDefs[key] = result
+  }
+
+  const normalizedTheme: Record<string, ColorValue> = {}
+  for (const [key, value] of Object.entries(themeColors)) {
+    if (value === undefined) continue
+    const result = normalizeColorValue(value, palette, normalizedDefs, themeColors, themeName)
+    if (typeof result === "object" && "error" in result) return result
+    normalizedTheme[key] = result
   }
 
   return {
     ...theme,
-    defs: theme.defs ? normalizedDefs : undefined,
-    theme: normalizedTheme as any,
+    defs: Object.keys(normalizedDefs).length > 0 ? normalizedDefs : undefined,
+    theme: normalizedTheme as ThemeJson["theme"],
   }
+}
+
+function resolveColor(
+  value: ColorValue,
+  mode: "dark" | "light",
+  defs: Record<string, ColorValue>,
+  themeColors: Record<string, ColorValue | undefined>,
+  themeName: string,
+): RGBA | { error: string } {
+  if (value instanceof RGBA) return value
+  if (typeof value === "string") {
+    if (value === "transparent" || value === "none") return RGBA.fromInts(0, 0, 0, 0)
+    if (value.startsWith("#")) return RGBA.fromHex(value)
+    // Reference resolution
+    if (defs[value]) return resolveColor(defs[value], mode, defs, themeColors, themeName)
+    if (themeColors[value] !== undefined) return resolveColor(themeColors[value]!, mode, defs, themeColors, themeName)
+    return { error: `Theme "${themeName}.json" has an invalid color reference: "${value}"` }
+  }
+  if (typeof value === "number") {
+    // Shouldn't happen after normalization, but handle it anyway
+    return ansiToRgba(value)
+  }
+  if (typeof value === "object" && "dark" in value && "light" in value) {
+    return resolveColor(value[mode], mode, defs, themeColors, themeName)
+  }
+  return { error: `Theme "${themeName}.json" has an invalid color value "${value}"` }
 }
 
 function resolveTheme(theme: ThemeJson, mode: "dark" | "light", themeName: string) {
   const defs = theme.defs ?? {}
-  function resolveColor(c: ColorValue): RGBA | {error: string} {
-    if (c instanceof RGBA) return c
-    if (typeof c === "string") {
-      if (c === "transparent" || c === "none") return RGBA.fromInts(0, 0, 0, 0)
+  const themeColors = theme.theme as Record<string, ColorValue | undefined>
+  const transparent = RGBA.fromInts(0, 0, 0, 0)
 
-      if (c.startsWith("#")) return RGBA.fromHex(c)
-
-      if (defs[c]) {
-        return resolveColor(defs[c])
-      } else if (theme.theme[c as keyof ThemeColors] !== undefined) {
-        return resolveColor(theme.theme[c as keyof ThemeColors]!)
-      } else {
-        return {error: `Theme "${themeName}.json" has an invalid color reference: "${c}`}
-      }
+  // Resolve all standard color keys, defaulting to transparent if missing
+  const resolved: Partial<ThemeColors> = {}
+  for (const key of themeColorKeys) {
+    const value = themeColors[key]
+    if (value !== undefined) {
+      const result = resolveColor(value, mode, defs, themeColors, themeName)
+      resolved[key] = result instanceof RGBA ? result : transparent
+    } else {
+      resolved[key] = transparent
     }
-
-    if (typeof c === "object" && "dark" in c && "light" in c) {
-      return resolveColor(c[mode])
-    }
-
-    // Is not really needed
-    if (typeof c === "number") {
-      return ansiToRgba(c)
-    }
-    return resolveColor(c[mode])
   }
 
-  const resolved = Object.fromEntries(
-    Object.entries(theme.theme)
-      .filter(([key]) => key !== "selectedListItemText" && key !== "backgroundMenu")
-      .flatMap(([key, value]) => {
-        const result = resolveColor(value)
-        return result instanceof RGBA ? [[key, result]] : [] // if error, return empty array
-      }),
-  ) as Partial<ThemeColors>
-
-  // Handle selectedListItemText separately since it's optional
-  const hasSelectedListItemText = theme.theme.selectedListItemText !== undefined
+  // Handle selectedListItemText separately since it has special fallback behavior
+  const hasSelectedListItemText = themeColors.selectedListItemText !== undefined
   if (hasSelectedListItemText) {
-    const result = resolveColor(theme.theme.selectedListItemText!)
-    if(result instanceof RGBA) {
-      resolved.selectedListItemText = result
-    }
+    const result = resolveColor(themeColors.selectedListItemText!, mode, defs, themeColors, themeName)
+    resolved.selectedListItemText = result instanceof RGBA ? result : transparent
   } else {
     // Backward compatibility: if selectedListItemText is not defined, use background color
-    // This preserves the current behavior for all existing themes
     resolved.selectedListItemText = resolved.background
   }
 
   // Handle backgroundMenu - optional with fallback to backgroundElement
-  if (theme.theme.backgroundMenu !== undefined) {
-    const result = resolveColor(theme.theme.backgroundMenu)
-    if(result instanceof RGBA) {
-      resolved.backgroundMenu = result
-    }
+  if (themeColors.backgroundMenu !== undefined) {
+    const result = resolveColor(themeColors.backgroundMenu, mode, defs, themeColors, themeName)
+    resolved.backgroundMenu = result instanceof RGBA ? result : transparent
   } else {
     resolved.backgroundMenu = resolved.backgroundElement
   }
@@ -355,10 +467,10 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
     const renderer = useRenderer()
 
     createEffect(async () => {
-        const custom = await getCustomThemes()
-        const normalizedCustom: Record<string, ThemeJson> = {}
+        const { themes: customThemes, errors } = await getCustomThemes()
 
-        for (const [name, theme] of Object.entries(custom)) {
+        const normalizedCustom: Record<string, ThemeJson> = {}
+        for (const [name, theme] of Object.entries(customThemes)) {
           let palette: string[] = []
           if (usesAnsiColors(theme)) {
             const colors = await renderer.getPalette({ size: 256 })
@@ -369,22 +481,26 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
 
           const normalized = normalizeTheme(theme, palette, name)
           if ("error" in normalized) {
-            setStore("customThemeError", normalized.error as string)
-            setStore("active", "opencode")
-            kv.set("theme", "opencode")
-            setStore("ready", true)
-            return
+            errors.push(normalized.error)
+            continue
           }
           normalizedCustom[name] = normalized
+        }
+
+        // If active theme failed to load, fall back to opencode
+        const activeTheme = store.active
+        if (activeTheme !== "opencode" && !(activeTheme in DEFAULT_THEMES) && !(activeTheme in normalizedCustom)) {
+          setStore("active", "opencode")
+          kv.set("theme", "opencode")
         }
 
         setStore(
           produce((draft) => {
             Object.assign(draft.themes, normalizedCustom)
             draft.ready = true
+            draft.customThemeError = errors[0] // Only show the first error
           }),
         )
-        setStore("customThemeError", undefined)
     })
     
     renderer
@@ -439,8 +555,13 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
   },
 })
 
+type CustomThemesResult = {
+  themes: Record<string, ThemeJson>
+  errors: string[]
+}
+
 const CUSTOM_THEME_GLOB = new Bun.Glob("themes/*.json")
-async function getCustomThemes() {
+async function getCustomThemes(): Promise<CustomThemesResult> {
   const directories = [
     Global.Path.config,
     ...(await Array.fromAsync(
@@ -451,7 +572,9 @@ async function getCustomThemes() {
     )),
   ]
 
-  const result: Record<string, ThemeJson> = {}
+  const themes: Record<string, ThemeJson> = {}
+  const errors: string[] = []
+
   for (const dir of directories) {
     for await (const item of CUSTOM_THEME_GLOB.scan({
       absolute: true,
@@ -460,32 +583,39 @@ async function getCustomThemes() {
       cwd: dir,
     })) {
       const name = path.basename(item, ".json")
-      result[name] = await Bun.file(item).json()
+      const json = await Bun.file(item).json()
+      const parsed = parseThemeJson(json, name)
+      if ("error" in parsed) {
+        errors.push(parsed.error)
+        continue
+      }
+      themes[name] = parsed
     }
   }
-  return result
+  return { themes, errors }
 }
+
 
 function generateSystem(colors: TerminalColors, mode: "dark" | "light"): ThemeJson {
   const bg = RGBA.fromHex(colors.defaultBackground ?? colors.palette[0]!)
-  const fg = RGBA.fromHex(colors.defaultForeground ?? colors.palette[7]!)
-  const palette = colors.palette.filter((x) => x !== null).map((x) => RGBA.fromHex(x))
+  const fg = colors.defaultForeground ?? colors.palette[7]!
+  const palette = colors.palette.filter((x) => x !== null)
   const isDark = mode == "dark"
 
   // Generate gray scale based on terminal background
   const grays = generateGrayScale(bg, isDark)
   const textMuted = generateMutedTextColor(bg, isDark)
 
-  // ANSI color references
+  // ANSI color references (use raw hex from palette)
   const ansiColors = {
-    black: palette[0],
-    red: palette[1],
-    green: palette[2],
-    yellow: palette[3],
-    blue: palette[4],
-    magenta: palette[5],
-    cyan: palette[6],
-    white: palette[7],
+    black: palette[0]!,
+    red: palette[1]!,
+    green: palette[2]!,
+    yellow: palette[3]!,
+    blue: palette[4]!,
+    magenta: palette[5]!,
+    cyan: palette[6]!,
+    white: palette[7]!,
   }
 
   return {
@@ -1171,3 +1301,4 @@ function getSyntaxRules(theme: Theme) {
     },
   ]
 }
+
