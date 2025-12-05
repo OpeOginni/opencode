@@ -508,13 +508,11 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
 
         const normalizedCustom: Record<string, ThemeJson> = {}
         for (const [name, theme] of Object.entries(customThemes)) {
-          let palette: string[] = []
-          if (usesAnsiColors(theme)) {
-            const colors = await renderer.getPalette({ size: 256 })
-            if (colors.palette[0]) {
-              palette = colors.palette.filter((x) => x !== null)
-            }
-          }
+
+          // Get palette from renderer if theme uses ANSI colors
+          const palette: string[] = usesAnsiColors(theme) ? 
+            await renderer.getPalette({ size: 256 }).then((colors) => colors.palette.filter((x) => x !== null)) 
+            : [] // If theme doesn't use ANSI colors, use empty palette
 
           const normalized = normalizeTheme(theme, palette, name)
           if ("error" in normalized) {
