@@ -83,6 +83,7 @@ type SearchMatch = {
   partID?: string
   text: string
   index: number
+  charOffset: number
 }
 
 const context = createContext<{
@@ -221,6 +222,7 @@ export function Session() {
               partID: part.id,
               text: part.text.slice(pos, pos + query.length),
               index: matchIndex++,
+              charOffset: pos,
             })
             pos += query.length
           }
@@ -245,10 +247,7 @@ export function Session() {
     const current = currentMatchIndex()
     const next = (current + 1) % m.length
     setCurrentMatchIndex(next)
-
-    if (m.length === 1 || m[current]?.messageID !== m[next]?.messageID) {
-      scrollToMatch(next)
-    }
+    scrollToMatch(next)
   }
 
   function handlePrevMatch() {
@@ -257,22 +256,46 @@ export function Session() {
     const current = currentMatchIndex()
     const next = current === 0 ? m.length - 1 : current - 1
     setCurrentMatchIndex(next)
-
-    if (m.length === 1 || m[current]?.messageID !== m[next]?.messageID) {
-      scrollToMatch(next)
-    }
+    scrollToMatch(next)
   }
 
   function scrollToMatch(index: number) {
     const m = matches()
     if (index < 0 || index >= m.length) return
     const match = m[index]
-    const child = scroll?.getChildren?.()?.find((c) => c.id === match.messageID)
-    if (child) {
-      const y = child.y - scroll.y
-      if (y < 0 || y >= scroll.height) {
-        scroll.scrollBy(y - Math.floor(scroll.height / 3))
+
+    if (!scroll) return
+
+    // Find the message containing the match
+    const child = scroll.getChildren?.()?.find((c) => c.id === match.messageID)
+    if (!child) return
+
+    // Get the part to calculate text metrics
+    const part = sync.data.part[match.messageID]?.find((p) => p.id === match.partID)
+    if (!part || part.type !== "text") {
+      // Fallback to message-level scrolling
+      const relativeY = child.y - scroll.y
+      if (relativeY < 0 || relativeY >= scroll.height) {
+        scroll.scrollBy(relativeY - Math.floor(scroll.height / 3))
       }
+      return
+    }
+
+    // Estimate line number based on character offset
+    // Assume ~80 chars per line as a reasonable estimate for wrapped text
+    const charsPerLine = Math.max(40, contentWidth() - 10) // Account for padding and wrapping
+    const estimatedLine = Math.floor(match.charOffset / charsPerLine)
+
+    // Estimate Y offset within the message box (each line is ~1 unit tall)
+    const estimatedYOffset = estimatedLine
+
+    // Calculate target scroll position
+    const targetY = child.y + estimatedYOffset
+    const relativeY = targetY - scroll.y
+
+    // Scroll if the estimated match position is not in viewport
+    if (relativeY < 0 || relativeY >= scroll.height) {
+      scroll.scrollBy(relativeY - Math.floor(scroll.height / 3))
     }
   }
 
@@ -1048,19 +1071,18 @@ export function Session() {
               </For>
             </scrollbox>
             <box flexShrink={0}>
-
               <Show when={!searchMode()}>
-              <Prompt
-                ref={(r) => {
-                  prompt = r
-                  promptRef.set(r)
-                }}
-                disabled={permissions().length > 0}
-                onSubmit={() => {
-                  toBottom()
-                }}
-                sessionID={route.sessionID}
-              />
+                <Prompt
+                  ref={(r) => {
+                    prompt = r
+                    promptRef.set(r)
+                  }}
+                  disabled={permissions().length > 0}
+                  onSubmit={() => {
+                    toBottom()
+                  }}
+                  sessionID={route.sessionID}
+                />
               </Show>
               <Show when={searchMode()}>
                 <SearchInput
@@ -1114,9 +1136,9 @@ function SearchHighlighter(props: { text: string; query: string; messageID: stri
 
   const segments = createMemo(() => {
     const query = props.query.toLowerCase()
-    if (!query) return [{ text: props.text, highlight: false, isActive: false }]
+    if (!query) return [{ text: props.text, highlight: false, isActive: false, matchIndex: -1 }]
 
-    const result: { text: string; highlight: boolean; isActive: boolean }[] = []
+    const result: { text: string; highlight: boolean; isActive: boolean; matchIndex: number }[] = []
     const text = props.text
     const lower = text.toLowerCase()
     let lastIndex = 0
@@ -1130,7 +1152,7 @@ function SearchHighlighter(props: { text: string; query: string; messageID: stri
     let pos = 0
     while ((pos = lower.indexOf(query, pos)) !== -1) {
       if (pos > lastIndex) {
-        result.push({ text: text.slice(lastIndex, pos), highlight: false, isActive: false })
+        result.push({ text: text.slice(lastIndex, pos), highlight: false, isActive: false, matchIndex: -1 })
       }
 
       const globalMatch = partMatches[matchCount]
@@ -1140,6 +1162,7 @@ function SearchHighlighter(props: { text: string; query: string; messageID: stri
         text: text.slice(pos, pos + query.length),
         highlight: true,
         isActive,
+        matchIndex: globalMatch?.index ?? -1,
       })
       lastIndex = pos + query.length
       pos = lastIndex
@@ -1147,7 +1170,7 @@ function SearchHighlighter(props: { text: string; query: string; messageID: stri
     }
 
     if (lastIndex < text.length) {
-      result.push({ text: text.slice(lastIndex), highlight: false, isActive: false })
+      result.push({ text: text.slice(lastIndex), highlight: false, isActive: false, matchIndex: -1 })
     }
 
     return result
@@ -1160,9 +1183,8 @@ function SearchHighlighter(props: { text: string; query: string; messageID: stri
           <Show when={segment.highlight} fallback={<>{segment.text}</>}>
             <span
               style={{
-                bg: theme.primary, // segment.isActive ? theme.primary : theme.warning, -> keeping as primary to match markdown
+                bg: theme.primary,
                 fg: theme.background,
-                // bold: segment.isActive, // disabled because we cant get working for markdown matches
               }}
             >
               {segment.text}
