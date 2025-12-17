@@ -1,8 +1,10 @@
+import { WebOnlyServer } from "@/server/web-only"
 import { Server } from "../../server/server"
 import { UI } from "../ui"
 import { cmd } from "./cmd"
 import open from "open"
 import { networkInterfaces } from "os"
+import type { BunWebSocketData } from "hono/bun"
 
 function getNetworkIPs() {
   const nets = networkInterfaces()
@@ -40,32 +42,50 @@ export const WebCommand = cmd({
         type: "string",
         describe: "hostname to listen on",
         default: "127.0.0.1",
+      })
+      .option("attach", {
+        type: "string",
+        describe: "attach to a running opencode server (e.g., http://localhost:4096)",
       }),
   describe: "starts a headless opencode server",
   handler: async (args) => {
     const hostname = args.hostname
     const port = args.port
-    const server = Server.listen({
-      port,
-      hostname,
+    const serverUrl = args.attach
+    let server: Bun.Server<BunWebSocketData>
+
+    if (serverUrl) {
+      server = WebOnlyServer.listen({
+        port,
+        hostname,
+        serverUrl
     })
+    } else {
+      server = Server.listen({
+        port,
+        hostname,
+      })
+    } 
+
+
     UI.empty()
     UI.println(UI.logo("  "))
     UI.empty()
 
     if (hostname === "0.0.0.0") {
       // Show localhost for local access
-      const localhostUrl = `http://localhost:${server.port}`
+      const localhostUrl = serverUrl ? `http://localhost:${server.port}?url=${serverUrl}` : `http://localhost:${server.port}`
       UI.println(UI.Style.TEXT_INFO_BOLD + "  Local access:      ", UI.Style.TEXT_NORMAL, localhostUrl)
 
       // Show network IPs for remote access
       const networkIPs = getNetworkIPs()
       if (networkIPs.length > 0) {
         for (const ip of networkIPs) {
+          const networkUrl = serverUrl ? `http://${ip}:${server.port}?url=${serverUrl}` : `http://${ip}:${server.port}`
           UI.println(
             UI.Style.TEXT_INFO_BOLD + "  Network access:    ",
             UI.Style.TEXT_NORMAL,
-            `http://${ip}:${server.port}`,
+            networkUrl,
           )
         }
       }
@@ -73,7 +93,7 @@ export const WebCommand = cmd({
       // Open localhost in browser
       open(localhostUrl.toString()).catch(() => {})
     } else {
-      const displayUrl = server.url.toString()
+      const displayUrl = serverUrl ? `${server.url.toString()}?url=${serverUrl}` : server.url.toString()
       UI.println(UI.Style.TEXT_INFO_BOLD + "  Web interface:    ", UI.Style.TEXT_NORMAL, displayUrl)
       open(displayUrl).catch(() => {})
     }

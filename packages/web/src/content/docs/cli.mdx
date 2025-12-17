@@ -250,6 +250,27 @@ This starts an HTTP server that provides API access to opencode functionality wi
 
 ---
 
+### web
+
+Start a web interface for OpenCode. Opens the desktop UI in your browser, allowing you to interact with OpenCode through a graphical interface.
+```bash
+opencode web
+```
+
+#### Flags
+
+| Flag         | Short | Description                                                      |
+| ------------ | ----- | ---------------------------------------------------------------- |
+| `--port`     | `-p`  | Port to listen on                                                |
+| `--hostname` |       | Hostname to listen on                                            |
+| `--attach`   |       | Attach to a running opencode server (e.g., `http://localhost:4096`) |
+
+:::note
+When using `--attach`, the web interface will connect to the specified server URL instead of starting a new server instance. This is useful when you already have an OpenCode server running and just want to access it through the web interface.
+:::
+
+---
+
 ### upgrade
 
 Updates opencode to the latest version or a specific version.
