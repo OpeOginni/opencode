@@ -135,7 +135,11 @@ for (const item of targets) {
       autoloadPackageJson: true,
       target: name.replace(pkg.name, "bun") as any,
       outfile: `dist/${name}/bin/opencode`,
-      execArgv: [`--user-agent=opencode/${Script.version}`, "--"],
+      execArgv: [
+        `--user-agent=opencode/${Script.version}`,
+        `--config=${item.os === "win32" ? "NUL" : "/dev/null"}`,
+        "--",
+      ],
       windows: {},
     },
     entrypoints: ["./src/index.ts", parserWorker, workerPath],
