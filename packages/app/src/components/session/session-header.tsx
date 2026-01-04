@@ -102,25 +102,33 @@ export function SessionHeader() {
               }
             >
               <div class="flex items-center gap-2 min-w-0">
-                <button
-                  type="button"
-                  class="text-14-regular text-text-base hover:text-text-strong transition-colors truncate max-w-[200px]"
-                  onClick={() => navigateToSession(parentSession())}
-                >
-                  {parentSession()?.title || "Parent"}
-                </button>
+                <Select
+                    options={sessions()}
+                    current={parentSession()}
+                    placeholder="Back to parent session"
+                    label={(x) => x.title}
+                    value={(x) => x.id}
+                    onSelect={(session) => {
+                      // Only navigate if selecting a different session than current parent
+                      const currentParent = parentSession()
+                      if (session && currentParent && session.id !== currentParent.id) {
+                        navigateToSession(session)
+                      }
+                    }}
+                    class="text-14-regular text-text-base max-w-[calc(100vw-180px)] md:max-w-md"
+                    variant="ghost"
+                  />
                 <div class="text-text-weaker">/</div>
                 <div class="flex items-center gap-1.5 min-w-0">
                   <Tooltip value="Back to parent session">
                     <button
                       type="button"
-                      class="flex items-center justify-center p-1 rounded hover:bg-surface-raised-base-hover active:bg-surface-raised-base-active transition-colors flex-shrink-0"
+                      class="flex items-center justify-center gap-1 p-1 rounded hover:bg-surface-raised-base-hover active:bg-surface-raised-base-active transition-colors flex-shrink-0"
                       onClick={() => navigateToSession(parentSession())}
                     >
                       <Icon name="arrow-left" size="small" class="text-icon-base" />
                     </button>
                   </Tooltip>
-                  <span class="text-14-regular text-text-strong truncate">{currentSession()?.title || "Child session"}</span>
                 </div>
               </div>
             </Show>
