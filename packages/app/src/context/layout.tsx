@@ -1,11 +1,12 @@
 import { createStore, produce } from "solid-js/store"
-import { batch, createMemo, onMount } from "solid-js"
+import { batch, createEffect, createMemo, onMount } from "solid-js"
 import { createSimpleContext } from "@opencode-ai/ui/context"
 import { useGlobalSync } from "./global-sync"
 import { useGlobalSDK } from "./global-sdk"
 import { useServer } from "./server"
 import { Project } from "@opencode-ai/sdk/v2"
 import { persisted } from "@/utils/persist"
+import { same } from "@/utils/same"
 
 const AVATAR_COLOR_KEYS = ["pink", "mint", "orange", "purple", "cyan", "lime"] as const
 export type AvatarColorKey = (typeof AVATAR_COLOR_KEYS)[number]
@@ -28,6 +29,16 @@ type SessionTabs = {
   all: string[]
 }
 
+type SessionScroll = {
+  x: number
+  y: number
+}
+
+type SessionView = {
+  scroll: Record<string, SessionScroll>
+  reviewOpen?: string[]
+}
+
 export type LocalProject = Partial<Project> & { worktree: string; expanded: boolean }
 
 export type ReviewDiffStyle = "unified" | "split"
@@ -39,7 +50,7 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
     const globalSync = useGlobalSync()
     const server = useServer()
     const [store, setStore, _, ready] = persisted(
-      "layout.v4",
+      "layout.v6",
       createStore({
         sidebar: {
           opened: false,
@@ -56,7 +67,11 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         session: {
           width: 600,
         },
+        mobileSidebar: {
+          opened: false,
+        },
         sessionTabs: {} as Record<string, SessionTabs>,
+        sessionView: {} as Record<string, SessionView>,
       }),
     )
 
@@ -69,11 +84,15 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
     }
 
     function enrich(project: { worktree: string; expanded: boolean }) {
-      const metadata = globalSync.data.project.find((x) => x.worktree === project.worktree)
+      const [childStore] = globalSync.child(project.worktree)
+      const projectID = childStore.project
+      const metadata = projectID
+        ? globalSync.data.project.find((x) => x.id === projectID)
+        : globalSync.data.project.find((x) => x.worktree === project.worktree)
       return [
         {
-          ...project,
           ...(metadata ?? {}),
+          ...project,
           icon: { url: metadata?.icon?.url, color: metadata?.icon?.color },
         },
       ]
@@ -89,6 +108,41 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
       }
       return project
     }
+
+    const roots = createMemo(() => {
+      const map = new Map<string, string>()
+      for (const project of globalSync.data.project) {
+        const sandboxes = project.sandboxes ?? []
+        for (const sandbox of sandboxes) {
+          map.set(sandbox, project.worktree)
+        }
+      }
+      return map
+    })
+
+    createEffect(() => {
+      const map = roots()
+      if (map.size === 0) return
+
+      const projects = server.projects.list()
+      const seen = new Set(projects.map((project) => project.worktree))
+
+      batch(() => {
+        for (const project of projects) {
+          const root = map.get(project.worktree)
+          if (!root) continue
+
+          server.projects.close(project.worktree)
+
+          if (!seen.has(root)) {
+            server.projects.open(root)
+            seen.add(root)
+          }
+
+          if (project.expanded) server.projects.expand(root)
+        }
+      })
+    })
 
     const enriched = createMemo(() => server.projects.list().flatMap(enrich))
     const list = createMemo(() => enriched().flatMap(colorize))
@@ -106,11 +160,10 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
       projects: {
         list,
         open(directory: string) {
-          if (server.projects.list().find((x) => x.worktree === directory)) {
-            return
-          }
-          globalSync.project.loadSessions(directory)
-          server.projects.open(directory)
+          const root = roots().get(directory) ?? directory
+          if (server.projects.list().find((x) => x.worktree === root)) return
+          globalSync.project.loadSessions(root)
+          server.projects.open(root)
         },
         close(directory: string) {
           server.projects.close(directory)
@@ -182,10 +235,54 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         resize(width: number) {
           if (!store.session) {
             setStore("session", { width })
-          } else {
-            setStore("session", "width", width)
+            return
           }
+          setStore("session", "width", width)
         },
+      },
+      mobileSidebar: {
+        opened: createMemo(() => store.mobileSidebar?.opened ?? false),
+        show() {
+          setStore("mobileSidebar", "opened", true)
+        },
+        hide() {
+          setStore("mobileSidebar", "opened", false)
+        },
+        toggle() {
+          setStore("mobileSidebar", "opened", (x) => !x)
+        },
+      },
+      view(sessionKey: string) {
+        const s = createMemo(() => store.sessionView[sessionKey] ?? { scroll: {} })
+        return {
+          scroll(tab: string) {
+            return s().scroll?.[tab]
+          },
+          setScroll(tab: string, pos: SessionScroll) {
+            const current = store.sessionView[sessionKey]
+            if (!current) {
+              setStore("sessionView", sessionKey, { scroll: { [tab]: pos } })
+              return
+            }
+
+            const prev = current.scroll?.[tab]
+            if (prev?.x === pos.x && prev?.y === pos.y) return
+            setStore("sessionView", sessionKey, "scroll", tab, pos)
+          },
+          review: {
+            open: createMemo(() => s().reviewOpen),
+            setOpen(open: string[]) {
+              const current = store.sessionView[sessionKey]
+              if (!current) {
+                setStore("sessionView", sessionKey, { scroll: {}, reviewOpen: open })
+                return
+              }
+
+              if (same(current.reviewOpen, open)) return
+              setStore("sessionView", sessionKey, "reviewOpen", open)
+            },
+          },
+        }
       },
       tabs(sessionKey: string) {
         const tabs = createMemo(() => store.sessionTabs[sessionKey] ?? { all: [] })
@@ -256,11 +353,8 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
               if (current.active !== tab) return
 
               const index = current.all.findIndex((f) => f === tab)
-              if (index <= 0) {
-                setStore("sessionTabs", sessionKey, "active", undefined)
-                return
-              }
-              setStore("sessionTabs", sessionKey, "active", current.all[index - 1])
+              const next = all[index - 1] ?? all[0]
+              setStore("sessionTabs", sessionKey, "active", next)
             })
           },
           move(tab: string, to: number) {
