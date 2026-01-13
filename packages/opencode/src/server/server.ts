@@ -97,7 +97,29 @@ export namespace Server {
             status: 500,
           })
         })
+        .use(
+          cors({
+            origin(input) {
+              if (!input) return
+
+              if (input.startsWith("http://localhost:")) return input
+              if (input.startsWith("http://127.0.0.1:")) return input
+              if (input === "tauri://localhost" || input === "http://tauri.localhost") return input
+
+              // *.opencode.ai (https only, adjust if needed)
+              if (/^https:\/\/([a-z0-9-]+\.)*opencode\.ai$/.test(input)) {
+                return input
+              }
+              if (_corsWhitelist.includes(input)) {
+                return input
+              }
+
+              return
+            },
+          }),
+        )
         .use((c, next) => {
+          if (c.req.path === "/global/health") return next()
           const password = Flag.OPENCODE_SERVER_PASSWORD
           if (!password) return next()
           const username = Flag.OPENCODE_SERVER_USERNAME ?? "opencode"
@@ -120,27 +142,6 @@ export namespace Server {
             timer.stop()
           }
         })
-        .use(
-          cors({
-            origin(input) {
-              if (!input) return
-
-              if (input.startsWith("http://localhost:")) return input
-              if (input.startsWith("http://127.0.0.1:")) return input
-              if (input === "tauri://localhost" || input === "http://tauri.localhost") return input
-
-              // *.opencode.ai (https only, adjust if needed)
-              if (/^https:\/\/([a-z0-9-]+\.)*opencode\.ai$/.test(input)) {
-                return input
-              }
-              if (_corsWhitelist.includes(input)) {
-                return input
-              }
-
-              return
-            },
-          }),
-        )
         .get(
           "/global/health",
           describeRoute({
@@ -159,7 +160,7 @@ export namespace Server {
             },
           }),
           async (c) => {
-            return c.json({ healthy: true, version: Installation.VERSION })
+            return c.json({ healthy: true, version: Installation.VERSION, authenticated: !!Flag.OPENCODE_SERVER_PASSWORD })
           },
         )
         .get(
