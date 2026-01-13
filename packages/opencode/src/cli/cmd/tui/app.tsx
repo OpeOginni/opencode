@@ -131,6 +131,8 @@ export function tui(input: {
                         directory={input.directory}
                         fetch={input.fetch}
                         events={input.events}
+                        username={input.args.username}
+                        password={input.args.password}
                       >
                         <SyncProvider>
                           <ThemeProvider mode={mode}>

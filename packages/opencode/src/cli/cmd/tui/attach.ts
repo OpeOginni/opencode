@@ -19,12 +19,23 @@ export const AttachCommand = cmd({
         alias: ["s"],
         type: "string",
         describe: "session id to continue",
+      })
+      .option("username", {
+        alias: ["u"],
+        type: "string",
+        default: "opencode",
+        describe: "username to authenticate with",
+      })
+      .option("password", {
+        alias: ["p"],
+        type: "string",
+        describe: "password to authenticate with",
       }),
   handler: async (args) => {
     if (args.dir) process.chdir(args.dir)
     await tui({
       url: args.url,
-      args: { sessionID: args.session },
+      args: { sessionID: args.session, username: args.username, password: args.password },
       directory: args.dir ? process.cwd() : undefined,
     })
   },
