@@ -1,3 +1,4 @@
+import { Flag } from "@/flag/flag"
 import { cmd } from "../cmd"
 import { tui } from "./app"
 
@@ -33,9 +34,11 @@ export const AttachCommand = cmd({
       }),
   handler: async (args) => {
     if (args.dir) process.chdir(args.dir)
+    const username = args.username ?? Flag.OPENCODE_SERVER_USERNAME ?? "opencode"
+    const password = args.password ?? Flag.OPENCODE_SERVER_PASSWORD
     await tui({
       url: args.url,
-      args: { sessionID: args.session, username: args.username, password: args.password },
+      args: { sessionID: args.session, username, password },
       directory: args.dir ? process.cwd() : undefined,
     })
   },
