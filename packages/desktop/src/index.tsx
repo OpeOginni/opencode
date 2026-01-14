@@ -293,60 +293,6 @@ const createPlatform = (password: Accessor<string | null>, serverUrl: Accessor<s
     }
   },
 
-  // fetch: async (input, init) => {
-  //   // Extract URL from input
-  //   let url: string
-  //   if (input instanceof Request) {
-  //     url = input.url
-  //   } else if (typeof input === "string") {
-  //     url = input
-  //   } else {
-  //     // Fallback to default behavior if we can't extract URL
-  //     return tauriFetch(input, init)
-  //   }
-
-  //   // Normalize URL (remove trailing slash, etc.)
-  //   const normalizedUrl = url.replace(/\/$/, "")
-  //   const desktopUrl = serverUrl()?.replace(/\/$/, "")
-
-  //   let authHeader: string | undefined
-
-  //   // Check if this is the desktop's own server
-  //   if (desktopUrl && normalizedUrl.startsWith(desktopUrl)) {
-  //     // Use the password signal for desktop's own server
-  //     const pw = password()
-  //     if (pw) {
-  //       authHeader = `Basic ${btoa(`opencode:${pw}`)}`
-  //     }
-  //   } else {
-  //     // Fetch credentials from store for other servers
-  //     try {
-  //       const result = await invoke<[string, string] | null>("get_server_credentials", { url })
-  //       if (result) {
-  //         authHeader = `Basic ${btoa(`${result[0]}:${result[1]}`)}`
-  //       }
-  //     } catch {
-  //       // Ignore errors, proceed without auth
-  //     }
-  //   }
-
-  //   const addHeader = (headers: Headers, header: string) => {
-  //     headers.append("Authorization", header)
-  //   }
-
-  //   if (input instanceof Request) {
-  //     if (authHeader) addHeader(input.headers, authHeader)
-  //     return tauriFetch(input)
-  //   } else {
-  //     const headers = new Headers(init?.headers)
-  //     if (authHeader) addHeader(headers, authHeader)
-  //     return tauriFetch(input, {
-  //       ...(init as any),
-  //       headers: headers,
-  //     })
-  //   }
-  // },
-
   getDefaultServerUrl: async () => {
     const result = await invoke<string | null>("get_default_server_url").catch(() => null)
     return result

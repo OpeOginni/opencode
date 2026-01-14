@@ -59,7 +59,6 @@ export default function Home() {
         size="large"
         variant="ghost"
         class="mt-4 mx-auto text-14-regular text-text-weak"
-        // onClick={() => dialog.show(() => <DialogSelectServer />)}
         onClick={() => dialog.show(() => <DialogSelectServer />)}
       >
         <div
