@@ -2,6 +2,7 @@ import { createOpencodeClient, type Event } from "@opencode-ai/sdk/v2"
 import { createSimpleContext } from "./helper"
 import { createGlobalEmitter } from "@solid-primitives/event-bus"
 import { batch, onCleanup, onMount } from "solid-js"
+import { Flag } from "@/flag/flag"
 
 export type EventSource = {
   on: (handler: (event: Event) => void) => () => void
@@ -11,14 +12,20 @@ export const { use: useSDK, provider: SDKProvider } = createSimpleContext({
   name: "SDK",
   init: (props: { url: string; directory?: string; fetch?: typeof fetch; events?: EventSource; username?: string; password?: string }) => {
     const abort = new AbortController()
+    const headers = props.username && props.password ? {
+      Authorization: `Basic ${btoa(`${props.username}:${props.password}`)}`,
+    } : 
+    Flag.OPENCODE_SERVER_PASSWORD ? {
+      Authorization: `Basic ${btoa(`${Flag.OPENCODE_SERVER_USERNAME ?? "opencode"}:${Flag.OPENCODE_SERVER_PASSWORD}`)}`,
+    } : undefined
+
+    
     const sdk = createOpencodeClient({
       baseUrl: props.url,
       signal: abort.signal,
       directory: props.directory,
       fetch: props.fetch,
-      headers: props.username && props.password ? {
-        Authorization: `Basic ${btoa(`${props.username}:${props.password}`)}`,
-      } : undefined,
+      headers: headers
     })
 
     const emitter = createGlobalEmitter<{
