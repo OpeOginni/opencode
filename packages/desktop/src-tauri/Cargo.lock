@@ -2794,11 +2794,13 @@ version = "0.0.0"
 dependencies = [
  "futures",
  "gtk",
+ "hex",
  "listeners",
  "reqwest",
  "semver",
  "serde",
  "serde_json",
+ "sha2",
  "tauri",
  "tauri-build",
  "tauri-plugin-clipboard-manager",

@@ -3,6 +3,7 @@ import { Button } from "@opencode-ai/ui/button"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { useSync } from "@/context/sync"
 import { DialogSelectMcp } from "@/components/dialog-select-mcp"
+import { DialogServerConfig } from "./dialog-server-config"
 
 export function SessionMcpIndicator() {
   const sync = useSync()
@@ -19,7 +20,7 @@ export function SessionMcpIndicator() {
 
   return (
     <Show when={mcpStats().total > 0}>
-      <Button variant="ghost" onClick={() => dialog.show(() => <DialogSelectMcp />)}>
+      <Button variant="ghost" onClick={() => dialog.show(() => <DialogServerConfig defaultTab="mcp" />)}>
         <div
           classList={{
             "size-1.5 rounded-full": true,

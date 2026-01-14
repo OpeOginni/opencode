@@ -4,6 +4,7 @@ import { useSDK } from "@/context/sdk"
 import { SerializeAddon } from "@/addons/serialize"
 import { LocalPTY } from "@/context/terminal"
 import { resolveThemeVariant, useTheme, withAlpha, type HexColor } from "@opencode-ai/ui/theme"
+import { useCredentials } from "@/context/credentials"
 
 export interface TerminalProps extends ComponentProps<"div"> {
   pty: LocalPTY
@@ -36,6 +37,7 @@ const DEFAULT_TERMINAL_COLORS: Record<"light" | "dark", TerminalColors> = {
 
 export const Terminal = (props: TerminalProps) => {
   const sdk = useSDK()
+  const credentials = useCredentials()
   const theme = useTheme()
   let container!: HTMLDivElement
   const [local, others] = splitProps(props, ["pty", "class", "classList", "onConnectError"])
@@ -101,10 +103,15 @@ export const Terminal = (props: TerminalProps) => {
     ghostty = await mod.Ghostty.load()
 
     const url = new URL(sdk.url + `/pty/${local.pty.id}/connect?directory=${encodeURIComponent(sdk.directory)}`)
-    if (window.__OPENCODE__?.serverPassword) {
+
+    if (credentials.credentials()) {
+      url.username = credentials.credentials()!.username
+      url.password = credentials.credentials()!.password
+    } else if (window.__OPENCODE__?.serverPassword) {
       url.username = "opencode"
       url.password = window.__OPENCODE__?.serverPassword
     }
+
     const socket = new WebSocket(url)
     ws = socket
 

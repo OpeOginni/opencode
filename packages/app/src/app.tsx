@@ -26,6 +26,7 @@ import DirectoryLayout from "@/pages/directory-layout"
 import { ErrorPage } from "./pages/error"
 import { iife } from "@opencode-ai/util/iife"
 import { Suspense } from "solid-js"
+import { CredentialsProvider } from "./context/credentials"
 
 const Home = lazy(() => import("@/pages/home"))
 const Session = lazy(() => import("@/pages/session"))
@@ -78,49 +79,53 @@ export function AppInterface(props: { defaultUrl?: string }) {
   return (
     <ServerProvider defaultUrl={defaultServerUrl()}>
       <ServerKey>
-        <GlobalSDKProvider>
-          <GlobalSyncProvider>
-            <Router
-              root={(props) => (
-                <PermissionProvider>
-                  <LayoutProvider>
-                    <NotificationProvider>
-                      <CommandProvider>
-                        <Layout>{props.children}</Layout>
-                      </CommandProvider>
-                    </NotificationProvider>
-                  </LayoutProvider>
-                </PermissionProvider>
-              )}
-            >
-              <Route
-                path="/"
-                component={() => (
-                  <Suspense fallback={<Loading />}>
-                    <Home />
-                  </Suspense>
-                )}
-              />
-              <Route path="/:dir" component={DirectoryLayout}>
-                <Route path="/" component={() => <Navigate href="session" />} />
-                <Route
-                  path="/session/:id?"
-                  component={() => (
-                    <TerminalProvider>
-                      <FileProvider>
-                        <PromptProvider>
-                          <Suspense fallback={<Loading />}>
-                            <Session />
-                          </Suspense>
-                        </PromptProvider>
-                      </FileProvider>
-                    </TerminalProvider>
+        <Suspense fallback={<Loading />}>
+          <CredentialsProvider>
+            <GlobalSDKProvider>
+              <GlobalSyncProvider>
+                <Router
+                  root={(props) => (
+                    <PermissionProvider>
+                      <LayoutProvider>
+                        <NotificationProvider>
+                          <CommandProvider>
+                            <Layout>{props.children}</Layout>
+                          </CommandProvider>
+                        </NotificationProvider>
+                      </LayoutProvider>
+                    </PermissionProvider>
                   )}
-                />
-              </Route>
-            </Router>
-          </GlobalSyncProvider>
-        </GlobalSDKProvider>
+                >
+                  <Route
+                    path="/"
+                    component={() => (
+                      <Suspense fallback={<Loading />}>
+                        <Home />
+                      </Suspense>
+                    )}
+                  />
+                  <Route path="/:dir" component={DirectoryLayout}>
+                    <Route path="/" component={() => <Navigate href="session" />} />
+                    <Route
+                      path="/session/:id?"
+                      component={() => (
+                        <TerminalProvider>
+                          <FileProvider>
+                            <PromptProvider>
+                              <Suspense fallback={<Loading />}>
+                                <Session />
+                              </Suspense>
+                            </PromptProvider>
+                          </FileProvider>
+                        </TerminalProvider>
+                      )}
+                    />
+                  </Route>
+                </Router>
+              </GlobalSyncProvider>
+            </GlobalSDKProvider>
+          </CredentialsProvider>
+        </Suspense>
       </ServerKey>
     </ServerProvider>
   )

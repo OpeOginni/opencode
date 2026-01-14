@@ -4,6 +4,9 @@ import { Button } from "@opencode-ai/ui/button"
 import { Component, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { usePlatform } from "@/context/platform"
+import { useServer } from "@/context/server"
+import { useGlobalSDK } from "@/context/global-sdk"
+import { createOpencodeClient } from "@opencode-ai/sdk/v2/client"
 import { Icon } from "@opencode-ai/ui/icon"
 
 export type InitError = {
@@ -180,12 +183,87 @@ interface ErrorPageProps {
   error: unknown
 }
 
+async function checkCredentials(
+  url: string,
+  username: string,
+  password: string,
+  fetch?: typeof globalThis.fetch,
+): Promise<{ correctCredentials: boolean }> {
+  const sdk = createOpencodeClient({
+    baseUrl: url,
+    fetch,
+    signal: AbortSignal.timeout(3000),
+    headers: {
+      Authorization: `Basic ${btoa(`${username}:${password}`)}`,
+    },
+  })
+  return sdk.config
+    .get()
+    .then((x) => {
+      if (x?.error) return { correctCredentials: false }
+      return { correctCredentials: true }
+    })
+    .catch(() => {
+      return { correctCredentials: false }
+    })
+}
+
 export const ErrorPage: Component<ErrorPageProps> = (props) => {
   const platform = usePlatform()
+  const server = useServer()
+  const globalSDK = useGlobalSDK()
   const [store, setStore] = createStore({
     checking: false,
     version: undefined as string | undefined,
+    showCredentials: false,
+    username: "",
+    password: "",
+    credentialsError: "",
+    saving: false,
   })
+
+  // Check if this is an Unauthorized error
+  const isUnauthorizedError = () => {
+    if (isInitError(props.error) && props.error.name === "APIError") {
+      const statusCode = props.error.data.statusCode
+      return typeof statusCode === "number" && statusCode === 401
+    }
+    if (props.error instanceof Error) {
+      return props.error.message.includes("Unauthorized") || props.error.message.includes("401")
+    }
+    if (typeof props.error === "string") {
+      return props.error.includes("Unauthorized") || props.error.includes("401")
+    }
+    return false
+  }
+
+  const serverUrl = () => server.url || ""
+
+  async function handleCredentialsSubmit(e: SubmitEvent) {
+    e.preventDefault()
+    const url = serverUrl()
+    if (!url || !store.username || !store.password) {
+      setStore("credentialsError", "Username and password are required")
+      return
+    }
+
+    setStore("credentialsError", "")
+    setStore("saving", true)
+
+    const result = await checkCredentials(url, store.username, store.password, platform.fetch)
+    setStore("saving", false)
+
+    if (!result.correctCredentials) {
+      setStore("credentialsError", "Invalid username or password")
+      return
+    }
+
+    await platform.storeServerCredentials?.(url, store.username, store.password)
+    await globalSDK.refetchCredentials()
+
+    // Restart the app to reconnect with new credentials
+    platform.restart?.()
+  }
 
   async function checkForUpdates() {
     if (!platform.checkUpdate) return
@@ -207,36 +285,118 @@ export const ErrorPage: Component<ErrorPageProps> = (props) => {
         <Logo class="w-58.5 opacity-12 shrink-0" />
         <div class="flex flex-col items-center gap-2 text-center">
           <h1 class="text-lg font-medium text-text-strong">Something went wrong</h1>
-          <p class="text-sm text-text-weak">An error occurred while loading the application.</p>
-        </div>
-        <TextField
-          value={formatError(props.error)}
-          readOnly
-          copyable
-          multiline
-          class="max-h-96 w-full font-mono text-xs no-scrollbar"
-          label="Error Details"
-          hideLabel
-        />
-        <div class="flex items-center gap-3">
-          <Button size="large" onClick={platform.restart}>
-            Restart
-          </Button>
-          <Show when={platform.checkUpdate}>
-            <Show
-              when={store.version}
-              fallback={
-                <Button size="large" variant="ghost" onClick={checkForUpdates} disabled={store.checking}>
-                  {store.checking ? "Checking..." : "Check for updates"}
-                </Button>
-              }
-            >
-              <Button size="large" onClick={installUpdate}>
-                Update to {store.version}
-              </Button>
-            </Show>
+          <Show
+            when={isUnauthorizedError() && serverUrl()}
+            fallback={<p class="text-sm text-text-weak">An error occurred while loading the application.</p>}
+          >
+            <div class="flex flex-col items-center gap-2">
+              <p class="text-sm text-text-weak">Authentication required for server:</p>
+              <p class="text-sm font-mono text-text-strong">{serverUrl()}</p>
+            </div>
           </Show>
         </div>
+        <Show
+          when={isUnauthorizedError() && serverUrl()}
+          fallback={
+            <>
+              <TextField
+                value={formatError(props.error)}
+                readOnly
+                copyable
+                multiline
+                class="max-h-96 w-full font-mono text-xs no-scrollbar"
+                label="Error Details"
+                hideLabel
+              />
+              <div class="flex items-center gap-3">
+                <Button size="large" onClick={platform.restart}>
+                  Restart
+                </Button>
+              </div>
+            </>
+          }
+        >
+          <div class="w-full flex flex-col gap-4">
+            <Show when={!store.showCredentials}>
+              <div class="flex flex-col gap-3">
+                <p class="text-sm text-text-weak text-center">
+                  This server requires authentication. Please enter your credentials to continue.
+                </p>
+                <Button size="large" onClick={() => setStore("showCredentials", true)}>
+                  Enter Credentials
+                </Button>
+              </div>
+            </Show>
+            <Show when={store.showCredentials}>
+              <form onSubmit={handleCredentialsSubmit} class="flex flex-col gap-4">
+                <TextField
+                  type="text"
+                  label="Username"
+                  value={store.username}
+                  onChange={(v) => {
+                    setStore("username", v)
+                    setStore("credentialsError", "")
+                  }}
+                  placeholder="opencode"
+                  autofocus
+                  required
+                />
+                <TextField
+                  type="password"
+                  label="Password"
+                  value={store.password}
+                  onChange={(v) => {
+                    setStore("password", v)
+                    setStore("credentialsError", "")
+                  }}
+                  placeholder="Enter password"
+                  required
+                  validationState={store.credentialsError ? "invalid" : "valid"}
+                  error={store.credentialsError}
+                />
+                <div class="flex items-center gap-3">
+                  <Button type="submit" size="large" disabled={store.saving}>
+                    {store.saving ? "Connecting..." : "Connect"}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="large"
+                    variant="ghost"
+                    onClick={() => {
+                      setStore("showCredentials", false)
+                      setStore("username", "")
+                      setStore("password", "")
+                      setStore("credentialsError", "")
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            </Show>
+          </div>
+        </Show>
+        <Show when={!isUnauthorizedError() || !serverUrl()}>
+          <div class="flex items-center gap-3">
+            <Button size="large" onClick={platform.restart}>
+              Restart
+            </Button>
+            <Show when={platform.checkUpdate}>
+              <Show
+                when={store.version}
+                fallback={
+                  <Button size="large" variant="ghost" onClick={checkForUpdates} disabled={store.checking}>
+                    {store.checking ? "Checking..." : "Check for updates"}
+                  </Button>
+                }
+              >
+                <Button size="large" onClick={installUpdate}>
+                  Update to {store.version}
+                </Button>
+              </Show>
+            </Show>
+          </div>
+        </Show>
         <div class="flex flex-col items-center gap-2">
           <div class="flex items-center justify-center gap-1">
             Please report this error to the OpenCode team

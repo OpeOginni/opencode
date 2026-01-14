@@ -21,6 +21,7 @@ import { SessionLspIndicator } from "@/components/session-lsp-indicator"
 import { SessionMcpIndicator } from "@/components/session-mcp-indicator"
 import type { Session } from "@opencode-ai/sdk/v2/client"
 import { same } from "@/utils/same"
+import { DialogServerConfig } from "../dialog-server-config"
 
 export function SessionHeader() {
   const globalSDK = useGlobalSDK()
@@ -149,7 +150,8 @@ export function SessionHeader() {
               size="small"
               variant="ghost"
               onClick={() => {
-                dialog.show(() => <DialogSelectServer />)
+                // dialog.show(() => <DialogSelectServer />)
+                dialog.show(() => <DialogServerConfig />)
               }}
             >
               <div

@@ -60,6 +60,7 @@ import { ConstrainDragXAxis } from "@/utils/solid-dnd"
 import { navStart } from "@/utils/perf"
 import { DialogSelectDirectory } from "@/components/dialog-select-directory"
 import { useServer } from "@/context/server"
+import { DialogServerConfig } from "@/components/dialog-server-config"
 
 export default function Layout(props: ParentProps) {
   const [store, setStore] = createStore({
@@ -643,7 +644,8 @@ export default function Layout(props: ParentProps) {
   }
 
   function openServer() {
-    dialog.show(() => <DialogSelectServer />)
+    // dialog.show(() => <DialogSelectServer />)
+    dialog.show(() => <DialogServerConfig />)
   }
 
   function navigateToProject(directory: string | undefined) {

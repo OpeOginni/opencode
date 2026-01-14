@@ -3,6 +3,12 @@ import { render } from "solid-js/web"
 import { AppBaseProviders, AppInterface } from "@/app"
 import { Platform, PlatformProvider } from "@/context/platform"
 import pkg from "../package.json"
+import {
+  getServerCredentials,
+  listServerCredentials,
+  removeServerCredentials,
+  storeServerCredentials,
+} from "./utils/credential-storage"
 
 const root = document.getElementById("root")
 if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
@@ -49,6 +55,18 @@ const platform: Platform = {
         }
       })
       .catch(() => undefined)
+  },
+  storeServerCredentials: async (url: string, username: string, password: string) => {
+    await storeServerCredentials(url, username, password)
+  },
+  getServerCredentials: async (url: string) => {
+    return await getServerCredentials(url)
+  },
+  removeServerCredentials: async (url: string) => {
+    await removeServerCredentials(url)
+  },
+  listServerCredentials: async () => {
+    return await listServerCredentials()
   },
 }
 

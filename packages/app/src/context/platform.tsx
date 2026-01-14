@@ -43,6 +43,18 @@ export type Platform = {
 
   /** Set the default server URL to use on app startup (desktop only) */
   setDefaultServerUrl?(url: string | null): Promise<void>
+
+  /** Store server credentials securely */
+  storeServerCredentials?(url: string, username: string, password: string): Promise<void>
+
+  /** Get stored server credentials */
+  getServerCredentials?(url: string): Promise<{ username: string; password: string } | null>
+
+  /** Remove stored server credentials */
+  removeServerCredentials?(url: string): Promise<void>
+
+  /** List all server URLs with stored credentials */
+  listServerCredentials?(): Promise<string[]>
 }
 
 export const { use: usePlatform, provider: PlatformProvider } = createSimpleContext({

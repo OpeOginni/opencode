@@ -150,11 +150,22 @@ function createGlobalSync() {
   async function bootstrapInstance(directory: string) {
     if (!directory) return
     const [store, setStore] = child(directory)
+
+    // Get credentials directly from platform (same as the resource does)
+    const credentials = platform.getServerCredentials ? await platform.getServerCredentials(globalSDK.url) : null
+
+    const headers = credentials
+      ? {
+          Authorization: `Basic ${btoa(`${credentials.username}:${credentials.password}`)}`,
+        }
+      : undefined
+
     const sdk = createOpencodeClient({
       baseUrl: globalSDK.url,
       fetch: platform.fetch,
       directory,
       throwOnError: true,
+      headers,
     })
 
     const blockingRequests = {
@@ -478,13 +489,28 @@ function createGlobalSync() {
         break
       }
       case "lsp.updated": {
-        const sdk = createOpencodeClient({
-          baseUrl: globalSDK.url,
-          fetch: platform.fetch,
-          directory,
-          throwOnError: true,
-        })
-        sdk.lsp.status().then((x) => setStore("lsp", x.data ?? []))
+        // Get credentials and create headers asynchronously
+        const getSDK = async () => {
+          const credentials = platform.getServerCredentials ? await platform.getServerCredentials(globalSDK.url) : null
+
+          const headers = credentials
+            ? {
+                Authorization: `Basic ${btoa(`${credentials.username}:${credentials.password}`)}`,
+              }
+            : undefined
+
+          return createOpencodeClient({
+            baseUrl: globalSDK.url,
+            fetch: platform.fetch,
+            directory,
+            throwOnError: true,
+            headers,
+          })
+        }
+
+        getSDK()
+          .then((sdk) => sdk.lsp.status().then((x) => setStore("lsp", x.data ?? [])))
+          .catch((err) => console.error("Failed to create SDK client for lsp.updated", err))
         break
       }
     }

@@ -28,7 +28,7 @@ if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
 
 let update: Update | null = null
 
-const createPlatform = (password: Accessor<string | null>): Platform => ({
+const createPlatform = (password: Accessor<string | null>, serverUrl: Accessor<string | null>): Platform => ({
   platform: "desktop",
   version: pkg.version,
 
@@ -257,23 +257,95 @@ const createPlatform = (password: Accessor<string | null>): Platform => ({
   // @ts-expect-error
   fetch: (input, init) => {
     const pw = password()
+    const desktopServerUrl = serverUrl()!.replace(/\/$/, "")
 
     const addHeader = (headers: Headers, password: string) => {
       headers.append("Authorization", `Basic ${btoa(`opencode:${password}`)}`)
     }
 
     if (input instanceof Request) {
-      if (pw) addHeader(input.headers, pw)
+      const url = input.url
+      const normalizedUrl = url.replace(/\/$/, "")
+
+      if (normalizedUrl.startsWith(desktopServerUrl)) {
+        if (pw) addHeader(input.headers, pw)
+      }
+
       return tauriFetch(input)
     } else {
       const headers = new Headers(init?.headers)
-      if (pw) addHeader(headers, pw)
+      let normalizedUrl: string
+
+      if (input instanceof URL) {
+        normalizedUrl = input.toString().replace(/\/$/, "")
+      } else {
+        normalizedUrl = input.replace(/\/$/, "")
+      }
+
+      if (desktopServerUrl && normalizedUrl.startsWith(desktopServerUrl)) {
+        if (pw) addHeader(headers, pw)
+      }
+
       return tauriFetch(input, {
         ...(init as any),
         headers: headers,
       })
     }
   },
+
+  // fetch: async (input, init) => {
+  //   // Extract URL from input
+  //   let url: string
+  //   if (input instanceof Request) {
+  //     url = input.url
+  //   } else if (typeof input === "string") {
+  //     url = input
+  //   } else {
+  //     // Fallback to default behavior if we can't extract URL
+  //     return tauriFetch(input, init)
+  //   }
+
+  //   // Normalize URL (remove trailing slash, etc.)
+  //   const normalizedUrl = url.replace(/\/$/, "")
+  //   const desktopUrl = serverUrl()?.replace(/\/$/, "")
+
+  //   let authHeader: string | undefined
+
+  //   // Check if this is the desktop's own server
+  //   if (desktopUrl && normalizedUrl.startsWith(desktopUrl)) {
+  //     // Use the password signal for desktop's own server
+  //     const pw = password()
+  //     if (pw) {
+  //       authHeader = `Basic ${btoa(`opencode:${pw}`)}`
+  //     }
+  //   } else {
+  //     // Fetch credentials from store for other servers
+  //     try {
+  //       const result = await invoke<[string, string] | null>("get_server_credentials", { url })
+  //       if (result) {
+  //         authHeader = `Basic ${btoa(`${result[0]}:${result[1]}`)}`
+  //       }
+  //     } catch {
+  //       // Ignore errors, proceed without auth
+  //     }
+  //   }
+
+  //   const addHeader = (headers: Headers, header: string) => {
+  //     headers.append("Authorization", header)
+  //   }
+
+  //   if (input instanceof Request) {
+  //     if (authHeader) addHeader(input.headers, authHeader)
+  //     return tauriFetch(input)
+  //   } else {
+  //     const headers = new Headers(init?.headers)
+  //     if (authHeader) addHeader(headers, authHeader)
+  //     return tauriFetch(input, {
+  //       ...(init as any),
+  //       headers: headers,
+  //     })
+  //   }
+  // },
 
   getDefaultServerUrl: async () => {
     const result = await invoke<string | null>("get_default_server_url").catch(() => null)
@@ -282,6 +354,24 @@ const createPlatform = (password: Accessor<string | null>): Platform => ({
 
   setDefaultServerUrl: async (url: string | null) => {
     await invoke("set_default_server_url", { url })
+  },
+
+  storeServerCredentials: async (url: string, username: string, password: string) => {
+    await invoke("store_server_credentials", { url, username, password })
+  },
+
+  getServerCredentials: async (url: string) => {
+    const result = await invoke<[string, string] | null>("get_server_credentials", { url })
+    if (!result) return null
+    return { username: result[0], password: result[1] }
+  },
+
+  removeServerCredentials: async (url: string) => {
+    await invoke("remove_server_credentials", { url })
+  },
+
+  listServerCredentials: async () => {
+    return await invoke<string[]>("list_server_credentials")
   },
 })
 
@@ -294,7 +384,11 @@ root?.addEventListener("mousewheel", (e) => {
 
 render(() => {
   const [serverPassword, setServerPassword] = createSignal<string | null>(null)
-  const platform = createPlatform(() => serverPassword())
+  const [serverUrl, setServerUrl] = createSignal<string | null>(null)
+  const platform = createPlatform(
+    () => serverPassword(),
+    () => serverUrl(),
+  )
 
   return (
     <PlatformProvider value={platform}>
@@ -305,6 +399,7 @@ render(() => {
         <ServerGate>
           {(data) => {
             setServerPassword(data().password)
+            setServerUrl(data().url)
             window.__OPENCODE__ ??= {}
             window.__OPENCODE__.serverPassword = data().password ?? undefined
 

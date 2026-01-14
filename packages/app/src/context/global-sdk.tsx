@@ -1,7 +1,7 @@
 import { createOpencodeClient, type Event } from "@opencode-ai/sdk/v2/client"
 import { createSimpleContext } from "@opencode-ai/ui/context"
 import { createGlobalEmitter } from "@solid-primitives/event-bus"
-import { batch, onCleanup } from "solid-js"
+import { batch, createMemo, createResource, onCleanup } from "solid-js"
 import { usePlatform } from "./platform"
 import { useServer } from "./server"
 
@@ -12,11 +12,34 @@ export const { use: useGlobalSDK, provider: GlobalSDKProvider } = createSimpleCo
     const platform = usePlatform()
     const abort = new AbortController()
 
-    const eventSdk = createOpencodeClient({
-      baseUrl: server.url,
-      signal: abort.signal,
-      fetch: platform.fetch,
+    const [credentials, { refetch: refetchCredentials }] = createResource(
+      () => server.url,
+      async (url) => {
+        if (!platform.getServerCredentials) return null
+        return await platform.getServerCredentials(url)
+      },
+    )
+
+    const headers = createMemo(() => {
+      const creds = credentials()
+      if (!creds) return undefined
+      return {
+        Authorization: `Basic ${btoa(`${creds.username}:${creds.password}`)}`,
+      }
     })
+
+    const eventSdkMemo = createMemo(() => {
+      // Wait for credentials to be ready before creating SDK client
+      const credsState = credentials.state
+      if (credsState !== "ready") return null
+      return createOpencodeClient({
+        baseUrl: server.url,
+        signal: abort.signal,
+        fetch: platform.fetch,
+        headers: headers(),
+      })
+    })
+
     const emitter = createGlobalEmitter<{
       [key: string]: Event
     }>()
@@ -66,6 +89,8 @@ export const { use: useGlobalSDK, provider: GlobalSDKProvider } = createSimpleCo
     }
 
     void (async () => {
+      const eventSdk = eventSdkMemo()
+      if (!eventSdk) return
       const events = await eventSdk.global.event()
       let yielded = Date.now()
       for await (const event of events.stream) {
@@ -95,12 +120,30 @@ export const { use: useGlobalSDK, provider: GlobalSDKProvider } = createSimpleCo
       stop()
     })
 
-    const sdk = createOpencodeClient({
-      baseUrl: server.url,
-      fetch: platform.fetch,
-      throwOnError: true,
+    const sdkMemo = createMemo(() => {
+      // Wait for credentials to be ready before creating SDK client
+      const credsState = credentials.state
+      if (credsState !== "ready") return null
+      return createOpencodeClient({
+        baseUrl: server.url,
+        fetch: platform.fetch,
+        throwOnError: true,
+        headers: headers(),
+      })
     })
 
-    return { url: server.url, client: sdk, event: emitter }
+    return {
+      url: server.url,
+      get client() {
+        const client = sdkMemo()
+        if (!client) throw new Error("SDK client not ready - credentials not loaded")
+        return client
+      },
+      event: emitter,
+      refetchCredentials,
+      get ready() {
+        return credentials.state === "ready"
+      },
+    }
   },
 })
