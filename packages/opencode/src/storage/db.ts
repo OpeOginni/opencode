@@ -41,7 +41,7 @@ const connection = lazy(() => {
 })
 
 function migrate(sqlite: Database) {
-  sqlite.exec(`
+  sqlite.run(`
     CREATE TABLE IF NOT EXISTS _migrations (
       name TEXT PRIMARY KEY,
       applied_at INTEGER NOT NULL
@@ -58,7 +58,7 @@ function migrate(sqlite: Database) {
   for (const migration of migrations) {
     if (applied.has(migration.name)) continue
     log.info("applying migration", { name: migration.name })
-    sqlite.exec(migration.sql)
+    sqlite.run(migration.sql)
     sqlite.run("INSERT INTO _migrations (name, applied_at) VALUES (?, ?)", [migration.name, Date.now()])
   }
 }
