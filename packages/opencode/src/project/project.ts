@@ -9,7 +9,6 @@ import { SessionTable } from "../session/session.sql"
 import { eq } from "drizzle-orm"
 import { Log } from "../util/log"
 import { Flag } from "@/flag/flag"
-import { Session } from "../session"
 import { work } from "../util/queue"
 import { fn } from "@opencode-ai/util/fn"
 import { BusEvent } from "@/bus/bus-event"
@@ -295,6 +294,7 @@ export namespace Project {
 
     log.info("migrating sessions from global", { newProjectID, worktree, count: globalSessions.length })
 
+    const { Session } = await import("../session")
     await work(10, globalSessions, async (row) => {
       const session = Session.fromRow(row)
       if (!session) return
