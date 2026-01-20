@@ -43,6 +43,7 @@ uuid = { version = "1.19.0", features = ["v4"] }
 sha2 = "0.10"
 hex = "0.4"
 
+
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk = "0.18.2"
 webkit2gtk = "=2.0.1"
