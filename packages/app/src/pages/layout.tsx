@@ -139,6 +139,8 @@ export default function Layout(props: ParentProps) {
   const isBusy = (directory: string) => busyWorkspaces().has(workspaceKey(directory))
   const editorRef = { current: undefined as HTMLInputElement | undefined }
 
+  const [hoverSession, setHoverSession] = createSignal<string | undefined>()
+
   const autoselecting = createMemo(() => {
     if (params.dir) return false
     if (initialDir) return false
@@ -848,8 +850,8 @@ export default function Layout(props: ParentProps) {
       },
       {
         id: "settings.open",
-        title: "Open settings",
-        category: "Settings",
+        title: language.t("command.settings.open"),
+        category: language.t("command.category.settings"),
         keybind: "mod+comma",
         onSelect: () => openSettings(),
       },
@@ -1175,7 +1177,7 @@ export default function Layout(props: ParentProps) {
 
     return (
       <Dialog title={language.t("workspace.delete.title")} fit>
-        <div class="flex flex-col gap-4 px-2.5 pb-3">
+        <div class="flex flex-col gap-4 pl-6 pr-2.5 pb-3">
           <div class="flex flex-col gap-1">
             <span class="text-14-regular text-text-strong">
               {language.t("workspace.delete.confirm", { name: name() })}
@@ -1255,7 +1257,7 @@ export default function Layout(props: ParentProps) {
 
     return (
       <Dialog title={language.t("workspace.reset.title")} fit>
-        <div class="flex flex-col gap-4 px-2.5 pb-3">
+        <div class="flex flex-col gap-4 pl-6 pr-2.5 pb-3">
           <div class="flex flex-col gap-1">
             <span class="text-14-regular text-text-strong">
               {language.t("workspace.reset.confirm", { name: name() })}
@@ -1542,7 +1544,15 @@ export default function Layout(props: ParentProps) {
             </Tooltip>
           }
         >
-          <HoverCard openDelay={1000} closeDelay={0} placement="right-start" gutter={28} trigger={item}>
+          <HoverCard
+            openDelay={1000}
+            closeDelay={0}
+            placement="right"
+            gutter={28}
+            trigger={item}
+            open={hoverSession() === props.session.id}
+            onOpenChange={(open) => setHoverSession(open ? props.session.id : undefined)}
+          >
             <Show
               when={hoverReady()}
               fallback={<div class="text-12-regular text-text-weak">{language.t("session.messages.loading")}</div>}
@@ -1575,7 +1585,12 @@ export default function Layout(props: ParentProps) {
             keybind={command.keybind("session.archive")}
             gutter={8}
           >
-            <IconButton icon="archive" variant="ghost" onClick={() => archiveSession(props.session)} />
+            <IconButton
+              icon="archive"
+              variant="ghost"
+              onClick={() => archiveSession(props.session)}
+              aria-label={language.t("command.session.archive")}
+            />
           </TooltipKeybind>
         </div>
       </div>
@@ -1751,7 +1766,13 @@ export default function Layout(props: ParentProps) {
                 >
                   <DropdownMenu open={menuOpen()} onOpenChange={setMenuOpen}>
                     <Tooltip value={language.t("common.moreOptions")} placement="top">
-                      <DropdownMenu.Trigger as={IconButton} icon="dot-grid" variant="ghost" class="size-6 rounded-md" />
+                      <DropdownMenu.Trigger
+                        as={IconButton}
+                        icon="dot-grid"
+                        variant="ghost"
+                        class="size-6 rounded-md"
+                        aria-label={language.t("common.moreOptions")}
+                      />
                     </Tooltip>
                     <DropdownMenu.Portal>
                       <DropdownMenu.Content
@@ -1799,6 +1820,7 @@ export default function Layout(props: ParentProps) {
                       variant="ghost"
                       class="size-6 rounded-md"
                       onClick={() => navigate(`/${slug()}/session`)}
+                      aria-label={language.t("command.session.new")}
                     />
                   </TooltipKeybind>
                 </div>
@@ -1883,9 +1905,11 @@ export default function Layout(props: ParentProps) {
         .slice(0, 2)
     }
 
+    const projectName = () => props.project.name || getFilename(props.project.worktree)
     const trigger = (
       <button
         type="button"
+        aria-label={projectName()}
         classList={{
           "flex items-center justify-center size-10 p-1 rounded-lg overflow-hidden transition-colors cursor-default": true,
           "bg-transparent border-2 border-icon-strong-base hover:bg-surface-base-hover": selected(),
@@ -1909,7 +1933,10 @@ export default function Layout(props: ParentProps) {
           placement="right-start"
           gutter={6}
           trigger={trigger}
-          onOpenChange={setOpen}
+          onOpenChange={(value) => {
+            setOpen(value)
+            if (value) setHoverSession(undefined)
+          }}
         >
           <div class="-m-3 p-2 flex flex-col w-72">
             <div class="px-4 pt-2 pb-1 text-14-medium text-text-strong truncate">{displayName(props.project)}</div>
@@ -2066,8 +2093,8 @@ export default function Layout(props: ParentProps) {
     command.register(() => [
       {
         id: "workspace.new",
-        title: "New workspace",
-        category: "Workspace",
+        title: language.t("workspace.new"),
+        category: language.t("command.category.workspace"),
         keybind: "mod+shift+w",
         disabled: !layout.sidebar.workspaces(project()?.worktree ?? "")(),
         onSelect: createWorkspace,
@@ -2105,7 +2132,13 @@ export default function Layout(props: ParentProps) {
                     </div>
                   }
                 >
-                  <IconButton icon="plus" variant="ghost" size="large" onClick={chooseProject} />
+                  <IconButton
+                    icon="plus"
+                    variant="ghost"
+                    size="large"
+                    onClick={chooseProject}
+                    aria-label={language.t("command.project.open")}
+                  />
                 </Tooltip>
               </div>
               <DragOverlay>
@@ -2119,7 +2152,13 @@ export default function Layout(props: ParentProps) {
               title={language.t("sidebar.settings")}
               keybind={command.keybind("settings.open")}
             >
-              <IconButton icon="settings-gear" variant="ghost" size="large" onClick={openSettings} />
+              <IconButton
+                icon="settings-gear"
+                variant="ghost"
+                size="large"
+                onClick={openSettings}
+                aria-label={language.t("sidebar.settings")}
+              />
             </TooltipKeybind>
             <Tooltip placement={sidebarProps.mobile ? "bottom" : "right"} value={language.t("sidebar.help")}>
               <IconButton
@@ -2127,6 +2166,7 @@ export default function Layout(props: ParentProps) {
                 variant="ghost"
                 size="large"
                 onClick={() => platform.openLink("https://opencode.ai/desktop-feedback")}
+                aria-label={language.t("sidebar.help")}
               />
             </Tooltip>
           </div>
@@ -2177,6 +2217,7 @@ export default function Layout(props: ParentProps) {
                           icon="dot-grid"
                           variant="ghost"
                           class="shrink-0 size-6 rounded-md opacity-0 group-hover/project:opacity-100 data-[expanded]:opacity-100 data-[expanded]:bg-surface-base-active"
+                          aria-label={language.t("common.moreOptions")}
                         />
                         <DropdownMenu.Portal>
                           <DropdownMenu.Content class="mt-1">
