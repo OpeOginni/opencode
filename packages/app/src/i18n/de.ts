@@ -274,13 +274,16 @@ export const dict = {
   "context.usage.clickToView": "Klicken, um Kontext anzuzeigen",
 
   "language.en": "Englisch",
-  "language.zh": "Chinesisch",
+  "language.zh": "Chinesisch (Vereinfacht)",
+  "language.zht": "Chinesisch (Traditionell)",
   "language.ko": "Koreanisch",
   "language.de": "Deutsch",
   "language.es": "Spanisch",
   "language.fr": "Französisch",
   "language.ja": "Japanisch",
   "language.da": "Dänisch",
+  "language.ru": "Russisch",
+  "language.pl": "Polnisch",
 
   "toast.language.title": "Sprache",
   "toast.language.description": "Zu {{language}} gewechselt",

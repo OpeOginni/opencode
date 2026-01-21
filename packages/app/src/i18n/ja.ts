@@ -267,13 +267,16 @@ export const dict = {
   "context.usage.clickToView": "クリックしてコンテキストを表示",
 
   "language.en": "英語",
-  "language.zh": "中国語",
+  "language.zh": "中国語(簡体字)",
+  "language.zht": "中国語(繁体字)",
   "language.ko": "韓国語",
   "language.de": "ドイツ語",
   "language.es": "スペイン語",
   "language.fr": "フランス語",
   "language.ja": "日本語",
   "language.da": "デンマーク語",
+  "language.ru": "ロシア語",
+  "language.pl": "ポーランド語",
 
   "toast.language.title": "言語",
   "toast.language.description": "{{language}}に切り替えました",
