@@ -77,8 +77,6 @@ export async function storeServerCredentials(url: string, username: string, pass
 
 export async function getServerCredentials(url: string) {
   const urlHash = await hash(url)
-  console.log("Getting credentials for", urlHash)
-  console.log("get credentials", `${CREDENTIALS_STORAGE_KEY}:${urlHash}`)
   const encrypted = localStorage.getItem(`${CREDENTIALS_STORAGE_KEY}:${urlHash}`)
   if (!encrypted) return null
 

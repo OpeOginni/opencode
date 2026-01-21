@@ -8,6 +8,7 @@ import { Instance } from "../../project/instance"
 import { Installation } from "@/installation"
 import { Log } from "../../util/log"
 import { lazy } from "../../util/lazy"
+import { Flag } from "@/flag/flag"
 
 const log = Log.create({ service: "server" })
 
@@ -26,14 +27,16 @@ export const GlobalRoutes = lazy(() =>
             description: "Health information",
             content: {
               "application/json": {
-                schema: resolver(z.object({ healthy: z.literal(true), version: z.string() })),
+                schema: resolver(
+                  z.object({ healthy: z.literal(true), version: z.string(), authenticated: z.boolean() }),
+                ),
               },
             },
           },
         },
       }),
       async (c) => {
-        return c.json({ healthy: true, version: Installation.VERSION })
+        return c.json({ healthy: true, version: Installation.VERSION, authenticated: !!Flag.OPENCODE_SERVER_PASSWORD })
       },
     )
     .get(

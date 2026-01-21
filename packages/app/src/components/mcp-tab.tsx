@@ -31,9 +31,10 @@ export const McpTab: Component = () => {
   }
 
   return (
-    <div class="flex flex-col gap-4 pb-6 pt-4 min-h-[150px]">
+    <div class="flex flex-col px-2 pb-2">
+      <div class="flex flex-col p-2 bg-background-base">
       <List
-        search={{ placeholder: "Search MCPs", autofocus: true }}
+        class="[&_[data-slot=list-scroll]_[data-slot=list-group]:last-child]:pb-0"
         emptyMessage="No MCPs configured"
         items={mcpItems}
         key={(x) => x.name}
@@ -65,6 +66,7 @@ export const McpTab: Component = () => {
           )
         }}
       </List>
+    </div>
     </div>
   )
 }

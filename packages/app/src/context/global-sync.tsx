@@ -24,6 +24,7 @@ import { Binary } from "@opencode-ai/util/binary"
 import { retry } from "@opencode-ai/util/retry"
 import { useGlobalSDK } from "./global-sdk"
 import { ErrorPage, type InitError } from "../pages/error"
+import { useCredentials } from "./credentials"
 import {
   batch,
   createContext,
@@ -96,6 +97,7 @@ type ChildOptions = {
 function createGlobalSync() {
   const globalSDK = useGlobalSDK()
   const platform = usePlatform()
+  const credentials = useCredentials()
   const language = useLanguage()
   const owner = getOwner()
   if (!owner) throw new Error("GlobalSync must be created within owner")
@@ -246,16 +248,9 @@ function createGlobalSync() {
 
   async function bootstrapInstance(directory: string) {
     if (!directory) return
-    const [store, setStore] = child(directory)
+    const [store, setStore] = child(directory, { bootstrap: false })
 
-    // Get credentials directly from platform (same as the resource does)
-    const credentials = platform.getServerCredentials ? await platform.getServerCredentials(globalSDK.url) : null
-
-    const headers = credentials
-      ? {
-          Authorization: `Basic ${btoa(`${credentials.username}:${credentials.password}`)}`,
-        }
-      : undefined
+    const headers = credentials.headers()
 
     const cache = vcsCache.get(directory)
     if (!cache) return
@@ -278,6 +273,7 @@ function createGlobalSync() {
         fetch: platform.fetch,
         directory,
         throwOnError: true,
+        headers,
       })
 
       setStore("status", "loading")
@@ -659,16 +655,8 @@ function createGlobalSync() {
         break
       }
       case "lsp.updated": {
-        // Get credentials and create headers asynchronously
         const getSDK = async () => {
-          const credentials = platform.getServerCredentials ? await platform.getServerCredentials(globalSDK.url) : null
-
-          const headers = credentials
-            ? {
-                Authorization: `Basic ${btoa(`${credentials.username}:${credentials.password}`)}`,
-              }
-            : undefined
-
+          const headers = credentials.headers()
           return createOpencodeClient({
             baseUrl: globalSDK.url,
             fetch: platform.fetch,

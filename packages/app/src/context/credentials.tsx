@@ -11,8 +11,6 @@ export const { use: useCredentials, provider: CredentialsProvider } = createSimp
 
     const getCredentials = async (url: string) => {
       if (!platform.getServerCredentials) return undefined
-      console.log("getCredentials", url)
-      console.log("platform.getServerCredentials", await platform.getServerCredentials(url))
       return await platform.getServerCredentials(url)
     }
 
@@ -32,6 +30,7 @@ export const { use: useCredentials, provider: CredentialsProvider } = createSimp
     return {
       credentials: () => credentials(),
       headers,
+      ready: () => credentials.state === "ready",
       refetch,
     }
   },

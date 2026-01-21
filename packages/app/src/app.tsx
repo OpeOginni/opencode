@@ -97,47 +97,23 @@ export function AppInterface(props: { defaultUrl?: string }) {
   return (
     <ServerProvider defaultUrl={defaultServerUrl()}>
       <ServerKey>
-        <GlobalSDKProvider>
-          <GlobalSyncProvider>
-            <Router
-              root={(props) => (
-                <SettingsProvider>
-                  <PermissionProvider>
-                    <LayoutProvider>
-                      <NotificationProvider>
-                        <CommandProvider>
-                          <Layout>{props.children}</Layout>
-                        </CommandProvider>
-                      </NotificationProvider>
-                    </LayoutProvider>
-                  </PermissionProvider>
-                </SettingsProvider>
-              )}
-            >
-              <Route
-                path="/"
-                component={() => (
-                  <Suspense fallback={<Loading />}>
-                    <Home />
-                  </Suspense>
-                )}
-              />
-              <Route path="/:dir" component={DirectoryLayout}>
-                <Route path="/" component={() => <Navigate href="session" />} />
-                <Route
-                  path="/session/:id?"
-                  component={(p) => (
-                    <Show when={p.params.id ?? "new"} keyed>
-                      <TerminalProvider>
-                        <FileProvider>
-                          <PromptProvider>
-                            <Suspense fallback={<Loading />}>
-                              <Session />
-                            </Suspense>
-                          </PromptProvider>
-                        </FileProvider>
-                      </TerminalProvider>
-                    </Show>
+        <Suspense fallback={<Loading />}>
+          <CredentialsProvider>
+            <GlobalSDKProvider>
+              <GlobalSyncProvider>
+                <Router
+                  root={(props) => (
+                    <SettingsProvider>
+                      <PermissionProvider>
+                        <LayoutProvider>
+                          <NotificationProvider>
+                            <CommandProvider>
+                              <Layout>{props.children}</Layout>
+                            </CommandProvider>
+                          </NotificationProvider>
+                        </LayoutProvider>
+                      </PermissionProvider>
+                    </SettingsProvider>
                   )}
                 >
                   <Route
@@ -152,16 +128,18 @@ export function AppInterface(props: { defaultUrl?: string }) {
                     <Route path="/" component={() => <Navigate href="session" />} />
                     <Route
                       path="/session/:id?"
-                      component={() => (
-                        <TerminalProvider>
-                          <FileProvider>
-                            <PromptProvider>
-                              <Suspense fallback={<Loading />}>
-                                <Session />
-                              </Suspense>
-                            </PromptProvider>
-                          </FileProvider>
-                        </TerminalProvider>
+                      component={(p) => (
+                        <Show when={p.params.id ?? "new"} keyed>
+                          <TerminalProvider>
+                            <FileProvider>
+                              <PromptProvider>
+                                <Suspense fallback={<Loading />}>
+                                  <Session />
+                                </Suspense>
+                              </PromptProvider>
+                            </FileProvider>
+                          </TerminalProvider>
+                        </Show>
                       )}
                     />
                   </Route>

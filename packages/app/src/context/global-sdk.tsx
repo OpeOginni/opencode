@@ -1,37 +1,26 @@
 import { createOpencodeClient, type Event } from "@opencode-ai/sdk/v2/client"
 import { createSimpleContext } from "@opencode-ai/ui/context"
 import { createGlobalEmitter } from "@solid-primitives/event-bus"
-import { batch, createMemo, createResource, onCleanup } from "solid-js"
+import { batch, createMemo, onCleanup } from "solid-js"
 import { usePlatform } from "./platform"
 import { useServer } from "./server"
+import { useCredentials } from "./credentials"
 
 export const { use: useGlobalSDK, provider: GlobalSDKProvider } = createSimpleContext({
   name: "GlobalSDK",
   init: () => {
     const server = useServer()
     const platform = usePlatform()
+    const credentials = useCredentials()
     const abort = new AbortController()
 
-    const [credentials, { refetch: refetchCredentials }] = createResource(
-      () => server.url,
-      async (url) => {
-        if (!platform.getServerCredentials) return null
-        return await platform.getServerCredentials(url)
-      },
-    )
-
     const headers = createMemo(() => {
-      const creds = credentials()
-      if (!creds) return undefined
-      return {
-        Authorization: `Basic ${btoa(`${creds.username}:${creds.password}`)}`,
-      }
+      return credentials.headers()
     })
 
     const eventSdkMemo = createMemo(() => {
       // Wait for credentials to be ready before creating SDK client
-      const credsState = credentials.state
-      if (credsState !== "ready") return null
+      if (!credentials.ready()) return null
       return createOpencodeClient({
         baseUrl: server.url,
         signal: abort.signal,
@@ -122,8 +111,7 @@ export const { use: useGlobalSDK, provider: GlobalSDKProvider } = createSimpleCo
 
     const sdkMemo = createMemo(() => {
       // Wait for credentials to be ready before creating SDK client
-      const credsState = credentials.state
-      if (credsState !== "ready") return null
+      if (!credentials.ready()) return null
       return createOpencodeClient({
         baseUrl: server.url,
         fetch: platform.fetch,
@@ -140,9 +128,9 @@ export const { use: useGlobalSDK, provider: GlobalSDKProvider } = createSimpleCo
         return client
       },
       event: emitter,
-      refetchCredentials,
+      refetchCredentials: credentials.refetch,
       get ready() {
-        return credentials.state === "ready"
+        return credentials.ready()
       },
     }
   },

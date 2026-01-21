@@ -20,13 +20,19 @@ import { Tooltip, TooltipKeybind } from "@opencode-ai/ui/tooltip"
 import { Popover } from "@opencode-ai/ui/popover"
 import { TextField } from "@opencode-ai/ui/text-field"
 import { Keybind } from "@opencode-ai/ui/keybind"
+import { useServer } from "@/context/server"
+import { Tabs } from "@opencode-ai/ui/tabs"
+import { ServerTab } from "../server-tab"
+import { McpTab } from "../mcp-tab"
+import { LspTab } from "../lsp-tab"
+import { PluginsTab } from "../plugins-tab"
 
 export function SessionHeader() {
   const globalSDK = useGlobalSDK()
   const layout = useLayout()
   const params = useParams()
   const command = useCommand()
-  // const server = useServer()
+  const server = useServer()
   // const dialog = useDialog()
   const sync = useSync()
   const platform = usePlatform()
@@ -59,6 +65,12 @@ export function SessionHeader() {
     timer: undefined as number | undefined,
   })
   const shareUrl = createMemo(() => currentSession()?.share?.url)
+
+  const mcpItems = createMemo(() =>
+    Object.entries(sync.data.mcp ?? {})
+      .map(([name]) => name)
+      .sort((a, b) => a.localeCompare(b)),
+  )
 
   createEffect(() => {
     const url = shareUrl()
@@ -154,28 +166,6 @@ export function SessionHeader() {
         {(mount) => (
           <Portal mount={mount()}>
             <div class="flex items-center gap-3">
-              {/* <div class="hidden md:flex items-center gap-1"> */}
-              {/*   <Button */}
-              {/*     size="small" */}
-              {/*     variant="ghost" */}
-              {/*     onClick={() => { */}
-              {/*       dialog.show(() => <DialogSelectServer />) */}
-              {/*     }} */}
-              {/*   > */}
-              {/*     <div */}
-              {/*       classList={{ */}
-              {/*         "size-1.5 rounded-full": true, */}
-              {/*         "bg-icon-success-base": server.healthy() === true, */}
-              {/*         "bg-icon-critical-base": server.healthy() === false, */}
-              {/*         "bg-border-weak-base": server.healthy() === undefined, */}
-              {/*       }} */}
-              {/*     /> */}
-              {/*     <Icon name="server" size="small" class="text-icon-weak" /> */}
-              {/*     <span class="text-12-regular text-text-weak truncate max-w-[200px]">{server.name}</span> */}
-              {/*   </Button> */}
-              {/*   <SessionLspIndicator /> */}
-              {/*   <SessionMcpIndicator /> */}
-              {/* </div> */}
               <div class="flex items-center gap-1">
                 <div class="hidden md:block shrink-0">
                   <TooltipKeybind
@@ -211,38 +201,86 @@ export function SessionHeader() {
                     </Button>
                   </TooltipKeybind>
                 </div>
-                <TooltipKeybind
-                  class="hidden md:block shrink-0"
-                  title={language.t("command.terminal.toggle")}
-                  keybind={command.keybind("terminal.toggle")}
+                <Popover
+                class="[&_[data-slot=popover-body]]:p-0 w-[360px] max-w-[calc(100vw-40px)] mx-5 bg-transparent border-0 shadow-none rounded-xl"
+                gutter={8}
+                  trigger={
+                    <Tooltip class="shrink-0" value={language.t("command.session.share")}>
+                      <Button
+                        variant="secondary"
+                        classList={{ "rounded-r-none": shareUrl() !== undefined }}
+                        style={{ scale: 1 }}
+                      >
+                        <div
+                          classList={{
+                            "size-1.5 rounded-full": true,
+                            "bg-icon-success-base": server.healthy() === true,
+                            "bg-icon-critical-base": server.healthy() === false,
+                            "bg-border-weak-base": server.healthy() === undefined,
+                          }}
+                        />
+
+                        {"Status"}
+                      </Button>
+                    </Tooltip>
+                  }
                 >
-                  <Button
-                    variant="ghost"
-                    class="group/terminal-toggle size-6 p-0"
-                    onClick={() => view().terminal.toggle()}
-                    aria-label={language.t("command.terminal.toggle")}
-                    aria-expanded={view().terminal.opened()}
-                    aria-controls="terminal-panel"
+              <div class="flex items-center gap-1 w-[360px] border border-border-weak-base rounded-xl">
+                <Tabs
+                    aria-label="Server Configurations"
+                    class="tabs"
+                    data-component="tabs"
+                    data-active="servers"
+                    defaultValue="servers"
+                    variant="alt"
+                    style={{
+                      "background-color": "var(--background-strong)",
+                      "border-radius": "12px",
+                      overflow: "hidden",
+                    }}
                   >
-                    <div class="relative flex items-center justify-center size-4 [&>*]:absolute [&>*]:inset-0">
-                      <Icon
-                        size="small"
-                        name={view().terminal.opened() ? "layout-bottom-full" : "layout-bottom"}
-                        class="group-hover/terminal-toggle:hidden"
-                      />
-                      <Icon
-                        size="small"
-                        name="layout-bottom-partial"
-                        class="hidden group-hover/terminal-toggle:inline-block"
-                      />
-                      <Icon
-                        size="small"
-                        name={view().terminal.opened() ? "layout-bottom" : "layout-bottom-full"}
-                        class="hidden group-active/terminal-toggle:inline-block"
-                      />
-                    </div>
-                  </Button>
-                </TooltipKeybind>
+                    <Tabs.List
+                      data-slot="tablist"
+                      style={{
+                        "background-color": "transparent",
+                        "border-bottom": "1px solid var(--border-weak-base)",
+                        padding: "8px 16px 0",
+                        gap: "16px",
+                        height: "40px",
+                      }}
+                    >
+                      <Tabs.Trigger value="servers" data-slot="tab" class="text-12-regular">
+                        {server.list.length} {server.list.length === 1 ? "Server" : "Servers"}
+                      </Tabs.Trigger>
+                      <Tabs.Trigger value="mcp" data-slot="tab" class="text-12-regular">
+                        {mcpItems().length} {mcpItems().length === 1 ? "MCP" : "MCPs"}
+                      </Tabs.Trigger>
+                      <Tabs.Trigger value="lsp" data-slot="tab" class="text-12-regular">
+                        LSP
+                      </Tabs.Trigger>
+                      <Tabs.Trigger value="plugins" data-slot="tab" class="text-12-regular">
+                        Plugins
+                      </Tabs.Trigger>
+                    </Tabs.List>
+
+                    <Tabs.Content data-slot="panel" value="servers">
+                      <ServerTab />
+                    </Tabs.Content>
+
+                    <Tabs.Content as="div" value="mcp">
+                      <McpTab />
+                    </Tabs.Content>
+
+                    <Tabs.Content as="div" value="lsp">
+                      <LspTab />
+                    </Tabs.Content>
+
+                    <Tabs.Content as="div" value="plugins">
+                      <PluginsTab />
+                    </Tabs.Content>
+                  </Tabs>
+                  </div>
+                </Popover>
               </div>
               <Show when={showShare()}>
                 <div class="flex items-center">
