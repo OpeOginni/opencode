@@ -1,4 +1,6 @@
-import { Component, createMemo } from "solid-js"
+import { Component, createMemo, createSignal, Show } from "solid-js"
+import { useSync } from "@/context/sync"
+import { useSDK } from "@/context/sdk"
 import { Dialog } from "@opencode-ai/ui/dialog"
 import { List } from "@opencode-ai/ui/list"
 import { Switch } from "@opencode-ai/ui/switch"
@@ -10,14 +12,28 @@ export const DialogSelectMcp: Component = () => {
   const language = useLanguage()
   const [loading, setLoading] = createSignal<string | null>(null)
 
-  const mcpItems = createMemo(() =>
+  const items = createMemo(() =>
     Object.entries(sync.data.mcp ?? {})
       .map(([name, status]) => ({ name, status: status.status }))
       .sort((a, b) => a.name.localeCompare(b.name)),
   )
 
-  const enabledCount = createMemo(() => mcpItems().filter((i) => i.status === "connected").length)
-  const totalCount = createMemo(() => mcpItems().length)
+  const toggle = async (name: string) => {
+    if (loading()) return
+    setLoading(name)
+    const status = sync.data.mcp[name]
+    if (status?.status === "connected") {
+      await sdk.client.mcp.disconnect({ name })
+    } else {
+      await sdk.client.mcp.connect({ name })
+    }
+    const result = await sdk.client.mcp.status()
+    if (result.data) sync.set("mcp", result.data)
+    setLoading(null)
+  }
+
+  const enabledCount = createMemo(() => items().filter((i) => i.status === "connected").length)
+  const totalCount = createMemo(() => items().length)
 
   return (
     <Dialog
