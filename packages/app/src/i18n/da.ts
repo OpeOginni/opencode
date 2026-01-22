@@ -203,6 +203,9 @@ export const dict = {
   "dialog.mcp.description": "{{enabled}} af {{total}} aktiveret",
   "dialog.mcp.empty": "Ingen MCP'er konfigureret",
 
+  "dialog.lsp.empty": "LSP'er registreret automatisk fra filtyper",
+  "dialog.plugins.empty": "Plugins konfigureret i opencode.json",
+
   "mcp.status.connected": "forbundet",
   "mcp.status.failed": "mislykkedes",
   "mcp.status.needs_auth": "kræver godkendelse",
@@ -230,6 +233,17 @@ export const dict = {
   "dialog.server.default.set": "Sæt nuværende server som standard",
   "dialog.server.default.clear": "Ryd",
   "dialog.server.action.remove": "Fjern server",
+
+  "dialog.server.credentials.title": "Indtast legitimationsoplysninger",
+  "dialog.server.credentials.description": "Forbind til {{url}}",
+  "dialog.server.credentials.error.required": "Brugernavn og adgangskode er påkrævet",
+  "dialog.server.credentials.error.invalid": "Ugyldigt brugernavn eller adgangskode",
+  "dialog.server.menu.edit": "Rediger",
+  "dialog.server.menu.default": "Sæt som standard",
+  "dialog.server.menu.delete": "Slet",
+  "dialog.server.current": "Nuværende server",
+  "dialog.server.status.authed": "Godkendt",
+  "dialog.server.status.default": "Standard",
 
   "dialog.project.edit.title": "Rediger projekt",
   "dialog.project.edit.name": "Navn",

@@ -19,6 +19,7 @@ export function DialogServerConfig(
       .map(([name]) => name)
       .sort((a, b) => a.localeCompare(b)),
   )
+  const lspItems = createMemo(() => (sync.data.lsp ?? []).slice().sort((a, b) => a.name.localeCompare(b.name)))
 
   return (
     <Dialog class="min-h-[150px]">
@@ -50,7 +51,7 @@ export function DialogServerConfig(
             {mcpItems().length} {mcpItems().length === 1 ? "MCP" : "MCPs"}
           </Tabs.Trigger>
           <Tabs.Trigger value="lsp" data-slot="tab">
-            LSP
+            {lspItems().length} {lspItems().length === 1 ? "LSP" : "LSPs"}
           </Tabs.Trigger>
           <Tabs.Trigger value="plugins" data-slot="tab">
             Plugins

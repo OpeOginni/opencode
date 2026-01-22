@@ -221,6 +221,9 @@ export const dict = {
   "dialog.mcp.description": "{{enabled}} من {{total}} مفعل",
   "dialog.mcp.empty": "لم يتم تكوين MCPs",
 
+  "dialog.lsp.empty": "تم الكشف تلقائيًا عن LSPs من أنواع الملفات",
+  "dialog.plugins.empty": "الإضافات المكونة في opencode.json",
+
   "mcp.status.connected": "متصل",
   "mcp.status.failed": "فشل",
   "mcp.status.needs_auth": "يحتاج إلى مصادقة",
@@ -248,6 +251,17 @@ export const dict = {
   "dialog.server.default.set": "تعيين الخادم الحالي كافتراضي",
   "dialog.server.default.clear": "مسح",
   "dialog.server.action.remove": "إزالة الخادم",
+
+  "dialog.server.credentials.title": "أدخل بيانات الاعتماد",
+  "dialog.server.credentials.description": "الاتصال بـ {{url}}",
+  "dialog.server.credentials.error.required": "اسم المستخدم وكلمة المرور مطلوبان",
+  "dialog.server.credentials.error.invalid": "اسم المستخدم أو كلمة المرور غير صالحة",
+  "dialog.server.menu.edit": "تعديل",
+  "dialog.server.menu.default": "تعيين كافتراضي",
+  "dialog.server.menu.delete": "حذف",
+  "dialog.server.current": "الخادم الحالي",
+  "dialog.server.status.authed": "موتّق",
+  "dialog.server.status.default": "افتراضي",
 
   "dialog.project.edit.title": "تحرير المشروع",
   "dialog.project.edit.name": "الاسم",

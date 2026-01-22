@@ -205,6 +205,9 @@ export const dict = {
   "dialog.mcp.description": "已啟用 {{enabled}} / {{total}}",
   "dialog.mcp.empty": "未設定 MCP",
 
+  "dialog.lsp.empty": "已從檔案類型自動偵測到 LSPs",
+  "dialog.plugins.empty": "在 opencode.json 中設定的外掛程式",
+
   "mcp.status.connected": "已連線",
   "mcp.status.failed": "失敗",
   "mcp.status.needs_auth": "需要授權",
@@ -231,6 +234,17 @@ export const dict = {
   "dialog.server.default.set": "將目前伺服器設為預設",
   "dialog.server.default.clear": "清除",
   "dialog.server.action.remove": "移除伺服器",
+
+  "dialog.server.credentials.title": "輸入憑證",
+  "dialog.server.credentials.description": "連線到 {{url}}",
+  "dialog.server.credentials.error.required": "需要使用者名稱和密碼",
+  "dialog.server.credentials.error.invalid": "使用者名稱或密碼無效",
+  "dialog.server.menu.edit": "編輯",
+  "dialog.server.menu.default": "設為預設",
+  "dialog.server.menu.delete": "刪除",
+  "dialog.server.current": "目前伺服器",
+  "dialog.server.status.authed": "已認證",
+  "dialog.server.status.default": "預設",
 
   "dialog.project.edit.title": "編輯專案",
   "dialog.project.edit.name": "名稱",

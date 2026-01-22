@@ -202,6 +202,9 @@ export const dict = {
   "dialog.mcp.description": "{{total}}個中{{enabled}}個が有効",
   "dialog.mcp.empty": "MCPが設定されていません",
 
+  "dialog.lsp.empty": "ファイルタイプから自動検出されたLSP",
+  "dialog.plugins.empty": "opencode.jsonで設定されたプラグイン",
+
   "mcp.status.connected": "接続済み",
   "mcp.status.failed": "失敗",
   "mcp.status.needs_auth": "認証が必要",
@@ -229,6 +232,17 @@ export const dict = {
   "dialog.server.default.set": "現在のサーバーをデフォルトに設定",
   "dialog.server.default.clear": "クリア",
   "dialog.server.action.remove": "サーバーを削除",
+
+  "dialog.server.credentials.title": "認証情報を入力",
+  "dialog.server.credentials.description": "{{url}} に接続",
+  "dialog.server.credentials.error.required": "ユーザー名とパスワードが必要です",
+  "dialog.server.credentials.error.invalid": "ユーザー名またはパスワードが無効です",
+  "dialog.server.menu.edit": "編集",
+  "dialog.server.menu.default": "デフォルトに設定",
+  "dialog.server.menu.delete": "削除",
+  "dialog.server.current": "現在のサーバー",
+  "dialog.server.status.authed": "認証済み",
+  "dialog.server.status.default": "デフォルト",
 
   "dialog.project.edit.title": "プロジェクトを編集",
   "dialog.project.edit.name": "名前",

@@ -208,6 +208,9 @@ export const dict = {
   "dialog.mcp.description": "{{enabled}} von {{total}} aktiviert",
   "dialog.mcp.empty": "Keine MCPs konfiguriert",
 
+  "dialog.lsp.empty": "LSPs automatisch nach Dateityp erkannt",
+  "dialog.plugins.empty": "In opencode.json konfigurierte Plugins",
+
   "mcp.status.connected": "verbunden",
   "mcp.status.failed": "fehlgeschlagen",
   "mcp.status.needs_auth": "benötigt Authentifizierung",
@@ -235,6 +238,17 @@ export const dict = {
   "dialog.server.default.set": "Aktuellen Server als Standard setzen",
   "dialog.server.default.clear": "Löschen",
   "dialog.server.action.remove": "Server entfernen",
+
+  "dialog.server.credentials.title": "Anmeldeinformationen eingeben",
+  "dialog.server.credentials.description": "Verbinden mit {{url}}",
+  "dialog.server.credentials.error.required": "Benutzername und Passwort erforderlich",
+  "dialog.server.credentials.error.invalid": "Ungültiger Benutzername oder Passwort",
+  "dialog.server.menu.edit": "Bearbeiten",
+  "dialog.server.menu.default": "Als Standard festlegen",
+  "dialog.server.menu.delete": "Löschen",
+  "dialog.server.current": "Aktueller Server",
+  "dialog.server.status.authed": "Auth",
+  "dialog.server.status.default": "Standard",
 
   "dialog.project.edit.title": "Projekt bearbeiten",
   "dialog.project.edit.name": "Name",

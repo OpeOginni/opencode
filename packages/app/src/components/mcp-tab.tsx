@@ -33,40 +33,40 @@ export const McpTab: Component = () => {
   return (
     <div class="flex flex-col px-2 pb-2">
       <div class="flex flex-col p-2 bg-background-base">
-      <List
-        class="[&_[data-slot=list-scroll]_[data-slot=list-group]:last-child]:pb-0"
-        emptyMessage="No MCPs configured"
-        items={mcpItems}
-        key={(x) => x.name}
-        onSelect={(x) => {
-          if (x) toggleMcp(x.name)
-        }}
-      >
-        {(i) => {
-          const mcpStatus = () => sync.data.mcp[i.name]
-          const status = () => mcpStatus()?.status
-          const enabled = () => status() === "connected"
-          return (
-            <div class="flex items-center gap-2 min-w-0 flex-1 group/item">
-              <div class="flex items-center gap-2 min-w-0 flex-1">
-                <div
-                  classList={{
-                    "size-1.5 rounded-full shrink-0": true,
-                    "bg-icon-success-base": status() === "connected",
-                    "bg-icon-critical-base": status() === "failed",
-                    "bg-border-weak-base": status() !== "connected" && status() !== "failed",
-                  }}
-                />
-                <span class="truncate">{i.name}</span>
+        <List
+          class="[&_[data-slot=list-scroll]_[data-slot=list-group]:last-child]:pb-0"
+          emptyMessage="No MCPs configured"
+          items={mcpItems}
+          key={(x) => x.name}
+          onSelect={(x) => {
+            if (x) toggleMcp(x.name)
+          }}
+        >
+          {(i) => {
+            const mcpStatus = () => sync.data.mcp[i.name]
+            const status = () => mcpStatus()?.status
+            const enabled = () => status() === "connected"
+            return (
+              <div class="flex items-center gap-2 min-w-0 flex-1 group/item">
+                <div class="flex items-center gap-2 min-w-0 flex-1">
+                  <div
+                    classList={{
+                      "size-1.5 rounded-full shrink-0": true,
+                      "bg-icon-success-base": status() === "connected",
+                      "bg-icon-critical-base": status() === "failed",
+                      "bg-border-weak-base": status() !== "connected" && status() !== "failed",
+                    }}
+                  />
+                  <span class="truncate">{i.name}</span>
+                </div>
+                <div onClick={(e) => e.stopPropagation()}>
+                  <Switch checked={enabled()} disabled={mcpLoading() === i.name} onChange={() => toggleMcp(i.name)} />
+                </div>
               </div>
-              <div onClick={(e) => e.stopPropagation()}>
-                <Switch checked={enabled()} disabled={mcpLoading() === i.name} onChange={() => toggleMcp(i.name)} />
-              </div>
-            </div>
-          )
-        }}
-      </List>
-    </div>
+            )
+          }}
+        </List>
+      </div>
     </div>
   )
 }

@@ -206,6 +206,9 @@ export const dict = {
   "dialog.mcp.description": "{{total}}개 중 {{enabled}}개 활성화됨",
   "dialog.mcp.empty": "구성된 MCP 없음",
 
+  "dialog.lsp.empty": "파일 유형에서 자동 감지된 LSP",
+  "dialog.plugins.empty": "opencode.json에 구성된 플러그인",
+
   "mcp.status.connected": "연결됨",
   "mcp.status.failed": "실패",
   "mcp.status.needs_auth": "인증 필요",
@@ -233,6 +236,17 @@ export const dict = {
   "dialog.server.default.set": "현재 서버를 기본값으로 설정",
   "dialog.server.default.clear": "지우기",
   "dialog.server.action.remove": "서버 제거",
+
+  "dialog.server.credentials.title": "자격 증명 입력",
+  "dialog.server.credentials.description": "{{url}}에 연결",
+  "dialog.server.credentials.error.required": "사용자 이름과 비밀번호가 필요합니다",
+  "dialog.server.credentials.error.invalid": "유효하지 않은 사용자 이름 또는 비밀번호",
+  "dialog.server.menu.edit": "편집",
+  "dialog.server.menu.default": "기본값으로 설정",
+  "dialog.server.menu.delete": "삭제",
+  "dialog.server.current": "현재 서버",
+  "dialog.server.status.authed": "인증됨",
+  "dialog.server.status.default": "기본값",
 
   "dialog.project.edit.title": "프로젝트 편집",
   "dialog.project.edit.name": "이름",

@@ -213,12 +213,13 @@ export function DialogSelectServer() {
     setStore("editServer", "busy", false)
   }
 
-  const dialogTitle = () => (store.serverCred.show ? "Enter credentials" : language.t("dialog.server.title"))
+  const dialogTitle = () =>
+    store.serverCred.show ? language.t("dialog.server.credentials.title") : language.t("dialog.server.title")
 
   const dialogDescription = () =>
     store.serverCred.show
-      ? `Connect to ${serverDisplayName(store.serverCred.url)}`
-      : language.t("dialog.server.description")
+      ? language.t("dialog.server.credentials.description", { url: serverDisplayName(store.serverCred.url) })
+      : null
 
   const canStoreCredentials = () => !!platform.storeServerCredentials && !!platform.getServerCredentials
 
@@ -405,6 +406,14 @@ export function DialogSelectServer() {
     handleAdd(store.addServer.url)
   }
 
+  const blurAdd = () => {
+    if (!store.addServer.url.trim()) {
+      resetAdd()
+      return
+    }
+    handleAdd(store.addServer.url)
+  }
+
   const handleEditKey = (event: KeyboardEvent, original: string) => {
     event.stopPropagation()
     if (event.key === "Escape") {
@@ -421,7 +430,7 @@ export function DialogSelectServer() {
     e.preventDefault()
     const url = store.serverCred.url
     if (!url || !store.serverCred.username || !store.serverCred.password) {
-      setStore("serverCred", "error", "Username and password are required")
+      setStore("serverCred", "error", language.t("dialog.server.credentials.error.required"))
       return
     }
 
@@ -432,7 +441,7 @@ export function DialogSelectServer() {
     setStore("serverCred", "busy", false)
 
     if (!result.correctCredentials) {
-      setStore("serverCred", "error", "Invalid username or password")
+      setStore("serverCred", "error", language.t("dialog.server.credentials.error.invalid"))
       return
     }
 
@@ -471,156 +480,161 @@ export function DialogSelectServer() {
   }
 
   return (
-    <Dialog title={language.t("dialog.server.title")} description={language.t("dialog.server.description")}>
-        <Show
+    <Dialog title={dialogTitle()} description={dialogDescription()}>
+      <Show
         when={store.serverCred.show}
         fallback={
-      <div class="flex flex-col gap-4 pb-4">
-        <List
-          search={{ placeholder: language.t("dialog.server.search.placeholder"), autofocus: true }}
-          emptyMessage={language.t("dialog.server.empty")}
-          items={sortedItems}
-          key={(x) => x}
-          current={current()}
-          onSelect={(x) => {
-            if (x) select(x)
-          }}
-          divider={true}
-          class="[&_[data-slot=list-items]]:bg-surface-raised-base [&_[data-slot=list-items]]:rounded-md [&_[data-slot=list-item]]:py-3"
-          add={
-            store.addServer.showForm
-              ? {
-                  render: () => (
-                    <AddRow
-                      value={store.addServer.url}
-                      placeholder={language.t("dialog.server.add.placeholder")}
-                      adding={store.addServer.adding}
-                      error={store.addServer.error}
-                      status={store.addServer.status}
-                      onChange={handleAddChange}
-                      onKeyDown={handleAddKey}
-                      onBlur={() => handleAdd(store.addServer.url)}
-                    />
-                  ),
-                }
-              : undefined
-          }
-        >
-          {(i) => {
+          <div class="flex flex-col gap-2 pb-4">
+            <List
+              search={{ placeholder: language.t("dialog.server.search.placeholder"), autofocus: true }}
+              emptyMessage={language.t("dialog.server.empty")}
+              items={sortedItems}
+              key={(x) => x}
+              onSelect={(x) => {
+                if (x) select(x)
+              }}
+              divider={true}
+              class="[&_[data-slot=list-items]]:bg-surface-raised-base [&_[data-slot=list-items]]:rounded-md [&_[data-slot=list-item]]:py-3"
+              add={
+                store.addServer.showForm
+                  ? {
+                      render: () => (
+                        <AddRow
+                          value={store.addServer.url}
+                          placeholder={language.t("dialog.server.add.placeholder")}
+                          adding={store.addServer.adding}
+                          error={store.addServer.error}
+                          status={store.addServer.status}
+                          onChange={handleAddChange}
+                          onKeyDown={handleAddKey}
+                          onBlur={blurAdd}
+                        />
+                      ),
+                    }
+                  : undefined
+              }
+            >
+              {(i) => {
                 const [popoverOpen, setPopoverOpen] = createSignal(false)
-            return (
-              <div class="flex items-center gap-3 min-w-0 flex-1 group/item">
-              <Show
-                when={store.editServer.id !== i}
-                fallback={
-                  <EditRow
-                    value={store.editServer.value}
-                    placeholder={language.t("dialog.server.add.placeholder")}
-                    busy={store.editServer.busy}
-                    error={store.editServer.error}
-                    status={store.editServer.status}
-                    onChange={handleEditChange}
-                    onKeyDown={(event) => handleEditKey(event, i)}
-                    onBlur={() => handleEdit(i, store.editServer.value)}
-                  />
-                }
-              >
-                <div
-                  class="flex items-center gap-3 px-4 min-w-0 flex-1"
-                  classList={{ "opacity-50": store.status[i]?.healthy === false }}
-                >
-                  <div
-                    classList={{
-                      "size-1.5 rounded-full shrink-0": true,
-                      "bg-icon-success-base": store.status[i]?.healthy === true,
-                      "bg-icon-critical-base": store.status[i]?.healthy === false,
-                      "bg-border-weak-base": store.status[i] === undefined,
-                    }}
-                  />
-                  <span class="truncate">{serverDisplayName(i)}</span>
-                  <Show when={store.status[i]?.authenticated === true}>
-                    <span class="text-text-weak text-12-regular">Auth</span>
-                  </Show>
-                  <span class="text-text-weak text-14-regular">{store.status[i]?.version}</span>
-                  <Show when={defaultUrl() === i}>
-                    <span class="text-text-weak text-12-regular">Default</span>
-                  </Show>
-                </div>
-              </Show>
-              <Show when={store.editServer.id !== i}>
-                <div class="flex items-center justify-center gap-5 px-4">
-                  <Show when={current() === i}>
-                    <p class="text-text-weak text-12-regular">Current Server</p>
-                  </Show>
-
-                  <div onClick={(e) => e.stopPropagation()}>
-                    <Popover
-                      open={popoverOpen()}
-                      onOpenChange={setPopoverOpen}
-                      placement="bottom-start"
-                      trigger={
-                        <IconButton
-                          icon="dot-grid"
-                          variant="ghost"
-                          class="bg-transparent transition-opacity shrink-0 hover:scale-110 size-8"
+                return (
+                  <div class="flex items-center gap-3 min-w-0 flex-1 group/item">
+                    <Show
+                      when={store.editServer.id !== i}
+                      fallback={
+                        <EditRow
+                          value={store.editServer.value}
+                          placeholder={language.t("dialog.server.add.placeholder")}
+                          busy={store.editServer.busy}
+                          error={store.editServer.error}
+                          status={store.editServer.status}
+                          onChange={handleEditChange}
+                          onKeyDown={(event) => handleEditKey(event, i)}
+                          onBlur={() => handleEdit(i, store.editServer.value)}
                         />
                       }
-                      class="w-max !min-w-fit !max-w-none"
                     >
-                      <div class="flex flex-col gap-1">
-                        <Button
-                          variant="ghost"
-                          size="normal"
-                          class="justify-start text-md"
-                          onClick={(e: MouseEvent) => {
-                            e.stopPropagation()
-                            setPopoverOpen(false)
-                            setStore("editServer", "id", i)
-                            setStore("editServer", "value", i)
-                            setStore("editServer", "error", "")
-                            setStore("editServer", "status", store.status[i]?.healthy)
+                      <div
+                        class="flex items-center gap-3 px-4 min-w-0 flex-1"
+                        classList={{ "opacity-50": store.status[i]?.healthy === false }}
+                      >
+                        <div
+                          classList={{
+                            "size-1.5 rounded-full shrink-0": true,
+                            "bg-icon-success-base": store.status[i]?.healthy === true,
+                            "bg-icon-critical-base": store.status[i]?.healthy === false,
+                            "bg-border-weak-base": store.status[i] === undefined,
                           }}
-                        >
-                          Edit
-                        </Button>
-                        <Show when={isDesktop}>
-                          <Button
-                            variant="ghost"
-                            size="normal"
-                            class="justify-start text-md"
-                            onClick={async (e: MouseEvent) => {
-                              e.stopPropagation()
-                              setPopoverOpen(false)
-                              await platform.setDefaultServerUrl?.(i)
-                              defaultUrlActions.refetch(i)
-                            }}
-                          >
-                            Set as default
-                          </Button>
+                        />
+                        <span class="truncate">{serverDisplayName(i)}</span>
+                        <Show when={store.status[i]?.authenticated === true}>
+                          <span class="text-text-weak text-12-regular">
+                            {language.t("dialog.server.status.authed")}
+                          </span>
                         </Show>
-                        <div class="h-px bg-border-weak-base my-1" />
-                        <Button
-                          variant="ghost"
-                          size="normal"
-                          class="justify-start text-md text-text-on-critical-base hover:bg-surface-critical-weak"
-                          onClick={(e: MouseEvent) => {
-                            e.stopPropagation()
-                            setPopoverOpen(false)
-                            handleRemove(i)
-                          }}
-                        >
-                          Delete
-                        </Button>
+                        <span class="text-text-weak text-14-regular">{store.status[i]?.version}</span>
+                        <Show when={defaultUrl() === i}>
+                          <span class="text-text-weak text-12-regular">
+                            {language.t("dialog.server.status.default")}
+                          </span>
+                        </Show>
                       </div>
-                    </Popover>
-                  </div>
-                </div>
-              </Show>
-            </div>
-          )}}
-        </List>
+                    </Show>
+                    <Show when={store.editServer.id !== i}>
+                      <div class="flex items-center justify-center gap-5 px-4">
+                        <Show when={current() === i}>
+                          <p class="text-text-weak text-12-regular">{language.t("dialog.server.current")}</p>
+                        </Show>
 
-        <div class="px-6 pt-2">
+                        <div onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
+                          <Popover
+                            open={popoverOpen()}
+                            onOpenChange={setPopoverOpen}
+                            placement="bottom-start"
+                            trigger={
+                              <IconButton
+                                icon="dot-grid"
+                                variant="ghost"
+                                class="bg-transparent transition-opacity shrink-0 hover:scale-110 size-8"
+                                onPointerDown={(event: PointerEvent) => event.stopPropagation()}
+                              />
+                            }
+                            class="w-max !min-w-fit !max-w-none"
+                          >
+                            <div class="flex flex-col gap-1">
+                              <Button
+                                variant="ghost"
+                                size="normal"
+                                class="justify-start text-md"
+                                onClick={(e: MouseEvent) => {
+                                  e.stopPropagation()
+                                  setPopoverOpen(false)
+                                  setStore("editServer", "id", i)
+                                  setStore("editServer", "value", i)
+                                  setStore("editServer", "error", "")
+                                  setStore("editServer", "status", store.status[i]?.healthy)
+                                }}
+                              >
+                                {language.t("dialog.server.menu.edit")}
+                              </Button>
+                              <Show when={isDesktop}>
+                                <Button
+                                  variant="ghost"
+                                  size="normal"
+                                  class="justify-start text-md"
+                                  onClick={async (e: MouseEvent) => {
+                                    e.stopPropagation()
+                                    setPopoverOpen(false)
+                                    await platform.setDefaultServerUrl?.(i)
+                                    defaultUrlActions.refetch(i)
+                                  }}
+                                >
+                                  {language.t("dialog.server.menu.default")}
+                                </Button>
+                              </Show>
+                              <div class="h-px bg-border-weak-base my-1" />
+                              <Button
+                                variant="ghost"
+                                size="normal"
+                                class="justify-start text-md text-text-on-critical-base hover:bg-surface-critical-weak"
+                                onClick={(e: MouseEvent) => {
+                                  e.stopPropagation()
+                                  setPopoverOpen(false)
+                                  handleRemove(i)
+                                }}
+                              >
+                                {language.t("dialog.server.menu.delete")}
+                              </Button>
+                            </div>
+                          </Popover>
+                        </div>
+                      </div>
+                    </Show>
+                  </div>
+                )
+              }}
+            </List>
+
+            <div class="px-6">
               <Button
                 variant="secondary"
                 icon="plus-small"
@@ -639,7 +653,7 @@ export function DialogSelectServer() {
             </div>
           </div>
         }
-        >
+      >
         <ServerCredentials
           url={store.serverCred.url}
           username={store.serverCred.username}

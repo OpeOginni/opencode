@@ -34,7 +34,6 @@ async function checkHealth(url: string, fetch?: typeof globalThis.fetch): Promis
     .catch(() => ({ healthy: false }))
 }
 
-
 export const ServerTab: Component<{ onTitleChange?: (title: string, description: string) => void }> = (props) => {
   const server = useServer()
   const platform = usePlatform()
@@ -73,6 +72,7 @@ export const ServerTab: Component<{ onTitleChange?: (title: string, description:
       return (order.get(a) ?? 0) - (order.get(b) ?? 0)
     })
   })
+  const visibleItems = createMemo(() => sortedItems().slice(0, 4))
 
   async function refreshHealth() {
     const results: Record<string, ServerStatus> = {}
@@ -91,7 +91,6 @@ export const ServerTab: Component<{ onTitleChange?: (title: string, description:
     onCleanup(() => clearInterval(interval))
   })
 
-
   function select(value: string, persist?: boolean) {
     if (!persist && store.status[value]?.healthy === false) return
     if (persist) {
@@ -103,58 +102,56 @@ export const ServerTab: Component<{ onTitleChange?: (title: string, description:
   }
 
   return (
-
-        <div class="flex flex-col px-2 pb-2">
-          <div class="flex flex-col p-2 bg-background-base">
-
-          <List
-            emptyMessage="No servers yet"
-            items={sortedItems}
-            key={(x) => x}
-            current={current()}
-            onSelect={(x) => {
-              if (x) select(x)
-            }}
-          >
-            {(i) => {
-              return (
-                <div class="flex items-center gap-2 min-w-0 flex-1 group/item">
-                  <div
-                    class="flex items-center gap-2 min-w-0 flex-1"
-                    classList={{ "opacity-50": store.status[i]?.healthy === false }}
-                  >
-                    <div
-                      classList={{
-                        "size-1.5 rounded-full shrink-0": true,
-                        "bg-icon-success-base": store.status[i]?.healthy === true,
-                        "bg-icon-critical-base": store.status[i]?.healthy === false,
-                        "bg-border-weak-base": store.status[i] === undefined,
-                      }}
-                    />
-                    <span class="truncate">{serverDisplayName(i)}</span>
-                    <Show when={store.status[i]?.authenticated === true}>
-                      <span class="text-text-weak text-12-regular">Authed</span>
-                    </Show>
-                    <span class="text-text-weak">{store.status[i]?.version}</span>
-                    <Show when={isDesktop && defaultUrl() === i}>
-                      <span class="text-text-weak text-12-regular">Default</span>
-                    </Show>
-                  </div>
-                </div>
-              )
-            }}
-          </List>
-          <div class="px-3">
-                <Button
-                  variant="secondary"
-                  size="small"
-                  onClick={() => dialog.show(() => <DialogSelectServer />)}
-                  class="px-3 py-4"
+    <div class="flex flex-col px-2 pb-2">
+      <div class="flex flex-col p-2 bg-background-base">
+        <List
+          emptyMessage="No servers yet"
+          items={visibleItems}
+          key={(x) => x}
+          current={current()}
+          onSelect={(x) => {
+            if (x) select(x)
+          }}
+        >
+          {(i) => {
+            return (
+              <div class="flex items-center gap-2 min-w-0 flex-1 group/item">
+                <div
+                  class="flex items-center gap-2 min-w-0 flex-1"
+                  classList={{ "opacity-50": store.status[i]?.healthy === false }}
                 >
-                  Manage server
-                </Button>
-          </div>
-          </div>
+                  <div
+                    classList={{
+                      "size-1.5 rounded-full shrink-0": true,
+                      "bg-icon-success-base": store.status[i]?.healthy === true,
+                      "bg-icon-critical-base": store.status[i]?.healthy === false,
+                      "bg-border-weak-base": store.status[i] === undefined,
+                    }}
+                  />
+                  <span class="truncate">{serverDisplayName(i)}</span>
+                  <Show when={store.status[i]?.authenticated === true}>
+                    <span class="text-text-weak text-12-regular">Authed</span>
+                  </Show>
+                  <span class="text-text-weak">{store.status[i]?.version}</span>
+                  <Show when={isDesktop && defaultUrl() === i}>
+                    <span class="text-text-weak text-12-regular">Default</span>
+                  </Show>
+                </div>
+              </div>
+            )
+          }}
+        </List>
+        <div class="px-3">
+          <Button
+            variant="secondary"
+            size="small"
+            onClick={() => dialog.show(() => <DialogSelectServer />)}
+            class="px-3 py-4"
+          >
+            Manage server
+          </Button>
         </div>
+      </div>
+    </div>
   )
 }

@@ -71,6 +71,7 @@ export function SessionHeader() {
       .map(([name]) => name)
       .sort((a, b) => a.localeCompare(b)),
   )
+  const lspItems = createMemo(() => (sync.data.lsp ?? []).slice().sort((a, b) => a.name.localeCompare(b.name)))
 
   createEffect(() => {
     const url = shareUrl()
@@ -166,67 +167,32 @@ export function SessionHeader() {
         {(mount) => (
           <Portal mount={mount()}>
             <div class="flex items-center gap-3">
-              <div class="flex items-center gap-1">
-                <div class="hidden md:block shrink-0">
-                  <TooltipKeybind
-                    title={language.t("command.review.toggle")}
-                    keybind={command.keybind("review.toggle")}
-                  >
-                    <Button
-                      variant="ghost"
-                      class="group/review-toggle size-6 p-0"
-                      onClick={() => view().reviewPanel.toggle()}
-                      aria-label={language.t("command.review.toggle")}
-                      aria-expanded={view().reviewPanel.opened()}
-                      aria-controls="review-panel"
-                      tabIndex={showReview() ? 0 : -1}
-                    >
-                      <div class="relative flex items-center justify-center size-4 [&>*]:absolute [&>*]:inset-0">
-                        <Icon
-                          size="small"
-                          name={view().reviewPanel.opened() ? "layout-right-full" : "layout-right"}
-                          class="group-hover/review-toggle:hidden"
-                        />
-                        <Icon
-                          size="small"
-                          name="layout-right-partial"
-                          class="hidden group-hover/review-toggle:inline-block"
-                        />
-                        <Icon
-                          size="small"
-                          name={view().reviewPanel.opened() ? "layout-right" : "layout-right-full"}
-                          class="hidden group-active/review-toggle:inline-block"
-                        />
-                      </div>
-                    </Button>
-                  </TooltipKeybind>
-                </div>
-                <Popover
+              <Popover
                 class="[&_[data-slot=popover-body]]:p-0 w-[360px] max-w-[calc(100vw-40px)] mx-5 bg-transparent border-0 shadow-none rounded-xl"
                 gutter={8}
-                  trigger={
-                    <Tooltip class="shrink-0" value={language.t("command.session.share")}>
-                      <Button
-                        variant="secondary"
-                        classList={{ "rounded-r-none": shareUrl() !== undefined }}
-                        style={{ scale: 1 }}
-                      >
-                        <div
-                          classList={{
-                            "size-1.5 rounded-full": true,
-                            "bg-icon-success-base": server.healthy() === true,
-                            "bg-icon-critical-base": server.healthy() === false,
-                            "bg-border-weak-base": server.healthy() === undefined,
-                          }}
-                        />
+                trigger={
+                  <Tooltip class="shrink-0" value={"Server Status"}>
+                    <Button
+                      variant="secondary"
+                      style={{ scale: 1 }}
+                      class="rounded-sm w-[75px] h-[24px] py-[6px] pr-3 pl-2 gap-2 bg-surface-base-hover border-none shadow-none"
+                    >
+                      <div
+                        classList={{
+                          "size-1.5 rounded-full": true,
+                          "bg-icon-success-base": server.healthy() === true,
+                          "bg-icon-critical-base": server.healthy() === false,
+                          "bg-border-weak-base": server.healthy() === undefined,
+                        }}
+                      />
 
-                        {"Status"}
-                      </Button>
-                    </Tooltip>
-                  }
-                >
-              <div class="flex items-center gap-1 w-[360px] border border-border-weak-base rounded-xl">
-                <Tabs
+                      {"Status"}
+                    </Button>
+                  </Tooltip>
+                }
+              >
+                <div class="flex items-center gap-1 w-[360px] border border-border-weak-base rounded-xl">
+                  <Tabs
                     aria-label="Server Configurations"
                     class="tabs"
                     data-component="tabs"
@@ -243,7 +209,7 @@ export function SessionHeader() {
                       data-slot="tablist"
                       style={{
                         "background-color": "transparent",
-                        "border-bottom": "1px solid var(--border-weak-base)",
+                        "border-bottom": "none",
                         padding: "8px 16px 0",
                         gap: "16px",
                         height: "40px",
@@ -256,7 +222,7 @@ export function SessionHeader() {
                         {mcpItems().length} {mcpItems().length === 1 ? "MCP" : "MCPs"}
                       </Tabs.Trigger>
                       <Tabs.Trigger value="lsp" data-slot="tab" class="text-12-regular">
-                        LSP
+                        {lspItems().length} {lspItems().length === 1 ? "LSP" : "LSPs"}
                       </Tabs.Trigger>
                       <Tabs.Trigger value="plugins" data-slot="tab" class="text-12-regular">
                         Plugins
@@ -279,9 +245,8 @@ export function SessionHeader() {
                       <PluginsTab />
                     </Tabs.Content>
                   </Tabs>
-                  </div>
-                </Popover>
-              </div>
+                </div>
+              </Popover>
               <Show when={showShare()}>
                 <div class="flex items-center">
                   <Popover
@@ -291,9 +256,11 @@ export function SessionHeader() {
                         ? language.t("session.share.popover.description.shared")
                         : language.t("session.share.popover.description.unshared")
                     }
+                    gutter={8}
                     triggerAs={Button}
                     triggerProps={{
                       variant: "secondary",
+                      class: "rounded-sm w-[60px] h-[24px]",
                       classList: { "rounded-r-none": shareUrl() !== undefined },
                       style: { scale: 1 },
                     }}
@@ -346,7 +313,7 @@ export function SessionHeader() {
                       </Show>
                     </div>
                   </Popover>
-                  <Show when={shareUrl()} fallback={<div class="size-6" aria-hidden="true" />}>
+                  <Show when={shareUrl()} fallback={<div aria-hidden="true" />}>
                     <Tooltip
                       value={
                         state.copied
@@ -372,6 +339,70 @@ export function SessionHeader() {
                   </Show>
                 </div>
               </Show>
+              <div class="hidden md:block shrink-0">
+                <TooltipKeybind
+                  title={language.t("command.terminal.toggle")}
+                  keybind={command.keybind("terminal.toggle")}
+                >
+                  <Button
+                    variant="ghost"
+                    class="group/terminal-toggle size-5 p-0"
+                    onClick={() => view().terminal.toggle()}
+                    aria-label={language.t("command.terminal.toggle")}
+                    aria-expanded={view().terminal.opened()}
+                    aria-controls="terminal-panel"
+                  >
+                    <div class="relative flex items-center justify-center size-4 [&>*]:absolute [&>*]:inset-0">
+                      <Icon
+                        size="small"
+                        name={view().terminal.opened() ? "layout-bottom-full" : "layout-bottom"}
+                        class="group-hover/terminal-toggle:hidden"
+                      />
+                      <Icon
+                        size="small"
+                        name="layout-bottom-partial"
+                        class="hidden group-hover/terminal-toggle:inline-block"
+                      />
+                      <Icon
+                        size="small"
+                        name={view().terminal.opened() ? "layout-bottom" : "layout-bottom-full"}
+                        class="hidden group-active/terminal-toggle:inline-block"
+                      />
+                    </div>
+                  </Button>
+                </TooltipKeybind>
+              </div>
+              <div class="hidden md:block shrink-0">
+                <TooltipKeybind title={language.t("command.review.toggle")} keybind={command.keybind("review.toggle")}>
+                  <Button
+                    variant="ghost"
+                    class="group/review-toggle size-5 p-0"
+                    onClick={() => view().reviewPanel.toggle()}
+                    aria-label={language.t("command.review.toggle")}
+                    aria-expanded={view().reviewPanel.opened()}
+                    aria-controls="review-panel"
+                    tabIndex={showReview() ? 0 : -1}
+                  >
+                    <div class="relative flex items-center justify-center size-4 [&>*]:absolute [&>*]:inset-0">
+                      <Icon
+                        size="small"
+                        name={view().reviewPanel.opened() ? "layout-right-full" : "layout-right"}
+                        class="group-hover/review-toggle:hidden"
+                      />
+                      <Icon
+                        size="small"
+                        name="layout-right-partial"
+                        class="hidden group-hover/review-toggle:inline-block"
+                      />
+                      <Icon
+                        size="small"
+                        name={view().reviewPanel.opened() ? "layout-right" : "layout-right-full"}
+                        class="hidden group-active/review-toggle:inline-block"
+                      />
+                    </div>
+                  </Button>
+                </TooltipKeybind>
+              </div>
             </div>
           </Portal>
         )}

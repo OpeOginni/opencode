@@ -221,6 +221,9 @@ export const dict = {
   "dialog.mcp.description": "{{enabled}} из {{total}} включено",
   "dialog.mcp.empty": "MCP не настроены",
 
+  "dialog.lsp.empty": "LSP автоматически обнаружены по типам файлов",
+  "dialog.plugins.empty": "Плагины настроены в opencode.json",
+
   "mcp.status.connected": "подключено",
   "mcp.status.failed": "ошибка",
   "mcp.status.needs_auth": "требуется авторизация",
@@ -248,6 +251,17 @@ export const dict = {
   "dialog.server.default.set": "Установить текущий сервер по умолчанию",
   "dialog.server.default.clear": "Очистить",
   "dialog.server.action.remove": "Удалить сервер",
+
+  "dialog.server.credentials.title": "Введите учетные данные",
+  "dialog.server.credentials.description": "Подключение к {{url}}",
+  "dialog.server.credentials.error.required": "Требуются имя пользователя и пароль",
+  "dialog.server.credentials.error.invalid": "Неверное имя пользователя или пароль",
+  "dialog.server.menu.edit": "Редактировать",
+  "dialog.server.menu.default": "Сделать по умолчанию",
+  "dialog.server.menu.delete": "Удалить",
+  "dialog.server.current": "Текущий сервер",
+  "dialog.server.status.authed": "Авт.",
+  "dialog.server.status.default": "По умолч.",
 
   "dialog.project.edit.title": "Редактировать проект",
   "dialog.project.edit.name": "Название",
