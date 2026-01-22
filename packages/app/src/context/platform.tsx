@@ -47,6 +47,9 @@ export type Platform = {
   /** Set the default server URL to use on app startup (desktop only) */
   setDefaultServerUrl?(url: string | null): Promise<void>
 
+  /** Parse markdown to HTML using native parser (desktop only, returns unprocessed code blocks) */
+  parseMarkdown?(markdown: string): Promise<string>
+
   /** Store server credentials securely */
   storeServerCredentials?(url: string, username: string, password: string): Promise<void>
 

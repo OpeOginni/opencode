@@ -335,6 +335,9 @@ const createPlatform = (password: Accessor<string | null>, serverUrl: Accessor<s
     await invoke("set_default_server_url", { url })
   },
 
+  parseMarkdown: async (markdown: string) => {
+    return invoke<string>("parse_markdown_command", { markdown }),
+ 
   storeServerCredentials: async (url: string, username: string, password: string) => {
     await invoke("store_server_credentials", { url, username, password })
   },
