@@ -260,7 +260,6 @@ export const dict = {
   "dialog.server.menu.default": "Ustaw jako domyślny",
   "dialog.server.menu.delete": "Usuń",
   "dialog.server.current": "Obecny serwer",
-  "dialog.server.status.authed": "Autoryzowany",
   "dialog.server.status.default": "Domyślny",
 
   "dialog.project.edit.title": "Edytuj projekt",

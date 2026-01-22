@@ -242,7 +242,6 @@ export const dict = {
   "dialog.server.menu.default": "Définir par défaut",
   "dialog.server.menu.delete": "Supprimer",
   "dialog.server.current": "Serveur actuel",
-  "dialog.server.status.authed": "Auth",
   "dialog.server.status.default": "Défaut",
 
   "dialog.project.edit.title": "Modifier le projet",

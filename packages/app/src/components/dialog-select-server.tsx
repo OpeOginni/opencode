@@ -546,11 +546,6 @@ export function DialogSelectServer() {
                           }}
                         />
                         <span class="truncate">{serverDisplayName(i)}</span>
-                        <Show when={store.status[i]?.authenticated === true}>
-                          <span class="text-text-weak text-12-regular">
-                            {language.t("dialog.server.status.authed")}
-                          </span>
-                        </Show>
                         <span class="text-text-weak text-14-regular">{store.status[i]?.version}</span>
                         <Show when={defaultUrl() === i}>
                           <span class="text-text-weak text-12-regular">

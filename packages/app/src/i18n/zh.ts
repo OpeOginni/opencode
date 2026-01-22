@@ -241,7 +241,6 @@ export const dict = {
   "dialog.server.menu.default": "设为默认",
   "dialog.server.menu.delete": "删除",
   "dialog.server.current": "当前服务器",
-  "dialog.server.status.authed": "已认证",
   "dialog.server.status.default": "默认",
 
   "dialog.project.edit.title": "编辑项目",

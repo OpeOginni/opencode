@@ -241,7 +241,6 @@ export const dict = {
   "dialog.server.menu.default": "デフォルトに設定",
   "dialog.server.menu.delete": "削除",
   "dialog.server.current": "現在のサーバー",
-  "dialog.server.status.authed": "認証済み",
   "dialog.server.status.default": "デフォルト",
 
   "dialog.project.edit.title": "プロジェクトを編集",

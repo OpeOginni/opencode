@@ -245,7 +245,6 @@ export const dict = {
   "dialog.server.menu.default": "기본값으로 설정",
   "dialog.server.menu.delete": "삭제",
   "dialog.server.current": "현재 서버",
-  "dialog.server.status.authed": "인증됨",
   "dialog.server.status.default": "기본값",
 
   "dialog.project.edit.title": "프로젝트 편집",

@@ -129,9 +129,6 @@ export const ServerTab: Component<{ onTitleChange?: (title: string, description:
                     }}
                   />
                   <span class="truncate">{serverDisplayName(i)}</span>
-                  <Show when={store.status[i]?.authenticated === true}>
-                    <span class="text-text-weak text-12-regular">Authed</span>
-                  </Show>
                   <span class="text-text-weak">{store.status[i]?.version}</span>
                   <Show when={isDesktop && defaultUrl() === i}>
                     <span class="text-text-weak text-12-regular">Default</span>

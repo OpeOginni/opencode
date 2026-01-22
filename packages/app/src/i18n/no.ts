@@ -263,7 +263,6 @@ export const dict = {
   "dialog.server.menu.default": "Sett som standard",
   "dialog.server.menu.delete": "Slett",
   "dialog.server.current": "Gjeldende server",
-  "dialog.server.status.authed": "Autentisert",
   "dialog.server.status.default": "Standard",
 
   "dialog.project.edit.title": "Rediger prosjekt",

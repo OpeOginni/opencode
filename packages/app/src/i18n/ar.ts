@@ -260,7 +260,6 @@ export const dict = {
   "dialog.server.menu.default": "تعيين كافتراضي",
   "dialog.server.menu.delete": "حذف",
   "dialog.server.current": "الخادم الحالي",
-  "dialog.server.status.authed": "موتّق",
   "dialog.server.status.default": "افتراضي",
 
   "dialog.project.edit.title": "تحرير المشروع",
