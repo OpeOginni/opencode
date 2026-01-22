@@ -69,7 +69,6 @@ import { DialogSelectDirectory } from "@/components/dialog-select-directory"
 import { DialogEditProject } from "@/components/dialog-edit-project"
 import { Titlebar } from "@/components/titlebar"
 import { useServer } from "@/context/server"
-import { DialogServerConfig } from "@/components/dialog-server-config"
 import { useLanguage, type Locale } from "@/context/language"
 
 export default function Layout(props: ParentProps) {
@@ -947,8 +946,7 @@ export default function Layout(props: ParentProps) {
   }
 
   function openServer() {
-    // dialog.show(() => <DialogSelectServer />)
-    dialog.show(() => <DialogServerConfig />)
+    dialog.show(() => <DialogSelectServer />)
   }
 
   function openSettings() {

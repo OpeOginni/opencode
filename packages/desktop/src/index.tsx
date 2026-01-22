@@ -360,6 +360,13 @@ const createPlatform = (password: Accessor<string | null>, serverUrl: Accessor<s
 
 createMenu()
 
+const Loader = () => (
+  <div class="h-screen w-screen flex flex-col items-center justify-center bg-background-base">
+    <Splash class="w-16 h-20 opacity-50 animate-pulse" />
+    <div data-tauri-decorum-tb class="flex flex-row absolute top-0 right-0 z-10 h-10" />
+  </div>
+)
+
 render(() => {
   const [serverPassword, setServerPassword] = createSignal<string | null>(null)
   const [serverUrl, setServerUrl] = createSignal<string | null>(null)
@@ -367,6 +374,7 @@ render(() => {
     () => serverPassword(),
     () => serverUrl(),
   )
+  const [userDefaultUrl] = createResource(() => platform.getDefaultServerUrl?.())
 
   function handleClick(e: MouseEvent) {
     const link = (e.target as HTMLElement).closest("a.external-link") as HTMLAnchorElement | null
@@ -393,7 +401,11 @@ render(() => {
             window.__OPENCODE__ ??= {}
             window.__OPENCODE__.serverPassword = data().password ?? undefined
 
-            return <AppInterface defaultUrl={data().url} />
+            return (
+              <Show when={userDefaultUrl.state !== "pending"} fallback={<Loader />}>
+                <AppInterface defaultUrl={userDefaultUrl() ?? data().url} sidecarUrl={data().url} />
+              </Show>
+            )
           }}
         </ServerGate>
       </AppBaseProviders>

@@ -241,9 +241,12 @@ export const dict = {
   "dialog.server.credentials.error.invalid": "使用者名稱或密碼無效",
   "dialog.server.menu.edit": "編輯",
   "dialog.server.menu.default": "設為預設",
+  "dialog.server.menu.defaultRemove": "取消預設",
   "dialog.server.menu.delete": "刪除",
   "dialog.server.current": "目前伺服器",
   "dialog.server.status.default": "預設",
+  "dialog.server.status.authRequired": "需要認證",
+  "dialog.server.status.invalidCredentials": "憑據無效",
 
   "dialog.project.edit.title": "編輯專案",
   "dialog.project.edit.name": "名稱",

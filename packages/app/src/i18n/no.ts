@@ -261,9 +261,12 @@ export const dict = {
   "dialog.server.credentials.error.invalid": "Ugyldig brukernavn eller passord",
   "dialog.server.menu.edit": "Rediger",
   "dialog.server.menu.default": "Sett som standard",
+  "dialog.server.menu.defaultRemove": "Fjern standard",
   "dialog.server.menu.delete": "Slett",
   "dialog.server.current": "Gjeldende server",
   "dialog.server.status.default": "Standard",
+  "dialog.server.status.authRequired": "Autentisering påkrevd",
+  "dialog.server.status.invalidCredentials": "Ugyldige påloggingsdetaljer",
 
   "dialog.project.edit.title": "Rediger prosjekt",
   "dialog.project.edit.name": "Navn",

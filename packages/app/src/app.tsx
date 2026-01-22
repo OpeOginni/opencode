@@ -84,7 +84,7 @@ function ServerKey(props: ParentProps) {
   )
 }
 
-export function AppInterface(props: { defaultUrl?: string }) {
+export function AppInterface(props: { defaultUrl?: string; sidecarUrl?: string }) {
   const defaultServerUrl = () => {
     if (props.defaultUrl) return props.defaultUrl
     if (location.hostname.includes("opencode.ai")) return "http://localhost:4096"
@@ -95,7 +95,7 @@ export function AppInterface(props: { defaultUrl?: string }) {
   }
 
   return (
-    <ServerProvider defaultUrl={defaultServerUrl()}>
+    <ServerProvider defaultUrl={defaultServerUrl()} sidecarUrl={props.sidecarUrl}>
       <ServerKey>
         <Suspense fallback={<Loading />}>
           <CredentialsProvider>

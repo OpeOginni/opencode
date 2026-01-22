@@ -20,20 +20,13 @@ import { Tooltip, TooltipKeybind } from "@opencode-ai/ui/tooltip"
 import { Popover } from "@opencode-ai/ui/popover"
 import { TextField } from "@opencode-ai/ui/text-field"
 import { Keybind } from "@opencode-ai/ui/keybind"
-import { useServer } from "@/context/server"
-import { Tabs } from "@opencode-ai/ui/tabs"
-import { ServerTab } from "../server-tab"
-import { McpTab } from "../mcp-tab"
-import { LspTab } from "../lsp-tab"
-import { PluginsTab } from "../plugins-tab"
+import { StatusPopover } from "../status-popover"
 
 export function SessionHeader() {
   const globalSDK = useGlobalSDK()
   const layout = useLayout()
   const params = useParams()
   const command = useCommand()
-  const server = useServer()
-  // const dialog = useDialog()
   const sync = useSync()
   const platform = usePlatform()
   const language = useLanguage()
@@ -65,13 +58,6 @@ export function SessionHeader() {
     timer: undefined as number | undefined,
   })
   const shareUrl = createMemo(() => currentSession()?.share?.url)
-
-  const mcpItems = createMemo(() =>
-    Object.entries(sync.data.mcp ?? {})
-      .map(([name]) => name)
-      .sort((a, b) => a.localeCompare(b)),
-  )
-  const lspItems = createMemo(() => (sync.data.lsp ?? []).slice().sort((a, b) => a.name.localeCompare(b.name)))
 
   createEffect(() => {
     const url = shareUrl()
@@ -167,86 +153,7 @@ export function SessionHeader() {
         {(mount) => (
           <Portal mount={mount()}>
             <div class="flex items-center gap-3">
-              <Popover
-                class="[&_[data-slot=popover-body]]:p-0 w-[360px] max-w-[calc(100vw-40px)] mx-5 bg-transparent border-0 shadow-none rounded-xl"
-                gutter={8}
-                trigger={
-                  <Tooltip class="shrink-0" value={"Server Status"}>
-                    <Button
-                      variant="secondary"
-                      style={{ scale: 1 }}
-                      class="rounded-sm w-[75px] h-[24px] py-[6px] pr-3 pl-2 gap-2 bg-surface-base-hover border-none shadow-none"
-                    >
-                      <div
-                        classList={{
-                          "size-1.5 rounded-full": true,
-                          "bg-icon-success-base": server.healthy() === true,
-                          "bg-icon-critical-base": server.healthy() === false,
-                          "bg-border-weak-base": server.healthy() === undefined,
-                        }}
-                      />
-
-                      {"Status"}
-                    </Button>
-                  </Tooltip>
-                }
-              >
-                <div class="flex items-center gap-1 w-[360px] border border-border-weak-base rounded-xl">
-                  <Tabs
-                    aria-label="Server Configurations"
-                    class="tabs"
-                    data-component="tabs"
-                    data-active="servers"
-                    defaultValue="servers"
-                    variant="alt"
-                    style={{
-                      "background-color": "var(--background-strong)",
-                      "border-radius": "12px",
-                      overflow: "hidden",
-                    }}
-                  >
-                    <Tabs.List
-                      data-slot="tablist"
-                      style={{
-                        "background-color": "transparent",
-                        "border-bottom": "none",
-                        padding: "8px 16px 0",
-                        gap: "16px",
-                        height: "40px",
-                      }}
-                    >
-                      <Tabs.Trigger value="servers" data-slot="tab" class="text-12-regular">
-                        {server.list.length} {server.list.length === 1 ? "Server" : "Servers"}
-                      </Tabs.Trigger>
-                      <Tabs.Trigger value="mcp" data-slot="tab" class="text-12-regular">
-                        {mcpItems().length} {mcpItems().length === 1 ? "MCP" : "MCPs"}
-                      </Tabs.Trigger>
-                      <Tabs.Trigger value="lsp" data-slot="tab" class="text-12-regular">
-                        {lspItems().length} {lspItems().length === 1 ? "LSP" : "LSPs"}
-                      </Tabs.Trigger>
-                      <Tabs.Trigger value="plugins" data-slot="tab" class="text-12-regular">
-                        Plugins
-                      </Tabs.Trigger>
-                    </Tabs.List>
-
-                    <Tabs.Content data-slot="panel" value="servers">
-                      <ServerTab />
-                    </Tabs.Content>
-
-                    <Tabs.Content as="div" value="mcp">
-                      <McpTab />
-                    </Tabs.Content>
-
-                    <Tabs.Content as="div" value="lsp">
-                      <LspTab />
-                    </Tabs.Content>
-
-                    <Tabs.Content as="div" value="plugins">
-                      <PluginsTab />
-                    </Tabs.Content>
-                  </Tabs>
-                </div>
-              </Popover>
+              <StatusPopover />
               <Show when={showShare()}>
                 <div class="flex items-center">
                   <Popover

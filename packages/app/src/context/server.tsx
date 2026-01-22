@@ -28,7 +28,7 @@ function projectsKey(url: string) {
 
 export const { use: useServer, provider: ServerProvider } = createSimpleContext({
   name: "Server",
-  init: (props: { defaultUrl: string }) => {
+  init: (props: { defaultUrl: string; sidecarUrl?: string }) => {
     const platform = usePlatform()
 
     const [store, setStore, _, ready] = persisted(
@@ -37,6 +37,7 @@ export const { use: useServer, provider: ServerProvider } = createSimpleContext(
         list: [] as string[],
         projects: {} as Record<string, StoredProject[]>,
         lastProject: {} as Record<string, string>,
+        isSidecar: {} as Record<string, boolean>,
       }),
     )
 
@@ -45,6 +46,7 @@ export const { use: useServer, provider: ServerProvider } = createSimpleContext(
     function setActive(input: string) {
       const url = normalizeServerUrl(input)
       if (!url) return
+      if (active() === url) return
       setActiveRaw(url)
     }
 
@@ -68,6 +70,7 @@ export const { use: useServer, provider: ServerProvider } = createSimpleContext(
 
       batch(() => {
         setStore("list", list)
+        if (store.isSidecar[url]) setStore("isSidecar", url, false)
         setActiveRaw(next)
       })
     }
@@ -85,19 +88,45 @@ export const { use: useServer, provider: ServerProvider } = createSimpleContext(
       })
     })
 
+    createEffect(() => {
+      if (!ready()) return
+      if (platform.platform !== "desktop") return
+      const url = normalizeServerUrl(props.sidecarUrl ?? "")
+      if (!url) return
+      const stale = Object.keys(store.isSidecar).filter((key) => store.isSidecar[key] && key !== url)
+      if (stale.length === 0 && store.isSidecar[url]) return
+      batch(() => {
+        for (const key of stale) {
+          setStore("list", (prev) => prev.filter((item) => item !== key))
+          setStore("isSidecar", key, false)
+        }
+        if (!store.list.includes(url)) {
+          setStore("list", store.list.length, url)
+        }
+        setStore("isSidecar", url, true)
+      })
+    })
+
     const isReady = createMemo(() => ready() && !!active())
 
     const [healthy, setHealthy] = createSignal<boolean | undefined>(undefined)
 
-    const check = (url: string) => {
+    const check = async (url: string) => {
+      const credentials = await platform.getServerCredentials?.(url)
+      const headers = credentials
+        ? {
+            Authorization: `Basic ${btoa(`${credentials.username}:${credentials.password}`)}`,
+          }
+        : undefined
       const sdk = createOpencodeClient({
         baseUrl: url,
         fetch: platform.fetch,
         signal: AbortSignal.timeout(3000),
+        headers,
       })
       return sdk.global
-        .health()
-        .then((x) => x.data?.healthy === true)
+        .health({ responseStyle: "fields" })
+        .then((x) => x?.response?.ok === true && x.data?.healthy === true)
         .catch(() => false)
     }
 

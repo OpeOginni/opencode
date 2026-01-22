@@ -240,9 +240,12 @@ export const dict = {
   "dialog.server.credentials.error.invalid": "Usuario o contraseña inválidos",
   "dialog.server.menu.edit": "Editar",
   "dialog.server.menu.default": "Establecer como predeterminado",
+  "dialog.server.menu.defaultRemove": "Quitar predeterminado",
   "dialog.server.menu.delete": "Eliminar",
   "dialog.server.current": "Servidor actual",
   "dialog.server.status.default": "Predeterminado",
+  "dialog.server.status.authRequired": "Autenticación requerida",
+  "dialog.server.status.invalidCredentials": "Credenciales inválidas",
 
   "dialog.project.edit.title": "Editar proyecto",
   "dialog.project.edit.name": "Nombre",

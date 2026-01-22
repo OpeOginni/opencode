@@ -15,7 +15,7 @@ import { Popover } from "@opencode-ai/ui/popover"
 import { useGlobalSDK } from "@/context/global-sdk"
 import { ServerCredentials } from "@/components/server-credentials"
 
-type ServerStatus = { healthy: boolean; version?: string; authenticated?: boolean }
+type ServerStatus = { healthy: boolean; version?: string; auth?: "required" | "invalid" }
 
 interface AddRowProps {
   value: string
@@ -39,21 +39,34 @@ interface EditRowProps {
   onBlur: () => void
 }
 
-async function checkHealth(url: string, fetch?: typeof globalThis.fetch): Promise<ServerStatus> {
+async function checkHealth(url: string, platform: ReturnType<typeof usePlatform>): Promise<ServerStatus> {
+  const credentials = await platform.getServerCredentials?.(url)
+  const headers = credentials
+    ? {
+        Authorization: `Basic ${btoa(`${credentials.username}:${credentials.password}`)}`,
+      }
+    : undefined
   const sdk = createOpencodeClient({
     baseUrl: url,
-    fetch,
+    fetch: platform.fetch,
     signal: AbortSignal.timeout(3000),
+    headers,
   })
   return sdk.global
-    .health()
+    .health({ responseStyle: "fields" })
     .then((x) => {
-      const data = x.data as { healthy: boolean; version?: string; authenticated?: boolean }
-      return {
-        healthy: data?.healthy === true,
-        version: data?.version,
-        authenticated: data?.authenticated === true,
+      if (x?.response?.ok) {
+        return {
+          healthy: x.data?.healthy === true,
+          version: x.data?.version,
+        }
       }
+      const status = x?.response?.status
+      if (status === 401 || status === 403 || status === 404) {
+        const auth = credentials ? ("invalid" as const) : ("required" as const)
+        return { healthy: false, auth }
+      }
+      return { healthy: false }
     })
     .catch(() => ({ healthy: false }))
 }
@@ -194,7 +207,7 @@ export function DialogSelectServer() {
     if (!looksComplete(value)) return
     const normalized = normalizeServerUrl(value)
     if (!normalized) return
-    const result = await checkHealth(normalized, platform.fetch)
+    const result = await checkHealth(normalized, platform)
     setStatus(result.healthy)
   }
 
@@ -223,20 +236,17 @@ export function DialogSelectServer() {
 
   const canStoreCredentials = () => !!platform.storeServerCredentials && !!platform.getServerCredentials
 
-  const needsCredentials = async (url: string, authenticated?: boolean) => {
-    if (!authenticated) return false
+  const needsCredentials = async (url: string, auth?: ServerStatus["auth"]) => {
+    if (auth !== "required") return false
     if (!canStoreCredentials()) return false
     const credentials = await platform.getServerCredentials?.(url)
     return !credentials
   }
 
-  const storedCredentialsInvalid = async (url: string, authenticated?: boolean) => {
-    if (!authenticated) return false
+  const storedCredentialsInvalid = async (auth?: ServerStatus["auth"]) => {
+    if (auth !== "invalid") return false
     if (!canStoreCredentials()) return false
-    const credentials = await platform.getServerCredentials?.(url)
-    if (!credentials) return false
-    const result = await checkCredentials(url, credentials.username, credentials.password, platform.fetch)
-    return !result.correctCredentials
+    return true
   }
 
   const startCredentials = (url: string, mode: "select" | "add" | "edit", original?: string) => {
@@ -301,7 +311,7 @@ export function DialogSelectServer() {
     const results: Record<string, ServerStatus> = {}
     await Promise.all(
       items().map(async (url) => {
-        results[url] = await checkHealth(url, platform.fetch)
+        results[url] = await checkHealth(url, platform)
       }),
     )
     setStore("status", reconcile(results))
@@ -315,13 +325,18 @@ export function DialogSelectServer() {
   })
 
   async function select(value: string, persist?: boolean) {
+    const auth = store.status[value]?.auth
+    if (!persist && auth) {
+      startCredentials(value, persist ? "add" : "select")
+      return
+    }
     if (!persist && store.status[value]?.healthy === false) return
-    const requiresCredentials = await needsCredentials(value, store.status[value]?.authenticated)
+    const requiresCredentials = await needsCredentials(value, auth)
     if (requiresCredentials) {
       startCredentials(value, persist ? "add" : "select")
       return
     }
-    const invalidCredentials = await storedCredentialsInvalid(value, store.status[value]?.authenticated)
+    const invalidCredentials = await storedCredentialsInvalid(auth)
     if (invalidCredentials) {
       startCredentials(value, persist ? "add" : "select")
       return
@@ -361,15 +376,20 @@ export function DialogSelectServer() {
     setStore("addServer", "adding", true)
     setStore("addServer", "error", "")
 
-    const result = await checkHealth(normalized, platform.fetch)
+    const result = await checkHealth(normalized, platform)
     setStore("addServer", "adding", false)
+
+    if (result.auth) {
+      startCredentials(normalized, "add")
+      return
+    }
 
     if (!result.healthy) {
       setStore("addServer", "error", language.t("dialog.server.add.error"))
       return
     }
 
-    if (await needsCredentials(normalized, result.authenticated)) {
+    if (await needsCredentials(normalized, result.auth)) {
       startCredentials(normalized, "add")
       return
     }
@@ -394,15 +414,20 @@ export function DialogSelectServer() {
     setStore("editServer", "busy", true)
     setStore("editServer", "error", "")
 
-    const result = await checkHealth(normalized, platform.fetch)
+    const result = await checkHealth(normalized, platform)
     setStore("editServer", "busy", false)
+
+    if (result.auth) {
+      startCredentials(normalized, "edit", original)
+      return
+    }
 
     if (!result.healthy) {
       setStore("editServer", "error", language.t("dialog.server.add.error"))
       return
     }
 
-    if (await needsCredentials(normalized, result.authenticated)) {
+    if (await needsCredentials(normalized, result.auth)) {
       resetEdit()
       startCredentials(normalized, "edit", original)
       return
@@ -560,9 +585,21 @@ export function DialogSelectServer() {
                           }}
                         />
                         <span class="truncate">{serverDisplayName(i)}</span>
-                        <span class="text-text-weak text-14-regular">{store.status[i]?.version}</span>
+                        <Show when={store.status[i]?.version}>
+                          <span class="text-text-weak text-14-regular">{store.status[i]?.version}</span>
+                        </Show>
+                        <Show when={store.status[i]?.auth === "required"}>
+                          <span class="text-text-weak text-14-regular">
+                            {language.t("dialog.server.status.authRequired")}
+                          </span>
+                        </Show>
+                        <Show when={store.status[i]?.auth === "invalid"}>
+                          <span class="text-text-weak text-14-regular">
+                            {language.t("dialog.server.status.invalidCredentials")}
+                          </span>
+                        </Show>
                         <Show when={defaultUrl() === i}>
-                          <span class="text-text-weak text-12-regular">
+                          <span class="text-text-weak bg-surface-base text-14-regular px-1.5 rounded-xs">
                             {language.t("dialog.server.status.default")}
                           </span>
                         </Show>
@@ -605,7 +642,7 @@ export function DialogSelectServer() {
                               >
                                 {language.t("dialog.server.menu.edit")}
                               </Button>
-                              <Show when={isDesktop}>
+                              <Show when={isDesktop && defaultUrl() !== i}>
                                 <Button
                                   variant="ghost"
                                   size="normal"
@@ -618,6 +655,21 @@ export function DialogSelectServer() {
                                   }}
                                 >
                                   {language.t("dialog.server.menu.default")}
+                                </Button>
+                              </Show>
+                              <Show when={isDesktop && defaultUrl() === i}>
+                                <Button
+                                  variant="ghost"
+                                  size="normal"
+                                  class="justify-start text-md"
+                                  onClick={async (e: MouseEvent) => {
+                                    e.stopPropagation()
+                                    setPopoverOpen(false)
+                                    await platform.setDefaultServerUrl?.(null)
+                                    defaultUrlActions.refetch(null)
+                                  }}
+                                >
+                                  {language.t("dialog.server.menu.defaultRemove")}
                                 </Button>
                               </Show>
                               <div class="h-px bg-border-weak-base my-1" />

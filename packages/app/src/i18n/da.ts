@@ -240,9 +240,12 @@ export const dict = {
   "dialog.server.credentials.error.invalid": "Ugyldigt brugernavn eller adgangskode",
   "dialog.server.menu.edit": "Rediger",
   "dialog.server.menu.default": "Sæt som standard",
+  "dialog.server.menu.defaultRemove": "Fjern som standard",
   "dialog.server.menu.delete": "Slet",
   "dialog.server.current": "Nuværende server",
   "dialog.server.status.default": "Standard",
+  "dialog.server.status.authRequired": "Godkendelse påkrævet",
+  "dialog.server.status.invalidCredentials": "Ugyldige loginoplysninger",
 
   "dialog.project.edit.title": "Rediger projekt",
   "dialog.project.edit.name": "Navn",
