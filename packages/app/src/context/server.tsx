@@ -51,13 +51,6 @@ export const { use: useServer, provider: ServerProvider } = createSimpleContext(
     function add(input: string) {
       const url = normalizeServerUrl(input)
       if (!url) return
-
-      const fallback = normalizeServerUrl(props.defaultUrl)
-      if (fallback && url === fallback) {
-        setActiveRaw(url)
-        return
-      }
-
       batch(() => {
         if (!store.list.includes(url)) {
           setStore("list", store.list.length, url)
@@ -84,7 +77,12 @@ export const { use: useServer, provider: ServerProvider } = createSimpleContext(
       if (active()) return
       const url = normalizeServerUrl(props.defaultUrl)
       if (!url) return
-      setActiveRaw(url)
+      batch(() => {
+        if (!store.list.includes(url)) {
+          setStore("list", store.list.length, url)
+        }
+        setActiveRaw(url)
+      })
     })
 
     const isReady = createMemo(() => ready() && !!active())

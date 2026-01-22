@@ -227,7 +227,7 @@ export const dict = {
   "dialog.server.add.placeholder": "http://localhost:4096",
   "dialog.server.add.error": "無法連線到伺服器",
   "dialog.server.add.checking": "檢查中...",
-  "dialog.server.add.button": "新增",
+  "dialog.server.add.button": "新增伺服器",
   "dialog.server.default.title": "預設伺服器",
   "dialog.server.default.description": "應用程式啟動時連線此伺服器，而不是啟動本地伺服器。需要重新啟動。",
   "dialog.server.default.none": "未選擇伺服器",

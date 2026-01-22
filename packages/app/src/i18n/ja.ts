@@ -224,7 +224,7 @@ export const dict = {
   "dialog.server.add.placeholder": "http://localhost:4096",
   "dialog.server.add.error": "サーバーに接続できませんでした",
   "dialog.server.add.checking": "確認中...",
-  "dialog.server.add.button": "追加",
+  "dialog.server.add.button": "サーバーを追加",
   "dialog.server.default.title": "デフォルトサーバー",
   "dialog.server.default.description":
     "ローカルサーバーを起動する代わりに、アプリ起動時にこのサーバーに接続します。再起動が必要です。",

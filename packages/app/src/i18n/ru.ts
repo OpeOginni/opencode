@@ -243,7 +243,7 @@ export const dict = {
   "dialog.server.add.placeholder": "http://localhost:4096",
   "dialog.server.add.error": "Не удалось подключиться к серверу",
   "dialog.server.add.checking": "Проверка...",
-  "dialog.server.add.button": "Добавить",
+  "dialog.server.add.button": "Добавить сервер",
   "dialog.server.default.title": "Сервер по умолчанию",
   "dialog.server.default.description":
     "Подключаться к этому серверу при запуске приложения вместо запуска локального сервера. Требуется перезапуск.",

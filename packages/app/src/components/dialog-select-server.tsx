@@ -230,6 +230,15 @@ export function DialogSelectServer() {
     return !credentials
   }
 
+  const storedCredentialsInvalid = async (url: string, authenticated?: boolean) => {
+    if (!authenticated) return false
+    if (!canStoreCredentials()) return false
+    const credentials = await platform.getServerCredentials?.(url)
+    if (!credentials) return false
+    const result = await checkCredentials(url, credentials.username, credentials.password, platform.fetch)
+    return !result.correctCredentials
+  }
+
   const startCredentials = (url: string, mode: "select" | "add" | "edit", original?: string) => {
     setStore("serverCred", "show", true)
     setStore("serverCred", "url", url)
@@ -309,6 +318,11 @@ export function DialogSelectServer() {
     if (!persist && store.status[value]?.healthy === false) return
     const requiresCredentials = await needsCredentials(value, store.status[value]?.authenticated)
     if (requiresCredentials) {
+      startCredentials(value, persist ? "add" : "select")
+      return
+    }
+    const invalidCredentials = await storedCredentialsInvalid(value, store.status[value]?.authenticated)
+    if (invalidCredentials) {
       startCredentials(value, persist ? "add" : "select")
       return
     }

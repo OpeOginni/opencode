@@ -228,7 +228,7 @@ export const dict = {
   "dialog.server.add.placeholder": "http://localhost:4096",
   "dialog.server.add.error": "서버에 연결할 수 없습니다",
   "dialog.server.add.checking": "확인 중...",
-  "dialog.server.add.button": "추가",
+  "dialog.server.add.button": "서버 추가",
   "dialog.server.default.title": "기본 서버",
   "dialog.server.default.description":
     "로컬 서버를 시작하는 대신 앱 실행 시 이 서버에 연결합니다. 다시 시작해야 합니다.",

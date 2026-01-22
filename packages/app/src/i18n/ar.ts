@@ -243,7 +243,7 @@ export const dict = {
   "dialog.server.add.placeholder": "http://localhost:4096",
   "dialog.server.add.error": "تعذر الاتصال بالخادم",
   "dialog.server.add.checking": "جارٍ التحقق...",
-  "dialog.server.add.button": "إضافة",
+  "dialog.server.add.button": "إضافة خادم",
   "dialog.server.default.title": "الخادم الافتراضي",
   "dialog.server.default.description":
     "الاتصال بهذا الخادم عند بدء تشغيل التطبيق بدلاً من بدء خادم محلي. يتطلب إعادة التشغيل.",

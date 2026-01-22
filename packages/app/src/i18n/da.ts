@@ -225,7 +225,7 @@ export const dict = {
   "dialog.server.add.placeholder": "http://localhost:4096",
   "dialog.server.add.error": "Kunne ikke forbinde til server",
   "dialog.server.add.checking": "Tjekker...",
-  "dialog.server.add.button": "Tilføj",
+  "dialog.server.add.button": "Tilføj server",
   "dialog.server.default.title": "Standardserver",
   "dialog.server.default.description":
     "Forbind til denne server ved start af app i stedet for at starte en lokal server. Kræver genstart.",
