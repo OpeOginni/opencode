@@ -64,8 +64,6 @@ export async function storeServerCredentials(url: string, username: string, pass
 
   // Store encrypted credentials
   localStorage.setItem(`${CREDENTIALS_STORAGE_KEY}:${urlHash}`, encrypted)
-  console.log("Hashing URL", url)
-  console.log("stored credentials", `${CREDENTIALS_STORAGE_KEY}:${urlHash}`, encrypted)
 
   // Update index
   const index = JSON.parse(localStorage.getItem(CREDENTIALS_INDEX_KEY) || "[]") as string[]
