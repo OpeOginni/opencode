@@ -211,7 +211,6 @@ export function StatusPopover() {
               {pluginCount() > 0 ? `${pluginCount()} ` : ""}Plugins
             </Tabs.Trigger>
           </Tabs.List>
-          
 
           <Tabs.Content value="servers">
             <div class="flex flex-col px-2 pb-2">

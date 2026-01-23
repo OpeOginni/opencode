@@ -243,10 +243,13 @@ export function DialogSelectServer() {
     return !credentials
   }
 
-  const storedCredentialsInvalid = async (auth?: ServerStatus["auth"]) => {
+  const storedCredentialsInvalid = async (url: string, auth?: ServerStatus["auth"]) => {
     if (auth !== "invalid") return false
     if (!canStoreCredentials()) return false
-    return true
+    const credentials = await platform.getServerCredentials?.(url)
+    if (!credentials) return true
+    const result = await checkHealth(url, platform)
+    return result.auth === "invalid"
   }
 
   const startCredentials = (url: string, mode: "select" | "add" | "edit", original?: string) => {
@@ -273,8 +276,10 @@ export function DialogSelectServer() {
 
   const replaceServer = (original: string, next: string) => {
     const active = server.url
+    const nextActive = active === original ? next : active
+
     server.add(next)
-    if (active && active !== original) server.setActive(active)
+    if (nextActive) server.setActive(nextActive)
     server.remove(original)
   }
 
@@ -326,7 +331,7 @@ export function DialogSelectServer() {
 
   async function select(value: string, persist?: boolean) {
     const auth = store.status[value]?.auth
-    if (!persist && auth) {
+    if (!persist && (auth === "required" || auth === "invalid")) {
       startCredentials(value, persist ? "add" : "select")
       return
     }
@@ -336,7 +341,7 @@ export function DialogSelectServer() {
       startCredentials(value, persist ? "add" : "select")
       return
     }
-    const invalidCredentials = await storedCredentialsInvalid(auth)
+    const invalidCredentials = await storedCredentialsInvalid(value, auth)
     if (invalidCredentials) {
       startCredentials(value, persist ? "add" : "select")
       return
@@ -356,6 +361,14 @@ export function DialogSelectServer() {
     setStore("addServer", "url", value)
     setStore("addServer", "error", "")
     void previewStatus(value, (next) => setStore("addServer", "status", next))
+  }
+
+  const scrollListToBottom = () => {
+    const scroll = document.querySelector<HTMLDivElement>('[data-component="list"] [data-slot="list-scroll"]')
+    if (!scroll) return
+    requestAnimationFrame(() => {
+      scroll.scrollTop = scroll.scrollHeight
+    })
   }
 
   const handleEditChange = (value: string) => {
@@ -503,6 +516,7 @@ export function DialogSelectServer() {
     }
 
     await select(url)
+    dialog.close()
   }
 
   function handleCancelCredentials() {
@@ -533,7 +547,7 @@ export function DialogSelectServer() {
                 if (x) select(x)
               }}
               divider={true}
-              class="[&_[data-slot=list-items]]:bg-surface-raised-base [&_[data-slot=list-items]]:rounded-md [&_[data-slot=list-item]]:py-3"
+              class="[&_[data-slot=list-scroll]]:max-h-[300px] [&_[data-slot=list-scroll]]:overflow-y-auto [&_[data-slot=list-items]]:bg-surface-raised-base [&_[data-slot=list-items]]:rounded-md [&_[data-slot=list-item]]:py-3"
               add={
                 store.addServer.showForm
                   ? {
@@ -704,6 +718,7 @@ export function DialogSelectServer() {
                   setStore("addServer", "showForm", true)
                   setStore("addServer", "url", "")
                   setStore("addServer", "error", "")
+                  scrollListToBottom()
                 }}
                 class="px-3 py-4"
               >

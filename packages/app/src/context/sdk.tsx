@@ -17,19 +17,27 @@ export const { use: useSDK, provider: SDKProvider } = createSimpleContext({
     const headers = createMemo(() => {
       return credentials.headers()
     })
-            
+
     const directory = createMemo(() => props.directory)
-    const client = createMemo(() =>
+    const client = createMemo(() => {
       // Wait for credentials to be ready before creating SDK client
-      if (!credentials.ready()) return null
-      createOpencodeClient({
+      if (!credentials.ready()) {
+        return createOpencodeClient({
+          baseUrl: globalSDK.url,
+          fetch: platform.fetch,
+          directory: directory(),
+          throwOnError: true,
+        })
+      }
+
+      return createOpencodeClient({
         baseUrl: globalSDK.url,
         fetch: platform.fetch,
         directory: directory(),
         throwOnError: true,
         headers: headers(),
-      }),
-    )
+      })
+    })
 
     const emitter = createGlobalEmitter<{
       [key in Event["type"]]: Extract<Event, { type: key }>

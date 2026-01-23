@@ -75,16 +75,63 @@ export const { use: useServer, provider: ServerProvider } = createSimpleContext(
       })
     }
 
+    const [healthy, setHealthy] = createSignal<boolean | undefined>(undefined)
+
+    const check = async (url: string) => {
+      const credentials = await platform.getServerCredentials?.(url)
+      const headers = credentials
+        ? {
+            Authorization: `Basic ${btoa(`${credentials.username}:${credentials.password}`)}`,
+          }
+        : undefined
+      const sdk = createOpencodeClient({
+        baseUrl: url,
+        fetch: platform.fetch,
+        signal: AbortSignal.timeout(3000),
+        headers,
+      })
+      return sdk.global
+        .health({ responseStyle: "fields" })
+        .then((x) => x?.response?.ok === true && x.data?.healthy === true)
+        .catch(() => false)
+    }
+
     createEffect(() => {
       if (!ready()) return
       if (active()) return
       const url = normalizeServerUrl(props.defaultUrl)
       if (!url) return
-      batch(() => {
-        if (!store.list.includes(url)) {
-          setStore("list", store.list.length, url)
+
+      const sidecar = normalizeServerUrl(props.sidecarUrl ?? "")
+      const shouldCheck = platform.platform === "desktop" && !!sidecar && sidecar !== url
+
+      const setUrl = (next: string) => {
+        batch(() => {
+          if (!store.list.includes(next)) {
+            setStore("list", store.list.length, next)
+          }
+          setActiveRaw(next)
+        })
+      }
+
+      if (!shouldCheck) {
+        setUrl(url)
+        return
+      }
+
+      let alive = true
+
+      void check(url).then((ok) => {
+        if (!alive) return
+        if (ok) {
+          setUrl(url)
+          return
         }
-        setActiveRaw(url)
+        setUrl(sidecar)
+      })
+
+      onCleanup(() => {
+        alive = false
       })
     })
 
@@ -108,27 +155,6 @@ export const { use: useServer, provider: ServerProvider } = createSimpleContext(
     })
 
     const isReady = createMemo(() => ready() && !!active())
-
-    const [healthy, setHealthy] = createSignal<boolean | undefined>(undefined)
-
-    const check = async (url: string) => {
-      const credentials = await platform.getServerCredentials?.(url)
-      const headers = credentials
-        ? {
-            Authorization: `Basic ${btoa(`${credentials.username}:${credentials.password}`)}`,
-          }
-        : undefined
-      const sdk = createOpencodeClient({
-        baseUrl: url,
-        fetch: platform.fetch,
-        signal: AbortSignal.timeout(3000),
-        headers,
-      })
-      return sdk.global
-        .health({ responseStyle: "fields" })
-        .then((x) => x?.response?.ok === true && x.data?.healthy === true)
-        .catch(() => false)
-    }
 
     createEffect(() => {
       const url = active()
