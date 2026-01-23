@@ -212,18 +212,22 @@ export function DialogSelectServer() {
   }
 
   const resetAdd = () => {
-    setStore("addServer", "url", "")
-    setStore("addServer", "error", "")
-    setStore("addServer", "showForm", false)
-    setStore("addServer", "status", undefined)
+    setStore("addServer", {
+      url: "",
+      error: "",
+      showForm: false,
+      status: undefined,
+    })
   }
 
   const resetEdit = () => {
-    setStore("editServer", "id", undefined)
-    setStore("editServer", "value", "")
-    setStore("editServer", "error", "")
-    setStore("editServer", "status", undefined)
-    setStore("editServer", "busy", false)
+    setStore("editServer", {
+      id: undefined,
+      value: "",
+      error: "",
+      status: undefined,
+      busy: false,
+    })
   }
 
   const dialogTitle = () =>
@@ -253,25 +257,29 @@ export function DialogSelectServer() {
   }
 
   const startCredentials = (url: string, mode: "select" | "add" | "edit", original?: string) => {
-    setStore("serverCred", "show", true)
-    setStore("serverCred", "url", url)
-    setStore("serverCred", "mode", mode)
-    setStore("serverCred", "original", original ?? "")
-    setStore("serverCred", "username", "opencode")
-    setStore("serverCred", "password", "")
-    setStore("serverCred", "error", "")
-    setStore("serverCred", "busy", false)
+    setStore("serverCred", {
+      show: true,
+      url,
+      mode,
+      original: original ?? "",
+      username: "opencode",
+      password: "",
+      error: "",
+      busy: false,
+    })
   }
 
   const stopCredentials = () => {
-    setStore("serverCred", "show", false)
-    setStore("serverCred", "url", "")
-    setStore("serverCred", "mode", undefined)
-    setStore("serverCred", "original", "")
-    setStore("serverCred", "username", "")
-    setStore("serverCred", "password", "")
-    setStore("serverCred", "error", "")
-    setStore("serverCred", "busy", false)
+    setStore("serverCred", {
+      show: false,
+      url: "",
+      mode: undefined,
+      original: "",
+      username: "",
+      password: "",
+      error: "",
+      busy: false,
+    })
   }
 
   const replaceServer = (original: string, next: string) => {
@@ -358,9 +366,8 @@ export function DialogSelectServer() {
 
   const handleAddChange = (value: string) => {
     if (store.addServer.adding) return
-    setStore("addServer", "url", value)
-    setStore("addServer", "error", "")
-    void previewStatus(value, (next) => setStore("addServer", "status", next))
+    setStore("addServer", { url: value, error: "" })
+    void previewStatus(value, (next) => setStore("addServer", { status: next }))
   }
 
   const scrollListToBottom = () => {
@@ -373,9 +380,8 @@ export function DialogSelectServer() {
 
   const handleEditChange = (value: string) => {
     if (store.editServer.busy) return
-    setStore("editServer", "value", value)
-    setStore("editServer", "error", "")
-    void previewStatus(value, (next) => setStore("editServer", "status", next))
+    setStore("editServer", { value, error: "" })
+    void previewStatus(value, (next) => setStore("editServer", { status: next }))
   }
 
   async function handleAdd(value: string) {
@@ -386,11 +392,10 @@ export function DialogSelectServer() {
       return
     }
 
-    setStore("addServer", "adding", true)
-    setStore("addServer", "error", "")
+    setStore("addServer", { adding: true, error: "" })
 
     const result = await checkHealth(normalized, platform)
-    setStore("addServer", "adding", false)
+    setStore("addServer", { adding: false })
 
     if (result.auth) {
       startCredentials(normalized, "add")
@@ -398,7 +403,7 @@ export function DialogSelectServer() {
     }
 
     if (!result.healthy) {
-      setStore("addServer", "error", language.t("dialog.server.add.error"))
+      setStore("addServer", { error: language.t("dialog.server.add.error") })
       return
     }
 
@@ -424,11 +429,10 @@ export function DialogSelectServer() {
       return
     }
 
-    setStore("editServer", "busy", true)
-    setStore("editServer", "error", "")
+    setStore("editServer", { busy: true, error: "" })
 
     const result = await checkHealth(normalized, platform)
-    setStore("editServer", "busy", false)
+    setStore("editServer", { busy: false })
 
     if (result.auth) {
       startCredentials(normalized, "edit", original)
@@ -436,7 +440,7 @@ export function DialogSelectServer() {
     }
 
     if (!result.healthy) {
-      setStore("editServer", "error", language.t("dialog.server.add.error"))
+      setStore("editServer", { error: language.t("dialog.server.add.error") })
       return
     }
 
@@ -482,18 +486,17 @@ export function DialogSelectServer() {
     e.preventDefault()
     const url = store.serverCred.url
     if (!url || !store.serverCred.username || !store.serverCred.password) {
-      setStore("serverCred", "error", language.t("dialog.server.credentials.error.required"))
+      setStore("serverCred", { error: language.t("dialog.server.credentials.error.required") })
       return
     }
 
-    setStore("serverCred", "error", "")
-    setStore("serverCred", "busy", true)
+    setStore("serverCred", { error: "", busy: true })
 
     const result = await checkCredentials(url, store.serverCred.username, store.serverCred.password, platform.fetch)
-    setStore("serverCred", "busy", false)
+    setStore("serverCred", { busy: false })
 
     if (!result.correctCredentials) {
-      setStore("serverCred", "error", language.t("dialog.server.credentials.error.invalid"))
+      setStore("serverCred", { error: language.t("dialog.server.credentials.error.invalid") })
       return
     }
 
@@ -523,7 +526,7 @@ export function DialogSelectServer() {
     const mode = store.serverCred.mode
     stopCredentials()
     if (mode === "add") {
-      setStore("addServer", "showForm", true)
+      setStore("addServer", { showForm: true })
     }
   }
 
@@ -648,10 +651,12 @@ export function DialogSelectServer() {
                                 onClick={(e: MouseEvent) => {
                                   e.stopPropagation()
                                   setPopoverOpen(false)
-                                  setStore("editServer", "id", i)
-                                  setStore("editServer", "value", i)
-                                  setStore("editServer", "error", "")
-                                  setStore("editServer", "status", store.status[i]?.healthy)
+                                  setStore("editServer", {
+                                    id: i,
+                                    value: i,
+                                    error: "",
+                                    status: store.status[i]?.healthy,
+                                  })
                                 }}
                               >
                                 {language.t("dialog.server.menu.edit")}
@@ -715,9 +720,7 @@ export function DialogSelectServer() {
                 icon="plus-small"
                 size="large"
                 onClick={() => {
-                  setStore("addServer", "showForm", true)
-                  setStore("addServer", "url", "")
-                  setStore("addServer", "error", "")
+                  setStore("addServer", { showForm: true, url: "", error: "" })
                   scrollListToBottom()
                 }}
                 class="px-3 py-4"
@@ -739,12 +742,10 @@ export function DialogSelectServer() {
           onSubmit={handleCredentialsSubmit}
           onCancel={handleCancelCredentials}
           onUsernameChange={(value: string) => {
-            setStore("serverCred", "username", value)
-            setStore("serverCred", "error", "")
+            setStore("serverCred", { username: value, error: "" })
           }}
           onPasswordChange={(value: string) => {
-            setStore("serverCred", "password", value)
-            setStore("serverCred", "error", "")
+            setStore("serverCred", { password: value, error: "" })
           }}
         />
       </Show>
