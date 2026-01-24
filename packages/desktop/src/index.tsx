@@ -41,7 +41,7 @@ window.getComputedStyle = ((elt: Element, pseudoElt?: string | null) => {
 
 let update: Update | null = null
 
-const createPlatform = (password: Accessor<string | null>, serverUrl: Accessor<string | null>): Platform => ({
+const createPlatform = (password: Accessor<string | null>): Platform => ({
   platform: "desktop",
   os: (() => {
     const type = ostype()
@@ -290,35 +290,17 @@ const createPlatform = (password: Accessor<string | null>, serverUrl: Accessor<s
   // @ts-expect-error
   fetch: (input, init) => {
     const pw = password()
-    const desktopServerUrl = serverUrl()!.replace(/\/$/, "")
 
     const addHeader = (headers: Headers, password: string) => {
       headers.append("Authorization", `Basic ${btoa(`opencode:${password}`)}`)
     }
 
     if (input instanceof Request) {
-      const url = input.url
-      const normalizedUrl = url.replace(/\/$/, "")
-
-      if (normalizedUrl.startsWith(desktopServerUrl)) {
-        if (pw) addHeader(input.headers, pw)
-      }
-
+      if (pw) addHeader(input.headers, pw)
       return tauriFetch(input)
     } else {
       const headers = new Headers(init?.headers)
-      let normalizedUrl: string
-
-      if (input instanceof URL) {
-        normalizedUrl = input.toString().replace(/\/$/, "")
-      } else {
-        normalizedUrl = input.replace(/\/$/, "")
-      }
-
-      if (desktopServerUrl && normalizedUrl.startsWith(desktopServerUrl)) {
-        if (pw) addHeader(headers, pw)
-      }
-
+      if (pw) addHeader(headers, pw)
       return tauriFetch(input, {
         ...(init as any),
         headers: headers,
@@ -342,21 +324,9 @@ const createPlatform = (password: Accessor<string | null>, serverUrl: Accessor<s
 
 createMenu()
 
-const Loader = () => (
-  <div class="h-screen w-screen flex flex-col items-center justify-center bg-background-base">
-    <Splash class="w-16 h-20 opacity-50 animate-pulse" />
-    <div data-tauri-decorum-tb class="flex flex-row absolute top-0 right-0 z-10 h-10" />
-  </div>
-)
-
 render(() => {
   const [serverPassword, setServerPassword] = createSignal<string | null>(null)
-  const [serverUrl, setServerUrl] = createSignal<string | null>(null)
-  const platform = createPlatform(
-    () => serverPassword(),
-    () => serverUrl(),
-  )
-  const [userDefaultUrl] = createResource(() => platform.getDefaultServerUrl?.())
+  const platform = createPlatform(() => serverPassword())
 
   function handleClick(e: MouseEvent) {
     const link = (e.target as HTMLElement).closest("a.external-link") as HTMLAnchorElement | null
@@ -379,15 +349,10 @@ render(() => {
         <ServerGate>
           {(data) => {
             setServerPassword(data().password)
-            setServerUrl(data().url)
             window.__OPENCODE__ ??= {}
             window.__OPENCODE__.serverPassword = data().password ?? undefined
 
-            return (
-              <Show when={userDefaultUrl.state !== "pending"} fallback={<Loader />}>
-                <AppInterface defaultUrl={userDefaultUrl() ?? data().url} sidecarUrl={data().url} />
-              </Show>
-            )
+            return <AppInterface defaultUrl={data().url} />
           }}
         </ServerGate>
       </AppBaseProviders>

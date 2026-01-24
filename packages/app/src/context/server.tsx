@@ -28,7 +28,7 @@ function projectsKey(url: string) {
 
 export const { use: useServer, provider: ServerProvider } = createSimpleContext({
   name: "Server",
-  init: (props: { defaultUrl: string; sidecarUrl?: string }) => {
+  init: (props: { defaultUrl: string }) => {
     const platform = usePlatform()
 
     const [store, setStore, _, ready] = persisted(
@@ -37,7 +37,6 @@ export const { use: useServer, provider: ServerProvider } = createSimpleContext(
         list: [] as string[],
         projects: {} as Record<string, StoredProject[]>,
         lastProject: {} as Record<string, string>,
-        isSidecar: {} as Record<string, boolean>,
       }),
     )
 
@@ -46,13 +45,19 @@ export const { use: useServer, provider: ServerProvider } = createSimpleContext(
     function setActive(input: string) {
       const url = normalizeServerUrl(input)
       if (!url) return
-      if (active() === url) return
       setActiveRaw(url)
     }
 
     function add(input: string) {
       const url = normalizeServerUrl(input)
       if (!url) return
+
+      const fallback = normalizeServerUrl(props.defaultUrl)
+      if (fallback && url === fallback) {
+        setActiveRaw(url)
+        return
+      }
+
       batch(() => {
         if (!store.list.includes(url)) {
           setStore("list", store.list.length, url)
@@ -70,14 +75,23 @@ export const { use: useServer, provider: ServerProvider } = createSimpleContext(
 
       batch(() => {
         setStore("list", list)
-        if (store.isSidecar[url]) setStore("isSidecar", url, false)
         setActiveRaw(next)
       })
     }
 
+    createEffect(() => {
+      if (!ready()) return
+      if (active()) return
+      const url = normalizeServerUrl(props.defaultUrl)
+      if (!url) return
+      setActiveRaw(url)
+    })
+
+    const isReady = createMemo(() => ready() && !!active())
+
     const [healthy, setHealthy] = createSignal<boolean | undefined>(undefined)
 
-    const check = async (url: string) => {
+    const check = (url: string) => {
       const sdk = createOpencodeClient({
         baseUrl: url,
         fetch: platform.fetch,
@@ -88,66 +102,6 @@ export const { use: useServer, provider: ServerProvider } = createSimpleContext(
         .then((x) => x.data?.healthy === true)
         .catch(() => false)
     }
-
-    createEffect(() => {
-      if (!ready()) return
-      if (active()) return
-      const url = normalizeServerUrl(props.defaultUrl)
-      if (!url) return
-
-      const sidecar = normalizeServerUrl(props.sidecarUrl ?? "")
-      const shouldCheck = platform.platform === "desktop" && !!sidecar && sidecar !== url
-
-      const setUrl = (next: string) => {
-        batch(() => {
-          if (!store.list.includes(next)) {
-            setStore("list", store.list.length, next)
-          }
-          setActiveRaw(next)
-        })
-      }
-
-      if (!shouldCheck) {
-        setUrl(url)
-        return
-      }
-
-      let alive = true
-
-      void check(url).then((ok) => {
-        if (!alive) return
-        if (ok) {
-          setUrl(url)
-          return
-        }
-        setUrl(sidecar)
-      })
-
-      onCleanup(() => {
-        alive = false
-      })
-    })
-
-    createEffect(() => {
-      if (!ready()) return
-      if (platform.platform !== "desktop") return
-      const url = normalizeServerUrl(props.sidecarUrl ?? "")
-      if (!url) return
-      const stale = Object.keys(store.isSidecar).filter((key) => store.isSidecar[key] && key !== url)
-      if (stale.length === 0 && store.isSidecar[url]) return
-      batch(() => {
-        for (const key of stale) {
-          setStore("list", (prev) => prev.filter((item) => item !== key))
-          setStore("isSidecar", key, false)
-        }
-        if (!store.list.includes(url)) {
-          setStore("list", store.list.length, url)
-        }
-        setStore("isSidecar", url, true)
-      })
-    })
-
-    const isReady = createMemo(() => ready() && !!active())
 
     createEffect(() => {
       const url = active()
