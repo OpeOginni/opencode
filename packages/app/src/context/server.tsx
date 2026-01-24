@@ -78,17 +78,10 @@ export const { use: useServer, provider: ServerProvider } = createSimpleContext(
     const [healthy, setHealthy] = createSignal<boolean | undefined>(undefined)
 
     const check = async (url: string) => {
-      const credentials = await platform.getServerCredentials?.(url)
-      const headers = credentials
-        ? {
-            Authorization: `Basic ${btoa(`${credentials.username}:${credentials.password}`)}`,
-          }
-        : undefined
       const sdk = createOpencodeClient({
         baseUrl: url,
         fetch: platform.fetch,
         signal: AbortSignal.timeout(3000),
-        headers,
       })
       return sdk.global
         .health({ responseStyle: "fields" })

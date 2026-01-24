@@ -27,16 +27,14 @@ export const GlobalRoutes = lazy(() =>
             description: "Health information",
             content: {
               "application/json": {
-                schema: resolver(
-                  z.object({ healthy: z.literal(true), version: z.string(), authenticated: z.boolean() }),
-                ),
+                schema: resolver(z.object({ healthy: z.literal(true), version: z.string() })),
               },
             },
           },
         },
       }),
       async (c) => {
-        return c.json({ healthy: true, version: Installation.VERSION, authenticated: !!Flag.OPENCODE_SERVER_PASSWORD })
+        return c.json({ healthy: true, version: Installation.VERSION })
       },
     )
     .get(

@@ -338,24 +338,6 @@ const createPlatform = (password: Accessor<string | null>, serverUrl: Accessor<s
   parseMarkdown: async (markdown: string) => {
     return invoke<string>("parse_markdown_command", { markdown })
   },
-
-  storeServerCredentials: async (url: string, username: string, password: string) => {
-    await invoke("store_server_credentials", { url, username, password })
-  },
-
-  getServerCredentials: async (url: string) => {
-    const result = await invoke<[string, string] | null>("get_server_credentials", { url })
-    if (!result) return null
-    return { username: result[0], password: result[1] }
-  },
-
-  removeServerCredentials: async (url: string) => {
-    await invoke("remove_server_credentials", { url })
-  },
-
-  listServerCredentials: async () => {
-    return await invoke<string[]>("list_server_credentials")
-  },
 })
 
 createMenu()

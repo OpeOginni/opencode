@@ -24,12 +24,9 @@ use tauri_plugin_store::StoreExt;
 use tokio::sync::oneshot;
 
 use crate::window_customizer::PinchZoomDisablePlugin;
-use sha2::{Sha256, Digest};
 
 const SETTINGS_STORE: &str = "opencode.settings.dat";
 const DEFAULT_SERVER_URL_KEY: &str = "defaultServerUrl";
-const CREDENTIALS_INDEX_KEY: &str = "opencode.server.credentials.index";
-const CREDENTIALS_SERVICE_PREFIX: &str = "opencode.server.credentials";
 
 #[derive(Clone, serde::Serialize)]
 struct ServerReadyData {
@@ -139,144 +136,6 @@ async fn set_default_server_url(app: AppHandle, url: Option<String>) -> Result<(
         .map_err(|e| format!("Failed to save settings: {}", e))?;
 
     Ok(())
-}
-
-fn hash_url(url: &str) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(url.as_bytes());
-    hex::encode(hasher.finalize())
-}
-
-#[tauri::command]
-async fn store_server_credentials(
-    app: AppHandle,
-    url: String,
-    username: String,
-    password: String,
-) -> Result<(), String> {
-    let url_hash = hash_url(&url);
-    let credentials_key = format!("{}:{}", CREDENTIALS_SERVICE_PREFIX, url_hash);
-    
-    let store = app
-        .store(SETTINGS_STORE)
-        .map_err(|e| format!("Failed to open settings store: {}", e))?;
-    
-    // Store credentials
-    let credentials = serde_json::json!({
-        "username": username,
-        "password": password
-    });
-    store.set(&credentials_key, credentials);
-    
-    // Update index
-    let index_value = store.get(CREDENTIALS_INDEX_KEY);
-    let mut index: Vec<String> = if let Some(v) = index_value {
-        if let Some(arr) = v.as_array() {
-            arr.iter()
-                .filter_map(|v| v.as_str().map(String::from))
-                .collect()
-        } else {
-            vec![]
-        }
-    } else {
-        vec![]
-    };
-    
-    if !index.contains(&url_hash) {
-        index.push(url_hash);
-        store.set(CREDENTIALS_INDEX_KEY, serde_json::Value::Array(
-            index.iter().map(|h| serde_json::Value::String(h.clone())).collect()
-        ));
-    }
-    
-    store.save().map_err(|e| format!("Failed to save credentials: {}", e))?;
-    
-    Ok(())
-}
-
-#[tauri::command]
-async fn get_server_credentials(app: AppHandle, url: String) -> Result<Option<(String, String)>, String> {
-    let url_hash = hash_url(&url);
-    let credentials_key = format!("{}:{}", CREDENTIALS_SERVICE_PREFIX, url_hash);
-    
-    let store = app
-        .store(SETTINGS_STORE)
-        .map_err(|e| format!("Failed to open settings store: {}", e))?;
-    
-    let credentials_value = store.get(&credentials_key);
-    let credentials = match credentials_value {
-        Some(v) => v,
-        None => return Ok(None),
-    };
-    
-    let username = credentials["username"]
-        .as_str()
-        .ok_or("Missing username in credentials")?
-        .to_string();
-    let password = credentials["password"]
-        .as_str()
-        .ok_or("Missing password in credentials")?
-        .to_string();
-    
-    Ok(Some((username, password)))
-}
-
-#[tauri::command]
-async fn remove_server_credentials(app: AppHandle, url: String) -> Result<(), String> {
-    let url_hash = hash_url(&url);
-    let credentials_key = format!("{}:{}", CREDENTIALS_SERVICE_PREFIX, url_hash);
-    
-    let store = app
-        .store(SETTINGS_STORE)
-        .map_err(|e| format!("Failed to open settings store: {}", e))?;
-    
-    // Remove credentials
-    store.delete(&credentials_key);
-    
-    // Update index
-    let index_value = store.get(CREDENTIALS_INDEX_KEY);
-    let index: Vec<String> = if let Some(v) = index_value {
-        if let Some(arr) = v.as_array() {
-            arr.iter()
-                .filter_map(|v| v.as_str().map(String::from))
-                .filter(|h| h != &url_hash)
-                .collect()
-        } else {
-            vec![]
-        }
-    } else {
-        vec![]
-    };
-    
-    store.set(CREDENTIALS_INDEX_KEY, serde_json::Value::Array(
-        index.iter().map(|h| serde_json::Value::String(h.clone())).collect()
-    ));
-    
-    store.save().map_err(|e| format!("Failed to save settings: {}", e))?;
-    
-    Ok(())
-}
-
-#[tauri::command]
-async fn list_server_credentials(app: AppHandle) -> Result<Vec<String>, String> {
-    let store = app
-        .store(SETTINGS_STORE)
-        .map_err(|e| format!("Failed to open settings store: {}", e))?;
-    
-    let index_value = store.get(CREDENTIALS_INDEX_KEY);
-    match index_value {
-        Some(v) => {
-            if let Some(arr) = v.as_array() {
-                Ok(arr
-                    .iter()
-                    .filter_map(|v| v.as_str().map(String::from))
-                    .collect())
-            } else {
-                Ok(vec![])
-            }
-        }
-        None => Ok(vec![]),
-    }
 }
 
 fn get_sidecar_port() -> u32 {
@@ -429,11 +288,7 @@ pub fn run() {
             ensure_server_ready,
             get_default_server_url,
             set_default_server_url,
-            markdown::parse_markdown_command,
-            store_server_credentials,
-            get_server_credentials,
-            remove_server_credentials,
-            list_server_credentials
+            markdown::parse_markdown_command
         ])
         .setup(move |app| {
             let app = app.handle().clone();

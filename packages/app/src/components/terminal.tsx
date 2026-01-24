@@ -5,7 +5,6 @@ import { monoFontFamily, useSettings } from "@/context/settings"
 import { SerializeAddon } from "@/addons/serialize"
 import { LocalPTY } from "@/context/terminal"
 import { resolveThemeVariant, useTheme, withAlpha, type HexColor } from "@opencode-ai/ui/theme"
-import { useCredentials } from "@/context/credentials"
 
 export interface TerminalProps extends ComponentProps<"div"> {
   pty: LocalPTY
@@ -39,7 +38,6 @@ const DEFAULT_TERMINAL_COLORS: Record<"light" | "dark", TerminalColors> = {
 
 export const Terminal = (props: TerminalProps) => {
   const sdk = useSDK()
-  const credentials = useCredentials()
   const settings = useSettings()
   const theme = useTheme()
   let container!: HTMLDivElement
@@ -115,10 +113,7 @@ export const Terminal = (props: TerminalProps) => {
 
     const url = new URL(sdk.url + `/pty/${local.pty.id}/connect?directory=${encodeURIComponent(sdk.directory)}`)
 
-    if (credentials.credentials()) {
-      url.username = credentials.credentials()!.username
-      url.password = credentials.credentials()!.password
-    } else if (window.__OPENCODE__?.serverPassword) {
+    if (window.__OPENCODE__?.serverPassword) {
       url.username = "opencode"
       url.password = window.__OPENCODE__?.serverPassword
     }

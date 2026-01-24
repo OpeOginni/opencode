@@ -24,7 +24,6 @@ import { Binary } from "@opencode-ai/util/binary"
 import { retry } from "@opencode-ai/util/retry"
 import { useGlobalSDK } from "./global-sdk"
 import { ErrorPage, type InitError } from "../pages/error"
-import { useCredentials } from "./credentials"
 import {
   batch,
   createContext,
@@ -133,7 +132,6 @@ function normalizeProviderList(input: ProviderListResponse): ProviderListRespons
 function createGlobalSync() {
   const globalSDK = useGlobalSDK()
   const platform = usePlatform()
-  const credentials = useCredentials()
   const language = useLanguage()
   const owner = getOwner()
   if (!owner) throw new Error("GlobalSync must be created within owner")
@@ -374,19 +372,6 @@ function createGlobalSync() {
 
   async function bootstrapInstance(directory: string) {
     if (!directory) return
-    const [store, setStore] = child(directory, { bootstrap: false })
-
-    const headers = credentials.headers()
-
-    const cache = vcsCache.get(directory)
-    if (!cache) return
-    const sdk = createOpencodeClient({
-      baseUrl: globalSDK.url,
-      fetch: platform.fetch,
-      directory,
-      throwOnError: true,
-      headers,
-    })
     const pending = booting.get(directory)
     if (pending) return pending
 

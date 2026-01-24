@@ -31,7 +31,6 @@ import DirectoryLayout from "@/pages/directory-layout"
 import { ErrorPage } from "./pages/error"
 import { iife } from "@opencode-ai/util/iife"
 import { Suspense } from "solid-js"
-import { CredentialsProvider } from "./context/credentials"
 
 const Home = lazy(() => import("@/pages/home"))
 const Session = lazy(() => import("@/pages/session"))
@@ -98,59 +97,55 @@ export function AppInterface(props: { defaultUrl?: string; sidecarUrl?: string }
   return (
     <ServerProvider defaultUrl={defaultServerUrl()} sidecarUrl={props.sidecarUrl}>
       <ServerKey>
-        <Suspense fallback={<Loading />}>
-          <CredentialsProvider>
-            <GlobalSDKProvider>
-              <GlobalSyncProvider>
-                <Router
-                  root={(props) => (
-                    <SettingsProvider>
-                      <PermissionProvider>
-                        <LayoutProvider>
-                          <NotificationProvider>
-                            <CommandProvider>
-                              <Layout>{props.children}</Layout>
-                            </CommandProvider>
-                          </NotificationProvider>
-                        </LayoutProvider>
-                      </PermissionProvider>
-                    </SettingsProvider>
+        <GlobalSDKProvider>
+          <GlobalSyncProvider>
+            <Router
+              root={(props) => (
+                <SettingsProvider>
+                  <PermissionProvider>
+                    <LayoutProvider>
+                      <NotificationProvider>
+                        <CommandProvider>
+                          <Layout>{props.children}</Layout>
+                        </CommandProvider>
+                      </NotificationProvider>
+                    </LayoutProvider>
+                  </PermissionProvider>
+                </SettingsProvider>
+              )}
+            >
+              <Route
+                path="/"
+                component={() => (
+                  <Suspense fallback={<Loading />}>
+                    <Home />
+                  </Suspense>
+                )}
+              />
+              <Route path="/:dir" component={DirectoryLayout}>
+                <Route path="/" component={() => <Navigate href="session" />} />
+                <Route
+                  path="/session/:id?"
+                  component={(p) => (
+                    <Show when={p.params.id ?? "new"}>
+                      <TerminalProvider>
+                        <FileProvider>
+                          <PromptProvider>
+                            <CommentsProvider>
+                              <Suspense fallback={<Loading />}>
+                                <Session />
+                              </Suspense>
+                            </CommentsProvider>
+                          </PromptProvider>
+                        </FileProvider>
+                      </TerminalProvider>
+                    </Show>
                   )}
-                >
-                  <Route
-                    path="/"
-                    component={() => (
-                      <Suspense fallback={<Loading />}>
-                        <Home />
-                      </Suspense>
-                    )}
-                  />
-                  <Route path="/:dir" component={DirectoryLayout}>
-                    <Route path="/" component={() => <Navigate href="session" />} />
-                    <Route
-                      path="/session/:id?"
-                      component={(p) => (
-                        <Show when={p.params.id ?? "new"}>
-                          <TerminalProvider>
-                            <FileProvider>
-                              <PromptProvider>
-                                <CommentsProvider>
-                                  <Suspense fallback={<Loading />}>
-                                    <Session />
-                                  </Suspense>
-                                </CommentsProvider>
-                              </PromptProvider>
-                            </FileProvider>
-                          </TerminalProvider>
-                        </Show>
-                      )}
-                    />
-                  </Route>
-                </Router>
-              </GlobalSyncProvider>
-            </GlobalSDKProvider>
-          </CredentialsProvider>
-        </Suspense>
+                />
+              </Route>
+            </Router>
+          </GlobalSyncProvider>
+        </GlobalSDKProvider>
       </ServerKey>
     </ServerProvider>
   )

@@ -15,20 +15,13 @@ import { useLanguage } from "@/context/language"
 import { createOpencodeClient } from "@opencode-ai/sdk/v2/client"
 import { DialogSelectServer } from "./dialog-select-server"
 
-type ServerStatus = { healthy: boolean; version?: string; auth?: "required" | "invalid" }
+type ServerStatus = { healthy: boolean; version?: string }
 
 async function checkHealth(url: string, platform: ReturnType<typeof usePlatform>): Promise<ServerStatus> {
-  const credentials = await platform.getServerCredentials?.(url)
-  const headers = credentials
-    ? {
-        Authorization: `Basic ${btoa(`${credentials.username}:${credentials.password}`)}`,
-      }
-    : undefined
   const sdk = createOpencodeClient({
     baseUrl: url,
     fetch: platform.fetch,
     signal: AbortSignal.timeout(3000),
-    headers,
   })
   return sdk.global
     .health({ responseStyle: "fields" })
@@ -38,8 +31,7 @@ async function checkHealth(url: string, platform: ReturnType<typeof usePlatform>
       }
       const status = x?.response?.status
       if (status === 401 || status === 403) {
-        const auth = credentials ? ("invalid" as const) : ("required" as const)
-        return { healthy: false, auth }
+        return { healthy: false }
       }
       return { healthy: false }
     })
@@ -220,11 +212,7 @@ export function StatusPopover() {
                     const isActive = () => url === server.url
                     const isDefault = () => url === defaultServerUrl()
                     const status = () => store.status[url]
-                    const isBlocked = () => status()?.healthy === false || !!status()?.auth
-                    const authLabel = () => {
-                      if (status()?.auth === "required") return language.t("dialog.server.status.authRequired")
-                      if (status()?.auth === "invalid") return language.t("dialog.server.status.invalidCredentials")
-                    }
+                    const isBlocked = () => status()?.healthy === false
                     return (
                       <button
                         type="button"
@@ -252,9 +240,6 @@ export function StatusPopover() {
                         <span class="text-14-regular text-text-base truncate">{serverDisplayName(url)}</span>
                         <Show when={status()?.version}>
                           <span class="text-12-regular text-text-weak">{status()?.version}</span>
-                        </Show>
-                        <Show when={authLabel()}>
-                          {(label) => <span class="text-12-regular text-text-weak">{label()}</span>}
                         </Show>
                         <Show when={isDefault()}>
                           <span class="text-11-regular text-text-base bg-surface-base px-1.5 py-0.5 rounded-md">
