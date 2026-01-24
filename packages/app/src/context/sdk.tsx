@@ -4,7 +4,6 @@ import { createGlobalEmitter } from "@solid-primitives/event-bus"
 import { createEffect, createMemo, onCleanup } from "solid-js"
 import { useGlobalSDK } from "./global-sdk"
 import { usePlatform } from "./platform"
-import { useCredentials } from "./credentials"
 
 export const { use: useSDK, provider: SDKProvider } = createSimpleContext({
   name: "SDK",
@@ -12,32 +11,15 @@ export const { use: useSDK, provider: SDKProvider } = createSimpleContext({
     const platform = usePlatform()
     const globalSDK = useGlobalSDK()
 
-    const credentials = useCredentials()
-
-    const headers = createMemo(() => {
-      return credentials.headers()
-    })
-
     const directory = createMemo(() => props.directory)
-    const client = createMemo(() => {
-      // Wait for credentials to be ready before creating SDK client
-      if (!credentials.ready()) {
-        return createOpencodeClient({
-          baseUrl: globalSDK.url,
-          fetch: platform.fetch,
-          directory: directory(),
-          throwOnError: true,
-        })
-      }
-
-      return createOpencodeClient({
+    const client = createMemo(() =>
+      createOpencodeClient({
         baseUrl: globalSDK.url,
         fetch: platform.fetch,
         directory: directory(),
         throwOnError: true,
-        headers: headers(),
-      })
-    })
+      }),
+    )
 
     const emitter = createGlobalEmitter<{
       [key in Event["type"]]: Extract<Event, { type: key }>
@@ -51,10 +33,6 @@ export const { use: useSDK, provider: SDKProvider } = createSimpleContext({
     })
 
     return {
-      refetchCredentials: credentials.refetch,
-      get ready() {
-        return credentials.ready()
-      },
       get directory() {
         return directory()
       },
