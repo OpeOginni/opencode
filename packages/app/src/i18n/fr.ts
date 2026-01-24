@@ -236,10 +236,6 @@ export const dict = {
   "dialog.server.default.clear": "Effacer",
   "dialog.server.action.remove": "Supprimer le serveur",
 
-  "dialog.server.credentials.title": "Entrez vos identifiants",
-  "dialog.server.credentials.description": "Se connecter à {{url}}",
-  "dialog.server.credentials.error.required": "Nom d'utilisateur et mot de passe requis",
-  "dialog.server.credentials.error.invalid": "Nom d'utilisateur ou mot de passe invalide",
   "dialog.server.menu.edit": "Modifier",
   "dialog.server.menu.default": "Définir par défaut",
   "dialog.server.menu.defaultRemove": "Supprimer par défaut",

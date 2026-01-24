@@ -257,10 +257,6 @@ export const dict = {
   "dialog.server.default.clear": "Tøm",
   "dialog.server.action.remove": "Fjern server",
 
-  "dialog.server.credentials.title": "Angi legitimasjon",
-  "dialog.server.credentials.description": "Koble til {{url}}",
-  "dialog.server.credentials.error.required": "Brukernavn og passord er påkrevd",
-  "dialog.server.credentials.error.invalid": "Ugyldig brukernavn eller passord",
   "dialog.server.menu.edit": "Rediger",
   "dialog.server.menu.default": "Sett som standard",
   "dialog.server.menu.defaultRemove": "Fjern standard",

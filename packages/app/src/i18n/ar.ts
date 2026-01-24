@@ -254,10 +254,6 @@ export const dict = {
   "dialog.server.default.clear": "مسح",
   "dialog.server.action.remove": "إزالة الخادم",
 
-  "dialog.server.credentials.title": "أدخل بيانات الاعتماد",
-  "dialog.server.credentials.description": "الاتصال بـ {{url}}",
-  "dialog.server.credentials.error.required": "اسم المستخدم وكلمة المرور مطلوبان",
-  "dialog.server.credentials.error.invalid": "اسم المستخدم أو كلمة المرور غير صالحة",
   "dialog.server.menu.edit": "تعديل",
   "dialog.server.menu.default": "تعيين كافتراضي",
   "dialog.server.menu.defaultRemove": "إزالة الافتراضي",

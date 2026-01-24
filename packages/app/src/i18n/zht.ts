@@ -237,10 +237,6 @@ export const dict = {
   "dialog.server.default.clear": "清除",
   "dialog.server.action.remove": "移除伺服器",
 
-  "dialog.server.credentials.title": "輸入憑證",
-  "dialog.server.credentials.description": "連線到 {{url}}",
-  "dialog.server.credentials.error.required": "需要使用者名稱和密碼",
-  "dialog.server.credentials.error.invalid": "使用者名稱或密碼無效",
   "dialog.server.menu.edit": "編輯",
   "dialog.server.menu.default": "設為預設",
   "dialog.server.menu.defaultRemove": "取消預設",

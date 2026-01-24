@@ -235,10 +235,6 @@ export const dict = {
   "dialog.server.default.clear": "クリア",
   "dialog.server.action.remove": "サーバーを削除",
 
-  "dialog.server.credentials.title": "認証情報を入力",
-  "dialog.server.credentials.description": "{{url}} に接続",
-  "dialog.server.credentials.error.required": "ユーザー名とパスワードが必要です",
-  "dialog.server.credentials.error.invalid": "ユーザー名またはパスワードが無効です",
   "dialog.server.menu.edit": "編集",
   "dialog.server.menu.default": "デフォルトに設定",
   "dialog.server.menu.defaultRemove": "デフォルト設定を解除",

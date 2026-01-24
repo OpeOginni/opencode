@@ -239,10 +239,6 @@ export const dict = {
   "dialog.server.default.clear": "지우기",
   "dialog.server.action.remove": "서버 제거",
 
-  "dialog.server.credentials.title": "자격 증명 입력",
-  "dialog.server.credentials.description": "{{url}}에 연결",
-  "dialog.server.credentials.error.required": "사용자 이름과 비밀번호가 필요합니다",
-  "dialog.server.credentials.error.invalid": "유효하지 않은 사용자 이름 또는 비밀번호",
   "dialog.server.menu.edit": "편집",
   "dialog.server.menu.default": "기본값으로 설정",
   "dialog.server.menu.defaultRemove": "기본값 제거",
