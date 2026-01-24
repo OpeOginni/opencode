@@ -1545,7 +1545,8 @@ export default function Page() {
                               "sticky top-0 z-30 bg-background-stronger": true,
                               "w-full": true,
                               "px-4 md:px-6": true,
-                              "md:max-w-200 md:mx-auto": !showTabs(),
+                              "md:max-w-200 md:mx-auto 2xl:max-w-[1300px] 2xl:mx-auto 3xl:max-w-[1800px] 3xl:mx-auto 4xl:max-w-[2000px] 4xl:mx-auto 5xl:max-w-[2200px] 5xl:mx-auto":
+                              !showTabs(),
                             }}
                           >
                             <div class="h-10 flex items-center gap-1">
@@ -1573,7 +1574,8 @@ export default function Page() {
                           class="flex flex-col gap-32 items-start justify-start pb-[calc(var(--prompt-height,8rem)+64px)] md:pb-[calc(var(--prompt-height,10rem)+64px)] transition-[margin]"
                           classList={{
                             "w-full": true,
-                            "md:max-w-200 md:mx-auto": !showTabs(),
+                            "md:max-w-200 md:mx-auto 2xl:max-w-[1300px] 2xl:mx-auto 3xl:max-w-[2000px] 3xl:mx-auto 4xl:max-w-[2200px] 4xl:mx-auto 5xl:max-w-[2400px] 5xl:mx-auto":
+                            !showTabs(),
                             "mt-0.5": !showTabs(),
                             "mt-0": showTabs(),
                           }}
@@ -1624,7 +1626,8 @@ export default function Page() {
                                   data-message-id={message.id}
                                   classList={{
                                     "min-w-0 w-full max-w-full": true,
-                                    "md:max-w-200": !showTabs(),
+                                    "md:max-w-200 2xl:max-w-[1300px] 3xl:max-w-[2000px] 4xl:max-w-[2200px] 5xl:max-w-[2400px]":
+                                    !showTabs(),
                                   }}
                                 >
                                   <SessionTurn
@@ -1681,7 +1684,7 @@ export default function Page() {
             <div
               classList={{
                 "w-full px-4 pointer-events-auto": true,
-                "md:max-w-200": !showTabs(),
+                "md:max-w-200 2xl:max-w-[1300px] 3xl:max-w-[2000px] 4xl:max-w-[2200px] 5xl:max-w-[2400px]": !showTabs(),
               }}
             >
               <Show
