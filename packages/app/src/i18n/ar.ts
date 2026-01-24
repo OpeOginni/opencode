@@ -260,8 +260,6 @@ export const dict = {
   "dialog.server.menu.delete": "حذف",
   "dialog.server.current": "الخادم الحالي",
   "dialog.server.status.default": "افتراضي",
-  "dialog.server.status.authRequired": "المصادقة مطلوبة",
-  "dialog.server.status.invalidCredentials": "بيانات الاعتماد غير صالحة",
 
   "dialog.project.edit.title": "تحرير المشروع",
   "dialog.project.edit.name": "الاسم",

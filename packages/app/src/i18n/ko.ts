@@ -245,8 +245,6 @@ export const dict = {
   "dialog.server.menu.delete": "삭제",
   "dialog.server.current": "현재 서버",
   "dialog.server.status.default": "기본값",
-  "dialog.server.status.authRequired": "인증 필요",
-  "dialog.server.status.invalidCredentials": "유효하지 않은 자격 증명",
 
   "dialog.project.edit.title": "프로젝트 편집",
   "dialog.project.edit.name": "이름",

@@ -242,8 +242,6 @@ export const dict = {
   "dialog.server.menu.delete": "Slet",
   "dialog.server.current": "Nuværende server",
   "dialog.server.status.default": "Standard",
-  "dialog.server.status.authRequired": "Godkendelse påkrævet",
-  "dialog.server.status.invalidCredentials": "Ugyldige loginoplysninger",
 
   "dialog.project.edit.title": "Rediger projekt",
   "dialog.project.edit.name": "Navn",

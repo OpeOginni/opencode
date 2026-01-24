@@ -242,8 +242,6 @@ export const dict = {
   "dialog.server.menu.delete": "Supprimer",
   "dialog.server.current": "Serveur actuel",
   "dialog.server.status.default": "Défaut",
-  "dialog.server.status.authRequired": "Authentification requise",
-  "dialog.server.status.invalidCredentials": "Identifiants invalides",
 
   "dialog.project.edit.title": "Modifier le projet",
   "dialog.project.edit.name": "Nom",

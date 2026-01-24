@@ -241,8 +241,6 @@ export const dict = {
   "dialog.server.menu.delete": "删除",
   "dialog.server.current": "当前服务器",
   "dialog.server.status.default": "默认",
-  "dialog.server.status.authRequired": "需要认证",
-  "dialog.server.status.invalidCredentials": "凭据无效",
 
   "dialog.project.edit.title": "编辑项目",
   "dialog.project.edit.name": "名称",

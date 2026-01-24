@@ -260,8 +260,6 @@ export const dict = {
   "dialog.server.menu.delete": "Usuń",
   "dialog.server.current": "Obecny serwer",
   "dialog.server.status.default": "Domyślny",
-  "dialog.server.status.authRequired": "Wymagana autoryzacja",
-  "dialog.server.status.invalidCredentials": "Nieprawidłowe dane uwierzytelniające",
 
   "dialog.project.edit.title": "Edytuj projekt",
   "dialog.project.edit.name": "Nazwa",
