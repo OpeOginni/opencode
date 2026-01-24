@@ -45,20 +45,8 @@ async function checkHealth(url: string, platform: ReturnType<typeof usePlatform>
     signal: AbortSignal.timeout(3000),
   })
   return sdk.global
-    .health({ responseStyle: "fields" })
-    .then((x) => {
-      if (x?.response?.ok) {
-        return {
-          healthy: x.data?.healthy === true,
-          version: x.data?.version,
-        }
-      }
-      const status = x?.response?.status
-      if (status === 401 || status === 403 || status === 404) {
-        return { healthy: false }
-      }
-      return { healthy: false }
-    })
+    .health()
+    .then((x) => ({ healthy: x.data?.healthy === true, version: x.data?.version }))
     .catch(() => ({ healthy: false }))
 }
 

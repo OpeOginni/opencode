@@ -8,7 +8,6 @@ import { Instance } from "../../project/instance"
 import { Installation } from "@/installation"
 import { Log } from "../../util/log"
 import { lazy } from "../../util/lazy"
-import { Flag } from "@/flag/flag"
 
 const log = Log.create({ service: "server" })
 

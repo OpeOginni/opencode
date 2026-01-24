@@ -84,8 +84,8 @@ export const { use: useServer, provider: ServerProvider } = createSimpleContext(
         signal: AbortSignal.timeout(3000),
       })
       return sdk.global
-        .health({ responseStyle: "fields" })
-        .then((x) => x?.response?.ok === true && x.data?.healthy === true)
+        .health()
+        .then((x) => x.data?.healthy === true)
         .catch(() => false)
     }
 
