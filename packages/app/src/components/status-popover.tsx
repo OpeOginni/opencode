@@ -13,22 +13,40 @@ import { useSDK } from "@/context/sdk"
 import { normalizeServerUrl, serverDisplayName, useServer } from "@/context/server"
 import { usePlatform } from "@/context/platform"
 import { useLanguage } from "@/context/language"
+import { useGlobalSDK } from "@/context/global-sdk"
 import { createOpencodeClient } from "@opencode-ai/sdk/v2/client"
-import { DialogSelectServer } from "./dialog-select-server"
+import { canAuth, DialogSelectServer, ServerStatus } from "./dialog-select-server"
 import { showToast } from "@opencode-ai/ui/toast"
 
-type ServerStatus = { healthy: boolean; version?: string }
-
-async function checkHealth(url: string, platform: ReturnType<typeof usePlatform>): Promise<ServerStatus> {
+async function checkHealth(
+  url: string,
+  platform: ReturnType<typeof usePlatform>,
+  headers?: Record<string, string>,
+): Promise<ServerStatus> {
   const signal = (AbortSignal as unknown as { timeout?: (ms: number) => AbortSignal }).timeout?.(3000)
+
   const sdk = createOpencodeClient({
     baseUrl: url,
     fetch: platform.fetch,
     signal,
+    headers,
   })
   return sdk.global
-    .health()
-    .then((x) => ({ healthy: x.data?.healthy === true, version: x.data?.version }))
+    .health({ responseStyle: "fields" })
+    .then((x) => {
+      if (x?.response?.ok) {
+        return {
+          healthy: x.data?.healthy === true,
+          version: x.data?.version,
+        }
+      }
+      const status = x?.response?.status
+      if (status === 401 || status === 403) {
+        if (!headers && canAuth(platform)) return { healthy: false, auth: "required" as const }
+        return { healthy: false }
+      }
+      return { healthy: false }
+    })
     .catch(() => ({ healthy: false }))
 }
 
@@ -37,6 +55,7 @@ export function StatusPopover() {
   const sdk = useSDK()
   const server = useServer()
   const platform = usePlatform()
+  const globalSDK = useGlobalSDK()
   const dialog = useDialog()
   const language = useLanguage()
   const navigate = useNavigate()
@@ -76,9 +95,11 @@ export function StatusPopover() {
 
   async function refreshHealth() {
     const results: Record<string, ServerStatus> = {}
+    const activeHeaders = globalSDK.headers ? globalSDK.headers() : undefined
     await Promise.all(
       servers().map(async (url) => {
-        results[url] = await checkHealth(url, platform)
+        const headers = url === globalSDK.url ? activeHeaders : undefined
+        results[url] = await checkHealth(url, platform, headers)
       }),
     )
     setStore("status", reconcile(results))
@@ -125,7 +146,8 @@ export function StatusPopover() {
   const pluginCount = createMemo(() => plugins().length)
 
   const overallHealthy = createMemo(() => {
-    const serverHealthy = server.healthy() === true
+    const active = store.status[server.url]
+    const serverHealthy = active?.healthy === true
     const anyMcpIssue = mcpItems().some((m) => m.status !== "connected" && m.status !== "disabled")
     return serverHealthy && !anyMcpIssue
   })
@@ -149,6 +171,33 @@ export function StatusPopover() {
     refreshDefaultServerUrl()
   })
 
+  const handleServerClick = async (url: string, needsAuth: boolean) => {
+    if (!needsAuth) {
+      server.setActive(url)
+      navigate("/")
+      return
+    }
+    if (!canAuth(platform)) {
+      dialog.show(() => <DialogSelectServer />, refreshDefaultServerUrl)
+      return
+    }
+    const credentials = await platform.getServerCredentials?.(url)
+    if (!credentials) {
+      dialog.show(() => <DialogSelectServer />, refreshDefaultServerUrl)
+      return
+    }
+    const headers = {
+      Authorization: `Basic ${btoa(`${credentials.username}:${credentials.password}`)}`,
+    }
+    const result = await checkHealth(url, platform, headers)
+    if (result.healthy) {
+      server.setActive(url)
+      navigate("/")
+      return
+    }
+    dialog.show(() => <DialogSelectServer />, refreshDefaultServerUrl)
+  }
+
   return (
     <Popover
       triggerAs={Button}
@@ -164,8 +213,8 @@ export function StatusPopover() {
             classList={{
               "size-1.5 rounded-full": true,
               "bg-icon-success-base": overallHealthy(),
-              "bg-icon-critical-base": !overallHealthy() && server.healthy() !== undefined,
-              "bg-border-weak-base": server.healthy() === undefined,
+              "bg-icon-critical-base": !overallHealthy() && store.status[server.url] !== undefined,
+              "bg-border-weak-base": store.status[server.url] === undefined,
             }}
           />
           <span class="text-12-regular text-text-strong">{language.t("status.popover.trigger")}</span>
@@ -212,7 +261,8 @@ export function StatusPopover() {
                     const isActive = () => url === server.url
                     const isDefault = () => url === store.defaultServerUrl
                     const status = () => store.status[url]
-                    const isBlocked = () => status()?.healthy === false
+                    const authNeeded = () => status()?.auth !== undefined
+                    const isBlocked = () => status()?.healthy === false && !authNeeded()
                     const [truncated, setTruncated] = createSignal(false)
                     let nameRef: HTMLSpanElement | undefined
                     let versionRef: HTMLSpanElement | undefined
@@ -254,15 +304,15 @@ export function StatusPopover() {
                           aria-disabled={isBlocked()}
                           onClick={() => {
                             if (isBlocked()) return
-                            server.setActive(url)
-                            navigate("/")
+                            void handleServerClick(url, authNeeded())
                           }}
                         >
                           <div
                             classList={{
                               "size-1.5 rounded-full shrink-0": true,
                               "bg-icon-success-base": status()?.healthy === true,
-                              "bg-icon-critical-base": status()?.healthy === false,
+                              "bg-icon-warning-base": status()?.auth !== undefined && status()?.healthy !== true,
+                              "bg-icon-critical-base": status()?.healthy === false && status()?.auth === undefined,
                               "bg-border-weak-base": status() === undefined,
                             }}
                           />

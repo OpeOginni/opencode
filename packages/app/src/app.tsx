@@ -26,6 +26,7 @@ import { DialogProvider } from "@opencode-ai/ui/context/dialog"
 import { CommandProvider } from "@/context/command"
 import { LanguageProvider, useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
+import { useGlobalSDK } from "@/context/global-sdk"
 import { HighlightsProvider } from "@/context/highlights"
 import Layout from "@/pages/layout"
 import DirectoryLayout from "@/pages/directory-layout"
@@ -43,13 +44,19 @@ function UiI18nBridge(props: ParentProps) {
 
 declare global {
   interface Window {
-    __OPENCODE__?: { updaterEnabled?: boolean; serverPassword?: string }
+    __OPENCODE__?: { updaterEnabled?: boolean; serverPassword?: string; serverUrl?: string }
   }
 }
 
 function MarkedProviderWithNativeParser(props: ParentProps) {
   const platform = usePlatform()
   return <MarkedProvider nativeParser={platform.parseMarkdown}>{props.children}</MarkedProvider>
+}
+
+function AuthGate(props: ParentProps) {
+  const globalSDK = useGlobalSDK()
+  const ready = () => !globalSDK.authReady || globalSDK.authReady()
+  return <Show when={ready()}>{props.children}</Show>
 }
 
 export function AppBaseProviders(props: ParentProps) {
@@ -109,57 +116,59 @@ export function AppInterface(props: { defaultUrl?: string }) {
     <ServerProvider defaultUrl={defaultServerUrl()}>
       <ServerKey>
         <GlobalSDKProvider>
-          <GlobalSyncProvider>
-            <Router
-              root={(props) => (
-                <SettingsProvider>
-                  <PermissionProvider>
-                    <LayoutProvider>
-                      <NotificationProvider>
-                        <ModelsProvider>
-                          <CommandProvider>
-                            <HighlightsProvider>
-                              <Layout>{props.children}</Layout>
-                            </HighlightsProvider>
-                          </CommandProvider>
-                        </ModelsProvider>
-                      </NotificationProvider>
-                    </LayoutProvider>
-                  </PermissionProvider>
-                </SettingsProvider>
-              )}
-            >
-              <Route
-                path="/"
-                component={() => (
-                  <Suspense fallback={<Loading />}>
-                    <Home />
-                  </Suspense>
+          <AuthGate>
+            <GlobalSyncProvider>
+              <Router
+                root={(props) => (
+                  <SettingsProvider>
+                    <PermissionProvider>
+                      <LayoutProvider>
+                        <NotificationProvider>
+                          <ModelsProvider>
+                            <CommandProvider>
+                              <HighlightsProvider>
+                                <Layout>{props.children}</Layout>
+                              </HighlightsProvider>
+                            </CommandProvider>
+                          </ModelsProvider>
+                        </NotificationProvider>
+                      </LayoutProvider>
+                    </PermissionProvider>
+                  </SettingsProvider>
                 )}
-              />
-              <Route path="/:dir" component={DirectoryLayout}>
-                <Route path="/" component={() => <Navigate href="session" />} />
+              >
                 <Route
-                  path="/session/:id?"
-                  component={(p) => (
-                    <Show when={p.params.id ?? "new"}>
-                      <TerminalProvider>
-                        <FileProvider>
-                          <PromptProvider>
-                            <CommentsProvider>
-                              <Suspense fallback={<Loading />}>
-                                <Session />
-                              </Suspense>
-                            </CommentsProvider>
-                          </PromptProvider>
-                        </FileProvider>
-                      </TerminalProvider>
-                    </Show>
+                  path="/"
+                  component={() => (
+                    <Suspense fallback={<Loading />}>
+                      <Home />
+                    </Suspense>
                   )}
                 />
-              </Route>
-            </Router>
-          </GlobalSyncProvider>
+                <Route path="/:dir" component={DirectoryLayout}>
+                  <Route path="/" component={() => <Navigate href="session" />} />
+                  <Route
+                    path="/session/:id?"
+                    component={(p) => (
+                      <Show when={p.params.id ?? "new"}>
+                        <TerminalProvider>
+                          <FileProvider>
+                            <PromptProvider>
+                              <CommentsProvider>
+                                <Suspense fallback={<Loading />}>
+                                  <Session />
+                                </Suspense>
+                              </CommentsProvider>
+                            </PromptProvider>
+                          </FileProvider>
+                        </TerminalProvider>
+                      </Show>
+                    )}
+                  />
+                </Route>
+              </Router>
+            </GlobalSyncProvider>
+          </AuthGate>
         </GlobalSDKProvider>
       </ServerKey>
     </ServerProvider>

@@ -1,6 +1,7 @@
 import type { Ghostty, Terminal as Term, FitAddon } from "ghostty-web"
 import { ComponentProps, createEffect, createSignal, onCleanup, onMount, splitProps } from "solid-js"
 import { useSDK } from "@/context/sdk"
+import { usePlatform } from "@/context/platform"
 import { monoFontFamily, useSettings } from "@/context/settings"
 import { SerializeAddon } from "@/addons/serialize"
 import { LocalPTY } from "@/context/terminal"
@@ -53,6 +54,7 @@ const DEFAULT_TERMINAL_COLORS: Record<"light" | "dark", TerminalColors> = {
 
 export const Terminal = (props: TerminalProps) => {
   const sdk = useSDK()
+  const platform = usePlatform()
   const settings = useSettings()
   const theme = useTheme()
   const language = useLanguage()
@@ -146,9 +148,26 @@ export const Terminal = (props: TerminalProps) => {
       const once = { value: false }
 
       const url = new URL(sdk.url + `/pty/${local.pty.id}/connect?directory=${encodeURIComponent(sdk.directory)}`)
-      if (window.__OPENCODE__?.serverPassword) {
-        url.username = "opencode"
-        url.password = window.__OPENCODE__?.serverPassword
+      const matchesLocal = (() => {
+        const localUrl = window.__OPENCODE__?.serverUrl
+        if (!localUrl) return false
+        try {
+          return new URL(localUrl).origin === new URL(sdk.url).origin
+        } catch {
+          return false
+        }
+      })()
+      const localPassword = matchesLocal ? window.__OPENCODE__?.serverPassword : null
+      const stored = localPassword
+        ? null
+        : platform.getServerCredentials
+          ? await platform.getServerCredentials(sdk.url).catch(() => null)
+          : null
+      const username = localPassword ? "opencode" : stored?.username
+      const password = localPassword ?? stored?.password
+      if (username && password) {
+        url.username = username
+        url.password = password
       }
       const socket = new WebSocket(url)
       cleanups.push(() => {

@@ -140,6 +140,11 @@ function createGlobalSync() {
   const iconCache = new Map<string, IconCache>()
 
   const sdkCache = new Map<string, ReturnType<typeof createOpencodeClient>>()
+  const headerKey = () => {
+    const headers = globalSDK.headers?.()
+    if (!headers) return ""
+    return JSON.stringify(headers)
+  }
   const sdkFor = (directory: string) => {
     const cached = sdkCache.get(directory)
     if (cached) return cached
@@ -147,12 +152,18 @@ function createGlobalSync() {
     const sdk = createOpencodeClient({
       baseUrl: globalSDK.url,
       fetch: platform.fetch,
+      headers: globalSDK.headers(),
       directory,
       throwOnError: true,
     })
     sdkCache.set(directory, sdk)
     return sdk
   }
+
+  createEffect(() => {
+    headerKey()
+    sdkCache.clear()
+  })
 
   const [projectCache, setProjectCache, , projectCacheReady] = persisted(
     Persist.global("globalSync.project", ["globalSync.project.v1"]),

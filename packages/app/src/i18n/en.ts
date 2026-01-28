@@ -270,12 +270,18 @@ export const dict = {
   "dialog.server.default.clear": "Clear",
   "dialog.server.action.remove": "Remove server",
 
+  "dialog.server.credentials.title": "Enter credentials",
+  "dialog.server.credentials.description": "Connect to {{url}}",
+  "dialog.server.credentials.error.required": "Username and password are required",
+  "dialog.server.credentials.error.invalid": "Invalid username or password",
   "dialog.server.menu.edit": "Edit",
   "dialog.server.menu.default": "Set as default",
   "dialog.server.menu.defaultRemove": "Remove default",
   "dialog.server.menu.delete": "Delete",
   "dialog.server.current": "Current Server",
   "dialog.server.status.default": "Default",
+  "dialog.server.status.authRequired": "Auth required",
+  "dialog.server.status.invalidCredentials": "Invalid credentials",
 
   "dialog.project.edit.title": "Edit project",
   "dialog.project.edit.name": "Name",

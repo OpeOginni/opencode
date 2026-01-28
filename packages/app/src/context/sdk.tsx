@@ -8,14 +8,15 @@ import { usePlatform } from "./platform"
 export const { use: useSDK, provider: SDKProvider } = createSimpleContext({
   name: "SDK",
   init: (props: { directory: string }) => {
-    const platform = usePlatform()
     const globalSDK = useGlobalSDK()
+    const platform = usePlatform()
 
     const directory = createMemo(() => props.directory)
     const client = createMemo(() =>
       createOpencodeClient({
         baseUrl: globalSDK.url,
         fetch: platform.fetch,
+        headers: globalSDK.headers(),
         directory: directory(),
         throwOnError: true,
       }),

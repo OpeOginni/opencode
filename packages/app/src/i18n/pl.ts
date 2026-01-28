@@ -264,12 +264,18 @@ export const dict = {
   "dialog.server.default.clear": "Wyczyść",
   "dialog.server.action.remove": "Usuń serwer",
 
+  "dialog.server.credentials.title": "Wprowadź poświadczenia",
+  "dialog.server.credentials.description": "Połącz z {{url}}",
+  "dialog.server.credentials.error.required": "Nazwa użytkownika i hasło są wymagane",
+  "dialog.server.credentials.error.invalid": "Nieprawidłowa nazwa użytkownika lub hasło",
   "dialog.server.menu.edit": "Edytuj",
   "dialog.server.menu.default": "Ustaw jako domyślny",
   "dialog.server.menu.defaultRemove": "Usuń domyślny",
   "dialog.server.menu.delete": "Usuń",
   "dialog.server.current": "Obecny serwer",
   "dialog.server.status.default": "Domyślny",
+  "dialog.server.status.authRequired": "Wymagana autoryzacja",
+  "dialog.server.status.invalidCredentials": "Nieprawidłowe poświadczenia",
 
   "dialog.project.edit.title": "Edytuj projekt",
   "dialog.project.edit.name": "Nazwa",

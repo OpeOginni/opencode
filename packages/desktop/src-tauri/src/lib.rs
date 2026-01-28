@@ -25,6 +25,9 @@ use tokio::sync::oneshot;
 
 use crate::window_customizer::PinchZoomDisablePlugin;
 
+use keyring::Entry;
+use sha2::{Digest, Sha256};
+
 const SETTINGS_STORE: &str = "opencode.settings.dat";
 const DEFAULT_SERVER_URL_KEY: &str = "defaultServerUrl";
 
@@ -134,6 +137,71 @@ async fn set_default_server_url(app: AppHandle, url: Option<String>) -> Result<(
     store
         .save()
         .map_err(|e| format!("Failed to save settings: {}", e))?;
+
+    Ok(())
+}
+
+fn hash_url(url: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(url.as_bytes());
+    hex::encode(hasher.finalize())
+}
+
+#[tauri::command]
+fn store_server_credentials(
+    url: String,
+    username: String,
+    password: String,
+) -> Result<(), String> {
+    let url_hash = hash_url(&url);
+
+    let entry = Entry::new("opencode_server_credentials", &url_hash).map_err(|e| e.to_string())?;
+    let payload = serde_json::json!({
+        "username": username,
+        "password": password
+    })
+    .to_string();
+    entry.set_password(&payload).map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+fn get_server_credentials(url: String) -> Result<Option<(String, String)>, String> {
+    let url_hash = hash_url(&url);
+
+    let entry = Entry::new("opencode_server_credentials", &url_hash).map_err(|e| e.to_string())?;
+    if let Ok(payload) = entry.get_password() {
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(&payload) {
+            let username = value.get("username").and_then(|v| v.as_str()).map(String::from);
+            let password = value.get("password").and_then(|v| v.as_str()).map(String::from);
+            if let (Some(u), Some(p)) = (username, password) {
+                return Ok(Some((u, p)));
+            }
+        }
+    }
+
+    let username_entry = Entry::new("opencode_username", &url_hash).map_err(|e| e.to_string())?;
+    let password_entry = Entry::new("opencode_password", &url_hash).map_err(|e| e.to_string())?;
+
+    match (username_entry.get_password(), password_entry.get_password()) {
+        (Ok(u), Ok(p)) => Ok(Some((u, p))),
+        _ => Ok(None)
+    }
+}
+
+#[tauri::command]
+fn remove_server_credentials(url: String) -> Result<(), String> {
+    let url_hash = hash_url(&url);
+
+    let entry = Entry::new("opencode_server_credentials", &url_hash).map_err(|e| e.to_string())?;
+    let _ = entry.delete_credential();
+
+    let username_entry = Entry::new("opencode_username", &url_hash).map_err(|e| e.to_string())?;
+    let password_entry = Entry::new("opencode_password", &url_hash).map_err(|e| e.to_string())?;
+
+    let _ = username_entry.delete_credential();
+    let _ = password_entry.delete_credential();
 
     Ok(())
 }
@@ -288,7 +356,10 @@ pub fn run() {
             ensure_server_ready,
             get_default_server_url,
             set_default_server_url,
-            markdown::parse_markdown_command
+            markdown::parse_markdown_command,
+            store_server_credentials,
+            get_server_credentials,
+            remove_server_credentials
         ])
         .setup(move |app| {
             let app = app.handle().clone();

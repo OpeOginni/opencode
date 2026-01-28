@@ -263,12 +263,18 @@ export const dict = {
   "dialog.server.default.clear": "清除",
   "dialog.server.action.remove": "移除服务器",
 
+  "dialog.server.credentials.title": "输入凭据",
+  "dialog.server.credentials.description": "连接到 {{url}}",
+  "dialog.server.credentials.error.required": "需要用户名和密码",
+  "dialog.server.credentials.error.invalid": "用户名或密码无效",
   "dialog.server.menu.edit": "编辑",
   "dialog.server.menu.default": "设为默认",
   "dialog.server.menu.defaultRemove": "取消默认",
   "dialog.server.menu.delete": "删除",
   "dialog.server.current": "当前服务器",
   "dialog.server.status.default": "默认",
+  "dialog.server.status.authRequired": "需要认证",
+  "dialog.server.status.invalidCredentials": "凭据无效",
 
   "dialog.project.edit.title": "编辑项目",
   "dialog.project.edit.name": "名称",

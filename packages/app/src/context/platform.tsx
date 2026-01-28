@@ -55,6 +55,15 @@ export type Platform = {
 
   /** Parse markdown to HTML using native parser (desktop only, returns unprocessed code blocks) */
   parseMarkdown?(markdown: string): Promise<string>
+
+  /** Store server credentials securely using keyrings (desktop only) */
+  storeServerCredentials?(url: string, username: string, password: string): Promise<void>
+
+  /** Get stored server credentials (desktop only) */
+  getServerCredentials?(url: string): Promise<{ username: string; password: string } | null>
+
+  /** Remove stored server credentials (desktop only) */
+  removeServerCredentials?(url: string): Promise<void>
 }
 
 export const { use: usePlatform, provider: PlatformProvider } = createSimpleContext({

@@ -15,15 +15,28 @@ import { DropdownMenu } from "@opencode-ai/ui/dropdown-menu"
 import { Tooltip } from "@opencode-ai/ui/tooltip"
 import { useGlobalSDK } from "@/context/global-sdk"
 import { showToast } from "@opencode-ai/ui/toast"
+import { ServerCredentialsForm } from "./server-credential-form"
 
-type ServerStatus = { healthy: boolean; version?: string }
+export type ServerStatus = { healthy: boolean; version?: string; auth?: "required" | "invalid" }
+
+type AddedServerStatus = "healthy" | "unhealthy" | "auth_needed" | undefined
+
+export const canAuth = (platform: ReturnType<typeof usePlatform>) =>
+  platform.platform === "desktop" && !!platform.storeServerCredentials && !!platform.getServerCredentials
+
+const authStatus = (input?: ServerStatus) => {
+  if (!input) return
+  if (input.healthy) return "healthy" as const
+  if (input.auth) return "auth_needed" as const
+  return "unhealthy" as const
+}
 
 interface AddRowProps {
   value: string
   placeholder: string
   adding: boolean
   error: string
-  status: boolean | undefined
+  status: AddedServerStatus
   onChange: (value: string) => void
   onKeyDown: (event: KeyboardEvent) => void
   onBlur: () => void
@@ -34,22 +47,48 @@ interface EditRowProps {
   placeholder: string
   busy: boolean
   error: string
-  status: boolean | undefined
+  status: AddedServerStatus
   onChange: (value: string) => void
   onKeyDown: (event: KeyboardEvent) => void
   onBlur: () => void
 }
 
-async function checkHealth(url: string, platform: ReturnType<typeof usePlatform>): Promise<ServerStatus> {
+async function checkHealth(
+  url: string,
+  platform: ReturnType<typeof usePlatform>,
+  username?: string,
+  password?: string,
+  headers?: Record<string, string>,
+): Promise<ServerStatus> {
   const signal = (AbortSignal as unknown as { timeout?: (ms: number) => AbortSignal }).timeout?.(3000)
+  const authHeaders = username
+    ? {
+        Authorization: `Basic ${btoa(`${username}:${password}`)}`,
+      }
+    : headers
+
   const sdk = createOpencodeClient({
     baseUrl: url,
     fetch: platform.fetch,
     signal,
+    headers: authHeaders,
   })
   return sdk.global
-    .health()
-    .then((x) => ({ healthy: x.data?.healthy === true, version: x.data?.version }))
+    .health({ responseStyle: "fields" })
+    .then((x) => {
+      if (x?.response?.ok) {
+        return {
+          healthy: x.data?.healthy === true,
+          version: x.data?.version,
+        }
+      }
+      const status = x?.response?.status
+      if (status === 401 || status === 403) {
+        if (!authHeaders && canAuth(platform)) return { healthy: false, auth: "required" as const }
+        return { healthy: false }
+      }
+      return { healthy: false }
+    })
     .catch(() => ({ healthy: false }))
 }
 
@@ -60,8 +99,9 @@ function AddRow(props: AddRowProps) {
         <div
           classList={{
             "size-1.5 rounded-full absolute left-3 top-1/2 -translate-y-1/2 z-10 pointer-events-none": true,
-            "bg-icon-success-base": props.status === true,
-            "bg-icon-critical-base": props.status === false,
+            "bg-icon-success-base": props.status === "healthy",
+            "bg-icon-warning-base": props.status === "auth_needed",
+            "bg-icon-critical-base": props.status === "unhealthy",
             "bg-border-weak-base": props.status === undefined,
           }}
           ref={(el) => {
@@ -99,8 +139,9 @@ function EditRow(props: EditRowProps) {
       <div
         classList={{
           "size-1.5 rounded-full shrink-0": true,
-          "bg-icon-success-base": props.status === true,
-          "bg-icon-critical-base": props.status === false,
+          "bg-icon-success-base": props.status === "healthy",
+          "bg-icon-warning-base": props.status === "auth_needed",
+          "bg-icon-critical-base": props.status === "unhealthy",
           "bg-border-weak-base": props.status === undefined,
         }}
       />
@@ -137,14 +178,24 @@ export function DialogSelectServer() {
       adding: false,
       error: "",
       showForm: false,
-      status: undefined as boolean | undefined,
+      status: undefined as AddedServerStatus,
     },
     editServer: {
       id: undefined as string | undefined,
       value: "",
       error: "",
       busy: false,
-      status: undefined as boolean | undefined,
+      status: undefined as AddedServerStatus,
+    },
+    serverCred: {
+      show: false,
+      url: "",
+      mode: undefined as "select" | "add" | "edit" | undefined,
+      original: "",
+      username: "",
+      password: "",
+      error: "",
+      busy: false,
     },
   })
   const [defaultUrl, defaultUrlActions] = createResource(
@@ -175,13 +226,13 @@ export function DialogSelectServer() {
     return host.includes(".") || host.includes(":")
   }
 
-  const previewStatus = async (value: string, setStatus: (value: boolean | undefined) => void) => {
+  const previewStatus = async (value: string, setStatus: (value: AddedServerStatus) => void) => {
     setStatus(undefined)
     if (!looksComplete(value)) return
     const normalized = normalizeServerUrl(value)
     if (!normalized) return
     const result = await checkHealth(normalized, platform)
-    setStatus(result.healthy)
+    setStatus(authStatus(result))
   }
 
   const resetAdd = () => {
@@ -243,9 +294,16 @@ export function DialogSelectServer() {
 
   async function refreshHealth() {
     const results: Record<string, ServerStatus> = {}
+    const activeHeaders = globalSDK.headers ? globalSDK.headers() : undefined
     await Promise.all(
       items().map(async (url) => {
-        results[url] = await checkHealth(url, platform)
+        results[url] = await checkHealth(
+          url,
+          platform,
+          undefined,
+          undefined,
+          url === globalSDK.url ? activeHeaders : undefined,
+        )
       }),
     )
     setStore("status", reconcile(results))
@@ -259,7 +317,13 @@ export function DialogSelectServer() {
   })
 
   async function select(value: string, persist?: boolean) {
-    if (!persist && store.status[value]?.healthy === false) return
+    const auth = store.status[value]?.auth
+    if (!persist && store.status[value]?.healthy === false && !auth) return
+    const gate = await getAuthGate(value, auth)
+    if (gate) {
+      startCredentialsFlow(value, persist ? "add" : "select")
+      return
+    }
     dialog.close()
     if (persist) {
       server.add(value)
@@ -300,11 +364,28 @@ export function DialogSelectServer() {
 
     setStore("addServer", { adding: true, error: "" })
 
-    const result = await checkHealth(normalized, platform)
+    const activeHeaders = globalSDK.headers ? globalSDK.headers() : undefined
+    const result = await checkHealth(
+      normalized,
+      platform,
+      undefined,
+      undefined,
+      normalized === globalSDK.url ? activeHeaders : undefined,
+    )
     setStore("addServer", { adding: false })
+
+    if (result.auth) {
+      startCredentialsFlow(normalized, "add")
+      return
+    }
 
     if (!result.healthy) {
       setStore("addServer", { error: language.t("dialog.server.add.error") })
+      return
+    }
+
+    if (await getAuthGate(normalized, result.auth)) {
+      startCredentialsFlow(normalized, "add")
       return
     }
 
@@ -327,11 +408,29 @@ export function DialogSelectServer() {
 
     setStore("editServer", { busy: true, error: "" })
 
-    const result = await checkHealth(normalized, platform)
+    const activeHeaders = globalSDK.headers ? globalSDK.headers() : undefined
+    const result = await checkHealth(
+      normalized,
+      platform,
+      undefined,
+      undefined,
+      normalized === globalSDK.url ? activeHeaders : undefined,
+    )
     setStore("editServer", { busy: false })
+
+    if (result.auth) {
+      startCredentialsFlow(normalized, "edit", original)
+      return
+    }
 
     if (!result.healthy) {
       setStore("editServer", { error: language.t("dialog.server.add.error") })
+      return
+    }
+
+    if (await getAuthGate(normalized, result.auth)) {
+      resetEdit()
+      startCredentialsFlow(normalized, "edit", original)
       return
     }
 
@@ -367,225 +466,359 @@ export function DialogSelectServer() {
     handleEdit(original, store.editServer.value)
   }
 
+  async function handleCredentialsSubmit(e: SubmitEvent) {
+    e.preventDefault()
+    const url = store.serverCred.url
+    if (!url || !store.serverCred.username || !store.serverCred.password) {
+      setStore("serverCred", { error: language.t("dialog.server.credentials.error.required") })
+      return
+    }
+
+    setStore("serverCred", { error: "", busy: true })
+
+    const result = await checkHealth(url, platform, store.serverCred.username, store.serverCred.password)
+    setStore("serverCred", { busy: false })
+
+    if (!result.healthy) {
+      setStore("serverCred", { error: language.t("dialog.server.credentials.error.invalid") })
+      return
+    }
+
+    await platform.storeServerCredentials?.(url, store.serverCred.username, store.serverCred.password)
+    globalSDK.refreshCredentials(url)
+
+    setStore("status", url, result)
+
+    const mode = store.serverCred.mode
+    const original = store.serverCred.original
+    stopCredentialsFlow()
+
+    if (mode === "edit" && original) {
+      replaceServer(original, url)
+      dialog.close()
+      return
+    }
+
+    if (mode === "add") {
+      resetAdd()
+      server.add(url)
+      navigate("/")
+      dialog.close()
+      return
+    }
+
+    server.setActive(url)
+    navigate("/")
+    dialog.close()
+  }
+
+  function handleCancelCredentials() {
+    const mode = store.serverCred.mode
+    stopCredentialsFlow()
+    if (mode === "add") {
+      setStore("addServer", { showForm: true })
+    }
+  }
+
   async function handleRemove(url: string) {
+    if (platform.platform === "desktop" && platform.removeServerCredentials) {
+      await platform.removeServerCredentials(url)
+    }
     server.remove(url)
   }
 
+  const dialogTitle = () =>
+    store.serverCred.show ? language.t("dialog.server.credentials.title") : language.t("dialog.server.title")
+
+  const dialogDescription = () =>
+    store.serverCred.show
+      ? language.t("dialog.server.credentials.description", { url: serverDisplayName(store.serverCred.url) })
+      : null
+
+  const getAuthGate = async (url: string, auth?: ServerStatus["auth"]) => {
+    if (!auth) return
+    if (!canAuth(platform)) return
+    const credentials = await platform.getServerCredentials?.(url)
+    if (!credentials) {
+      if (auth === "required") return "required"
+      if (auth === "invalid") return "invalid"
+      return
+    }
+    const headers = {
+      Authorization: `Basic ${btoa(`${credentials.username}:${credentials.password}`)}`,
+    }
+    const result = await checkHealth(url, platform, undefined, undefined, headers)
+    if (result.healthy) return
+    return "invalid"
+  }
+
+  const startCredentialsFlow = (url: string, mode: "select" | "add" | "edit", original?: string) => {
+    setStore("serverCred", {
+      show: true,
+      url,
+      mode,
+      original: original ?? "",
+      username: "opencode",
+      password: "",
+      error: "",
+      busy: false,
+    })
+  }
+
+  const stopCredentialsFlow = () => {
+    setStore("serverCred", {
+      show: false,
+      url: "",
+      mode: undefined,
+      original: "",
+      username: "",
+      password: "",
+      error: "",
+      busy: false,
+    })
+  }
+
   return (
-    <Dialog title={language.t("dialog.server.title")}>
-      <div class="flex flex-col gap-2">
-        <List
-          search={{ placeholder: language.t("dialog.server.search.placeholder"), autofocus: false }}
-          noInitialSelection
-          emptyMessage={language.t("dialog.server.empty")}
-          items={sortedItems}
-          key={(x) => x}
-          onSelect={(x) => {
-            if (x) select(x)
-          }}
-          onFilter={(value) => {
-            if (value && store.addServer.showForm && !store.addServer.adding) {
-              resetAdd()
-            }
-          }}
-          divider={true}
-          class="px-5 [&_[data-slot=list-search-wrapper]]:w-full [&_[data-slot=list-scroll]]:max-h-[300px] [&_[data-slot=list-scroll]]:overflow-y-auto [&_[data-slot=list-items]]:bg-surface-raised-base [&_[data-slot=list-items]]:rounded-md [&_[data-slot=list-item]]:h-14 [&_[data-slot=list-item]]:p-3 [&_[data-slot=list-item]]:!bg-transparent [&_[data-slot=list-item-add]]:px-0"
-          add={
-            store.addServer.showForm
-              ? {
-                  render: () => (
-                    <AddRow
-                      value={store.addServer.url}
-                      placeholder={language.t("dialog.server.add.placeholder")}
-                      adding={store.addServer.adding}
-                      error={store.addServer.error}
-                      status={store.addServer.status}
-                      onChange={handleAddChange}
-                      onKeyDown={handleAddKey}
-                      onBlur={blurAdd}
-                    />
-                  ),
+    <Dialog title={dialogTitle()} description={dialogDescription()}>
+      <Show
+        when={store.serverCred.show}
+        fallback={
+          <div class="flex flex-col gap-2">
+            <List
+              search={{ placeholder: language.t("dialog.server.search.placeholder"), autofocus: false }}
+              noInitialSelection
+              emptyMessage={language.t("dialog.server.empty")}
+              items={sortedItems}
+              key={(x) => x}
+              onSelect={(x) => {
+                if (x) select(x)
+              }}
+              onFilter={(value) => {
+                if (value && store.addServer.showForm && !store.addServer.adding) {
+                  resetAdd()
                 }
-              : undefined
-          }
-        >
-          {(i) => {
-            const [truncated, setTruncated] = createSignal(false)
-            let nameRef: HTMLSpanElement | undefined
-            let versionRef: HTMLSpanElement | undefined
+              }}
+              divider={true}
+              class="px-5 [&_[data-slot=list-search-wrapper]]:w-full [&_[data-slot=list-scroll]]:max-h-[300px] [&_[data-slot=list-scroll]]:overflow-y-auto [&_[data-slot=list-items]]:bg-surface-raised-base [&_[data-slot=list-items]]:rounded-md [&_[data-slot=list-item]]:h-14 [&_[data-slot=list-item]]:p-3 [&_[data-slot=list-item]]:!bg-transparent [&_[data-slot=list-item-add]]:px-0"
+              add={
+                store.addServer.showForm
+                  ? {
+                      render: () => (
+                        <AddRow
+                          value={store.addServer.url}
+                          placeholder={language.t("dialog.server.add.placeholder")}
+                          adding={store.addServer.adding}
+                          error={store.addServer.error}
+                          status={store.addServer.status}
+                          onChange={handleAddChange}
+                          onKeyDown={handleAddKey}
+                          onBlur={blurAdd}
+                        />
+                      ),
+                    }
+                  : undefined
+              }
+            >
+              {(i) => {
+                const [truncated, setTruncated] = createSignal(false)
+                let nameRef: HTMLSpanElement | undefined
+                let versionRef: HTMLSpanElement | undefined
 
-            const check = () => {
-              const nameTruncated = nameRef ? nameRef.scrollWidth > nameRef.clientWidth : false
-              const versionTruncated = versionRef ? versionRef.scrollWidth > versionRef.clientWidth : false
-              setTruncated(nameTruncated || versionTruncated)
-            }
+                const check = () => {
+                  const nameTruncated = nameRef ? nameRef.scrollWidth > nameRef.clientWidth : false
+                  const versionTruncated = versionRef ? versionRef.scrollWidth > versionRef.clientWidth : false
+                  setTruncated(nameTruncated || versionTruncated)
+                }
 
-            createEffect(() => {
-              check()
-              window.addEventListener("resize", check)
-              onCleanup(() => window.removeEventListener("resize", check))
-            })
+                createEffect(() => {
+                  check()
+                  window.addEventListener("resize", check)
+                  onCleanup(() => window.removeEventListener("resize", check))
+                })
 
-            const tooltipValue = () => {
-              const name = serverDisplayName(i)
-              const version = store.status[i]?.version
-              return (
-                <span class="flex items-center gap-2">
-                  <span>{name}</span>
-                  <Show when={version}>
-                    <span class="text-text-invert-base">{version}</span>
-                  </Show>
-                </span>
-              )
-            }
+                const tooltipValue = () => {
+                  const name = serverDisplayName(i)
+                  const version = store.status[i]?.version
+                  return (
+                    <span class="flex items-center gap-2">
+                      <span>{name}</span>
+                      <Show when={version}>
+                        <span class="text-text-invert-base">{version}</span>
+                      </Show>
+                    </span>
+                  )
+                }
 
-            return (
-              <div class="flex items-center gap-3 min-w-0 flex-1 group/item">
-                <Show
-                  when={store.editServer.id !== i}
-                  fallback={
-                    <EditRow
-                      value={store.editServer.value}
-                      placeholder={language.t("dialog.server.add.placeholder")}
-                      busy={store.editServer.busy}
-                      error={store.editServer.error}
-                      status={store.editServer.status}
-                      onChange={handleEditChange}
-                      onKeyDown={(event) => handleEditKey(event, i)}
-                      onBlur={() => handleEdit(i, store.editServer.value)}
-                    />
-                  }
-                >
-                  <Tooltip value={tooltipValue()} placement="top" inactive={!truncated()}>
-                    <div
-                      class="flex items-center gap-3 px-4 min-w-0 flex-1"
-                      classList={{ "opacity-50": store.status[i]?.healthy === false }}
+                return (
+                  <div class="flex items-center gap-3 min-w-0 flex-1 group/item">
+                    <Show
+                      when={store.editServer.id !== i}
+                      fallback={
+                        <EditRow
+                          value={store.editServer.value}
+                          placeholder={language.t("dialog.server.add.placeholder")}
+                          busy={store.editServer.busy}
+                          error={store.editServer.error}
+                          status={store.editServer.status}
+                          onChange={handleEditChange}
+                          onKeyDown={(event) => handleEditKey(event, i)}
+                          onBlur={() => handleEdit(i, store.editServer.value)}
+                        />
+                      }
                     >
-                      <div
-                        classList={{
-                          "size-1.5 rounded-full shrink-0": true,
-                          "bg-icon-success-base": store.status[i]?.healthy === true,
-                          "bg-icon-critical-base": store.status[i]?.healthy === false,
-                          "bg-border-weak-base": store.status[i] === undefined,
-                        }}
-                      />
-                      <span ref={nameRef} class="truncate">
-                        {serverDisplayName(i)}
-                      </span>
-                      <Show when={store.status[i]?.version}>
-                        <span ref={versionRef} class="text-text-weak text-14-regular truncate">
-                          {store.status[i]?.version}
-                        </span>
-                      </Show>
-                      <Show when={defaultUrl() === i}>
-                        <span class="text-text-weak bg-surface-base text-14-regular px-1.5 rounded-xs">
-                          {language.t("dialog.server.status.default")}
-                        </span>
-                      </Show>
-                    </div>
-                  </Tooltip>
-                </Show>
-                <Show when={store.editServer.id !== i}>
-                  <div class="flex items-center justify-center gap-5 pl-4">
-                    <Show when={current() === i}>
-                      <p class="text-text-weak text-12-regular">{language.t("dialog.server.current")}</p>
-                    </Show>
-
-                    <DropdownMenu>
-                      <DropdownMenu.Trigger
-                        as={IconButton}
-                        icon="dot-grid"
-                        variant="ghost"
-                        class="shrink-0 size-8 hover:bg-surface-base-hover data-[expanded]:bg-surface-base-active"
-                        onClick={(e: MouseEvent) => e.stopPropagation()}
-                        onPointerDown={(e: PointerEvent) => e.stopPropagation()}
-                      />
-                      <DropdownMenu.Portal>
-                        <DropdownMenu.Content class="mt-1">
-                          <DropdownMenu.Item
-                            onSelect={() => {
-                              setStore("editServer", {
-                                id: i,
-                                value: i,
-                                error: "",
-                                status: store.status[i]?.healthy,
-                              })
+                      <Tooltip value={tooltipValue()} placement="top" inactive={!truncated()}>
+                        <div
+                          class="flex items-center gap-3 px-4 min-w-0 flex-1"
+                          classList={{ "opacity-50": store.status[i]?.healthy === false }}
+                        >
+                          <div
+                            classList={{
+                              "size-1.5 rounded-full shrink-0": true,
+                              "bg-icon-success-base": store.status[i]?.healthy === true,
+                              "bg-icon-warning-base": store.status[i]?.auth !== undefined,
+                              "bg-icon-critical-base": store.status[i]?.healthy === false,
+                              "bg-border-weak-base": store.status[i] === undefined,
                             }}
-                          >
-                            <DropdownMenu.ItemLabel>{language.t("dialog.server.menu.edit")}</DropdownMenu.ItemLabel>
-                          </DropdownMenu.Item>
-                          <Show when={canDefault() && defaultUrl() !== i}>
-                            <DropdownMenu.Item
-                              onSelect={async () => {
-                                try {
-                                  await platform.setDefaultServerUrl?.(i)
-                                  defaultUrlActions.mutate(i)
-                                } catch (err) {
-                                  showToast({
-                                    variant: "error",
-                                    title: language.t("common.requestFailed"),
-                                    description: err instanceof Error ? err.message : String(err),
-                                  })
-                                }
-                              }}
-                            >
-                              <DropdownMenu.ItemLabel>
-                                {language.t("dialog.server.menu.default")}
-                              </DropdownMenu.ItemLabel>
-                            </DropdownMenu.Item>
+                          />
+                          <span ref={nameRef} class="truncate">
+                            {serverDisplayName(i)}
+                          </span>
+                          <Show when={store.status[i]?.version}>
+                            <span ref={versionRef} class="text-text-weak text-14-regular truncate">
+                              {store.status[i]?.version}
+                            </span>
                           </Show>
-                          <Show when={canDefault() && defaultUrl() === i}>
-                            <DropdownMenu.Item
-                              onSelect={async () => {
-                                try {
-                                  await platform.setDefaultServerUrl?.(null)
-                                  defaultUrlActions.mutate(null)
-                                } catch (err) {
-                                  showToast({
-                                    variant: "error",
-                                    title: language.t("common.requestFailed"),
-                                    description: err instanceof Error ? err.message : String(err),
-                                  })
-                                }
-                              }}
-                            >
-                              <DropdownMenu.ItemLabel>
-                                {language.t("dialog.server.menu.defaultRemove")}
-                              </DropdownMenu.ItemLabel>
-                            </DropdownMenu.Item>
+                          <Show when={defaultUrl() === i}>
+                            <span class="text-text-weak bg-surface-base text-14-regular px-1.5 rounded-xs">
+                              {language.t("dialog.server.status.default")}
+                            </span>
                           </Show>
-                          <DropdownMenu.Separator />
-                          <DropdownMenu.Item
-                            onSelect={() => handleRemove(i)}
-                            class="text-text-on-critical-base hover:bg-surface-critical-weak"
-                          >
-                            <DropdownMenu.ItemLabel>{language.t("dialog.server.menu.delete")}</DropdownMenu.ItemLabel>
-                          </DropdownMenu.Item>
-                        </DropdownMenu.Content>
-                      </DropdownMenu.Portal>
-                    </DropdownMenu>
-                  </div>
-                </Show>
-              </div>
-            )
-          }}
-        </List>
+                        </div>
+                      </Tooltip>
+                    </Show>
+                    <Show when={store.editServer.id !== i}>
+                      <div class="flex items-center justify-center gap-5 pl-4">
+                        <Show when={current() === i}>
+                          <p class="text-text-weak text-12-regular">{language.t("dialog.server.current")}</p>
+                        </Show>
 
-        <div class="px-5 pb-5">
-          <Button
-            variant="secondary"
-            icon="plus-small"
-            size="large"
-            onClick={() => {
-              setStore("addServer", { showForm: true, url: "", error: "" })
-              scrollListToBottom()
-            }}
-            class="py-1.5 pl-1.5 pr-3 flex items-center gap-1.5"
-          >
-            {store.addServer.adding ? language.t("dialog.server.add.checking") : language.t("dialog.server.add.button")}
-          </Button>
-        </div>
-      </div>
+                        <DropdownMenu>
+                          <DropdownMenu.Trigger
+                            as={IconButton}
+                            icon="dot-grid"
+                            variant="ghost"
+                            class="shrink-0 size-8 hover:bg-surface-base-hover data-[expanded]:bg-surface-base-active"
+                            onClick={(e: MouseEvent) => e.stopPropagation()}
+                            onPointerDown={(e: PointerEvent) => e.stopPropagation()}
+                          />
+                          <DropdownMenu.Portal>
+                            <DropdownMenu.Content class="mt-1">
+                              <DropdownMenu.Item
+                                onSelect={() => {
+                                  setStore("editServer", {
+                                    id: i,
+                                    value: i,
+                                    error: "",
+                                    status: store.status[i]?.healthy ? "healthy" : "unhealthy",
+                                  })
+                                }}
+                              >
+                                <DropdownMenu.ItemLabel>{language.t("dialog.server.menu.edit")}</DropdownMenu.ItemLabel>
+                              </DropdownMenu.Item>
+                              <Show when={canDefault() && defaultUrl() !== i}>
+                                <DropdownMenu.Item
+                                  onSelect={async () => {
+                                    try {
+                                      await platform.setDefaultServerUrl?.(i)
+                                      defaultUrlActions.mutate(i)
+                                    } catch (err) {
+                                      showToast({
+                                        variant: "error",
+                                        title: language.t("common.requestFailed"),
+                                        description: err instanceof Error ? err.message : String(err),
+                                      })
+                                    }
+                                  }}
+                                >
+                                  <DropdownMenu.ItemLabel>
+                                    {language.t("dialog.server.menu.default")}
+                                  </DropdownMenu.ItemLabel>
+                                </DropdownMenu.Item>
+                              </Show>
+                              <Show when={canDefault() && defaultUrl() === i}>
+                                <DropdownMenu.Item
+                                  onSelect={async () => {
+                                    try {
+                                      await platform.setDefaultServerUrl?.(null)
+                                      defaultUrlActions.mutate(null)
+                                    } catch (err) {
+                                      showToast({
+                                        variant: "error",
+                                        title: language.t("common.requestFailed"),
+                                        description: err instanceof Error ? err.message : String(err),
+                                      })
+                                    }
+                                  }}
+                                >
+                                  <DropdownMenu.ItemLabel>
+                                    {language.t("dialog.server.menu.defaultRemove")}
+                                  </DropdownMenu.ItemLabel>
+                                </DropdownMenu.Item>
+                              </Show>
+                              <DropdownMenu.Separator />
+                              <DropdownMenu.Item
+                                onSelect={() => handleRemove(i)}
+                                class="text-text-on-critical-base hover:bg-surface-critical-weak"
+                              >
+                                <DropdownMenu.ItemLabel>
+                                  {language.t("dialog.server.menu.delete")}
+                                </DropdownMenu.ItemLabel>
+                              </DropdownMenu.Item>
+                            </DropdownMenu.Content>
+                          </DropdownMenu.Portal>
+                        </DropdownMenu>
+                      </div>
+                    </Show>
+                  </div>
+                )
+              }}
+            </List>
+
+            <div class="px-5 pb-5">
+              <Button
+                variant="secondary"
+                icon="plus-small"
+                size="large"
+                onClick={() => {
+                  setStore("addServer", { showForm: true, url: "", error: "" })
+                  scrollListToBottom()
+                }}
+                class="py-1.5 pl-1.5 pr-3 flex items-center gap-1.5"
+              >
+                {store.addServer.adding
+                  ? language.t("dialog.server.add.checking")
+                  : language.t("dialog.server.add.button")}
+              </Button>
+            </div>
+          </div>
+        }
+      >
+        <ServerCredentialsForm
+          url={store.serverCred.url}
+          username={store.serverCred.username}
+          password={store.serverCred.password}
+          error={store.serverCred.error}
+          busy={store.serverCred.busy}
+          onSubmit={handleCredentialsSubmit}
+          onCancel={handleCancelCredentials}
+          onUsernameChange={(value: string) => {
+            setStore("serverCred", { username: value, error: "" })
+          }}
+          onPasswordChange={(value: string) => {
+            setStore("serverCred", { password: value, error: "" })
+          }}
+        />
+      </Show>
     </Dialog>
   )
 }

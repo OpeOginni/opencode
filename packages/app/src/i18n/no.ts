@@ -267,12 +267,18 @@ export const dict = {
   "dialog.server.default.clear": "Tøm",
   "dialog.server.action.remove": "Fjern server",
 
+  "dialog.server.credentials.title": "Oppgi legitimasjon",
+  "dialog.server.credentials.description": "Koble til {{url}}",
+  "dialog.server.credentials.error.required": "Brukernavn og passord er påkrevd",
+  "dialog.server.credentials.error.invalid": "Ugyldig brukernavn eller passord",
   "dialog.server.menu.edit": "Rediger",
   "dialog.server.menu.default": "Sett som standard",
   "dialog.server.menu.defaultRemove": "Fjern standard",
   "dialog.server.menu.delete": "Slett",
   "dialog.server.current": "Gjeldende server",
   "dialog.server.status.default": "Standard",
+  "dialog.server.status.authRequired": "Autentisering kreves",
+  "dialog.server.status.invalidCredentials": "Ugyldig legitimasjon",
 
   "dialog.project.edit.title": "Rediger prosjekt",
   "dialog.project.edit.name": "Navn",
