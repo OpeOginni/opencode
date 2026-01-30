@@ -4,6 +4,7 @@ import type { JSONSchema } from "zod/v4/core"
 import type { Provider } from "./provider"
 import type { ModelsDev } from "./models"
 import { iife } from "@/util/iife"
+import { Log } from "@/util/log"
 
 type Modality = NonNullable<ModelsDev.Model["modalities"]>["input"][number]
 
@@ -346,12 +347,6 @@ export namespace ProviderTransform {
     switch (model.api.npm) {
       case "@openrouter/ai-sdk-provider":
         if (!model.id.includes("gpt") && !model.id.includes("gemini-3")) return {}
-           
-        // Following logic for the `@ai-sdk/openai` case
-        if (id.includes("codex")) {
-          if (id.includes("5.2")) return Object.fromEntries([...WIDELY_SUPPORTED_EFFORTS, "xhigh"].map((effort) => [effort, { reasoning: { effort } }]))
-          return Object.fromEntries(WIDELY_SUPPORTED_EFFORTS.map((effort) => [effort, { reasoning: { effort } }]))
-        }
 
         return Object.fromEntries(OPENAI_EFFORTS.map((effort) => [effort, { reasoning: { effort } }]))
 
@@ -384,6 +379,11 @@ export namespace ProviderTransform {
       case "@ai-sdk/deepinfra":
       // https://v5.ai-sdk.dev/providers/ai-sdk-providers/deepinfra
       case "@ai-sdk/openai-compatible":
+        // Following logic for the `@ai-sdk/openai` case
+        if (id.includes("codex")) {
+          if (id.includes("5.2")) return Object.fromEntries([...WIDELY_SUPPORTED_EFFORTS, "xhigh"].map((effort) => [effort, { reasoning: { effort } }]))
+          return Object.fromEntries(WIDELY_SUPPORTED_EFFORTS.map((effort) => [effort, { reasoning: { effort } }]))
+        }
         return Object.fromEntries(WIDELY_SUPPORTED_EFFORTS.map((effort) => [effort, { reasoningEffort: effort }]))
 
       case "@ai-sdk/azure":
