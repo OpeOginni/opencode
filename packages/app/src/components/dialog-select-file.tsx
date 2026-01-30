@@ -36,7 +36,6 @@ export function DialogSelectFile(props: { mode?: DialogSelectFileMode; onOpenFil
   const filesOnly = () => props.mode === "files"
   const sessionKey = createMemo(() => `${params.dir}${params.id ? "/" + params.id : ""}`)
   const tabs = createMemo(() => layout.tabs(sessionKey))
-  const view = createMemo(() => layout.view(sessionKey))
   const state = { cleanup: undefined as (() => void) | void, committed: false }
   const [grouped, setGrouped] = createSignal(false)
   const common = [
@@ -163,7 +162,8 @@ export function DialogSelectFile(props: { mode?: DialogSelectFileMode; onOpenFil
     const value = file.tab(path)
     tabs().open(value)
     file.load(path)
-    view().reviewPanel.open()
+    layout.fileTree.open()
+    layout.fileTree.setTab("all")
     props.onOpenFile?.(path)
   }
 
@@ -196,7 +196,6 @@ export function DialogSelectFile(props: { mode?: DialogSelectFileMode; onOpenFil
             : language.t("palette.search.placeholder"),
           autofocus: true,
           hideIcon: true,
-          class: "pl-3 pr-2 !mb-0",
         }}
         emptyMessage={language.t("palette.empty")}
         loadingMessage={language.t("common.loading")}
@@ -224,7 +223,7 @@ export function DialogSelectFile(props: { mode?: DialogSelectFileMode; onOpenFil
               </div>
             }
           >
-            <div class="w-full flex items-center justify-between gap-4 pl-1">
+            <div class="w-full flex items-center justify-between gap-4">
               <div class="flex items-center gap-2 min-w-0">
                 <span class="text-14-regular text-text-strong whitespace-nowrap">{item.title}</span>
                 <Show when={item.description}>
