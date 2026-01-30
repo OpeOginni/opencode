@@ -7,23 +7,27 @@ import type {
   Config,
   Todo,
   Command,
-  Permission,
+  PermissionRequest,
+  QuestionRequest,
   LspStatus,
   McpStatus,
+  McpResource,
   FormatterStatus,
   SessionStatus,
   ProviderListResponse,
   ProviderAuthMethod,
   VcsInfo,
-} from "@opencode-ai/sdk"
+} from "@opencode-ai/sdk/v2"
 import { createStore, produce, reconcile } from "solid-js/store"
 import { useSDK } from "@tui/context/sdk"
 import { Binary } from "@opencode-ai/util/binary"
 import { createSimpleContext } from "./helper"
 import type { Snapshot } from "@/snapshot"
 import { useExit } from "./exit"
+import { useArgs } from "./args"
 import { batch, onMount } from "solid-js"
 import { Log } from "@/util/log"
+import type { Path } from "@opencode-ai/sdk"
 
 export const { use: useSync, provider: SyncProvider } = createSimpleContext({
   name: "Sync",
@@ -37,7 +41,10 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
       agent: Agent[]
       command: Command[]
       permission: {
-        [sessionID: string]: Permission[]
+        [sessionID: string]: PermissionRequest[]
+      }
+      question: {
+        [sessionID: string]: QuestionRequest[]
       }
       config: Config
       session: Session[]
@@ -60,8 +67,12 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
       mcp: {
         [key: string]: McpStatus
       }
+      mcp_resource: {
+        [key: string]: McpResource
+      }
       formatter: FormatterStatus[]
       vcs: VcsInfo | undefined
+      path: Path
     }>({
       provider_next: {
         all: [],
@@ -73,6 +84,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
       status: "loading",
       agent: [],
       permission: {},
+      question: {},
       command: [],
       provider: [],
       provider_default: {},
@@ -84,8 +96,10 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
       part: {},
       lsp: [],
       mcp: {},
+      mcp_resource: {},
       formatter: [],
       vcs: undefined,
+      path: { state: "", config: "", worktree: "", directory: "" },
     })
 
     const sdk = useSDK()
@@ -93,36 +107,79 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
     sdk.event.listen((e) => {
       const event = e.details
       switch (event.type) {
-        case "permission.updated": {
-          const permissions = store.permission[event.properties.sessionID]
-          if (!permissions) {
-            setStore("permission", event.properties.sessionID, [event.properties])
-            break
-          }
-          const match = Binary.search(permissions, event.properties.id, (p) => p.id)
-          setStore(
-            "permission",
-            event.properties.sessionID,
-            produce((draft) => {
-              if (match.found) {
-                draft[match.index] = event.properties
-                return
-              }
-              draft.push(event.properties)
-            }),
-          )
+        case "server.instance.disposed":
+          bootstrap()
           break
-        }
-
         case "permission.replied": {
-          const permissions = store.permission[event.properties.sessionID]
-          const match = Binary.search(permissions, event.properties.permissionID, (p) => p.id)
+          const requests = store.permission[event.properties.sessionID]
+          if (!requests) break
+          const match = Binary.search(requests, event.properties.requestID, (r) => r.id)
           if (!match.found) break
           setStore(
             "permission",
             event.properties.sessionID,
             produce((draft) => {
               draft.splice(match.index, 1)
+            }),
+          )
+          break
+        }
+
+        case "permission.asked": {
+          const request = event.properties
+          const requests = store.permission[request.sessionID]
+          if (!requests) {
+            setStore("permission", request.sessionID, [request])
+            break
+          }
+          const match = Binary.search(requests, request.id, (r) => r.id)
+          if (match.found) {
+            setStore("permission", request.sessionID, match.index, reconcile(request))
+            break
+          }
+          setStore(
+            "permission",
+            request.sessionID,
+            produce((draft) => {
+              draft.splice(match.index, 0, request)
+            }),
+          )
+          break
+        }
+
+        case "question.replied":
+        case "question.rejected": {
+          const requests = store.question[event.properties.sessionID]
+          if (!requests) break
+          const match = Binary.search(requests, event.properties.requestID, (r) => r.id)
+          if (!match.found) break
+          setStore(
+            "question",
+            event.properties.sessionID,
+            produce((draft) => {
+              draft.splice(match.index, 1)
+            }),
+          )
+          break
+        }
+
+        case "question.asked": {
+          const request = event.properties
+          const requests = store.question[request.sessionID]
+          if (!requests) {
+            setStore("question", request.sessionID, [request])
+            break
+          }
+          const match = Binary.search(requests, request.id, (r) => r.id)
+          if (match.found) {
+            setStore("question", request.sessionID, match.index, reconcile(request))
+            break
+          }
+          setStore(
+            "question",
+            request.sessionID,
+            produce((draft) => {
+              draft.splice(match.index, 0, request)
             }),
           )
           break
@@ -184,9 +241,27 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
             event.properties.info.sessionID,
             produce((draft) => {
               draft.splice(result.index, 0, event.properties.info)
-              if (draft.length > 100) draft.shift()
             }),
           )
+          const updated = store.message[event.properties.info.sessionID]
+          if (updated.length > 100) {
+            const oldest = updated[0]
+            batch(() => {
+              setStore(
+                "message",
+                event.properties.info.sessionID,
+                produce((draft) => {
+                  draft.shift()
+                }),
+              )
+              setStore(
+                "part",
+                produce((draft) => {
+                  delete draft[oldest.id]
+                }),
+              )
+            })
+          }
           break
         }
         case "message.removed": {
@@ -251,41 +326,75 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
     })
 
     const exit = useExit()
+    const args = useArgs()
 
     async function bootstrap() {
-      // blocking
-      await Promise.all([
-        sdk.client.config.providers({ throwOnError: true }).then((x) => {
-          batch(() => {
-            setStore("provider", x.data!.providers)
-            setStore("provider_default", x.data!.default)
+      console.log("bootstrapping")
+      const start = Date.now() - 30 * 24 * 60 * 60 * 1000
+      const sessionListPromise = sdk.client.session
+        .list({ start: start })
+        .then((x) => (x.data ?? []).toSorted((a, b) => a.id.localeCompare(b.id)))
+
+      // blocking - include session.list when continuing a session
+      const providersPromise = sdk.client.config.providers({}, { throwOnError: true })
+      const providerListPromise = sdk.client.provider.list({}, { throwOnError: true })
+      const agentsPromise = sdk.client.app.agents({}, { throwOnError: true })
+      const configPromise = sdk.client.config.get({}, { throwOnError: true })
+      const blockingRequests: Promise<unknown>[] = [
+        providersPromise,
+        providerListPromise,
+        agentsPromise,
+        configPromise,
+        ...(args.continue ? [sessionListPromise] : []),
+      ]
+
+      await Promise.all(blockingRequests)
+        .then(() => {
+          const providersResponse = providersPromise.then((x) => x.data!)
+          const providerListResponse = providerListPromise.then((x) => x.data!)
+          const agentsResponse = agentsPromise.then((x) => x.data ?? [])
+          const configResponse = configPromise.then((x) => x.data!)
+          const sessionListResponse = args.continue ? sessionListPromise : undefined
+
+          return Promise.all([
+            providersResponse,
+            providerListResponse,
+            agentsResponse,
+            configResponse,
+            ...(sessionListResponse ? [sessionListResponse] : []),
+          ]).then((responses) => {
+            const providers = responses[0]
+            const providerList = responses[1]
+            const agents = responses[2]
+            const config = responses[3]
+            const sessions = responses[4]
+
+            batch(() => {
+              setStore("provider", reconcile(providers.providers))
+              setStore("provider_default", reconcile(providers.default))
+              setStore("provider_next", reconcile(providerList))
+              setStore("agent", reconcile(agents))
+              setStore("config", reconcile(config))
+              if (sessions !== undefined) setStore("session", reconcile(sessions))
+            })
           })
-        }),
-        sdk.client.provider.list({ throwOnError: true }).then((x) => {
-          batch(() => {
-            setStore("provider_next", x.data!)
-          })
-        }),
-        sdk.client.app.agents({ throwOnError: true }).then((x) => setStore("agent", x.data ?? [])),
-        sdk.client.config.get({ throwOnError: true }).then((x) => setStore("config", x.data!)),
-      ])
+        })
         .then(() => {
           if (store.status !== "complete") setStore("status", "partial")
           // non-blocking
           Promise.all([
-            sdk.client.session.list().then((x) =>
-              setStore(
-                "session",
-                (x.data ?? []).toSorted((a, b) => a.id.localeCompare(b.id)),
-              ),
-            ),
-            sdk.client.command.list().then((x) => setStore("command", x.data ?? [])),
-            sdk.client.lsp.status().then((x) => setStore("lsp", x.data!)),
-            sdk.client.mcp.status().then((x) => setStore("mcp", x.data!)),
-            sdk.client.formatter.status().then((x) => setStore("formatter", x.data!)),
-            sdk.client.session.status().then((x) => setStore("session_status", x.data!)),
-            sdk.client.provider.auth().then((x) => setStore("provider_auth", x.data ?? {})),
-            sdk.client.vcs.get().then((x) => setStore("vcs", x.data)),
+            ...(args.continue ? [] : [sessionListPromise.then((sessions) => setStore("session", reconcile(sessions)))]),
+            sdk.client.command.list().then((x) => setStore("command", reconcile(x.data ?? []))),
+            sdk.client.lsp.status().then((x) => setStore("lsp", reconcile(x.data!))),
+            sdk.client.mcp.status().then((x) => setStore("mcp", reconcile(x.data!))),
+            sdk.client.experimental.resource.list().then((x) => setStore("mcp_resource", reconcile(x.data ?? {}))),
+            sdk.client.formatter.status().then((x) => setStore("formatter", reconcile(x.data!))),
+            sdk.client.session.status().then((x) => {
+              setStore("session_status", reconcile(x.data!))
+            }),
+            sdk.client.provider.auth().then((x) => setStore("provider_auth", reconcile(x.data ?? {}))),
+            sdk.client.vcs.get().then((x) => setStore("vcs", reconcile(x.data))),
+            sdk.client.path.get().then((x) => setStore("path", reconcile(x.data!))),
           ]).then(() => {
             setStore("status", "complete")
           })
@@ -333,10 +442,10 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
         async sync(sessionID: string) {
           if (fullSyncedSessions.has(sessionID)) return
           const [session, messages, todo, diff] = await Promise.all([
-            sdk.client.session.get({ path: { id: sessionID }, throwOnError: true }),
-            sdk.client.session.messages({ path: { id: sessionID }, query: { limit: 100 } }),
-            sdk.client.session.todo({ path: { id: sessionID } }),
-            sdk.client.session.diff({ path: { id: sessionID } }),
+            sdk.client.session.get({ sessionID }, { throwOnError: true }),
+            sdk.client.session.messages({ sessionID, limit: 100 }),
+            sdk.client.session.todo({ sessionID }),
+            sdk.client.session.diff({ sessionID }),
           ])
           setStore(
             produce((draft) => {

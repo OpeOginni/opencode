@@ -6,14 +6,19 @@ import { Session } from "@/session"
 import { MessageV2 } from "@/session/message-v2"
 import { Storage } from "@/storage/storage"
 import { Log } from "@/util/log"
-import type * as SDK from "@opencode-ai/sdk"
+import type * as SDK from "@opencode-ai/sdk/v2"
 
 export namespace ShareNext {
   const log = Log.create({ service: "share-next" })
 
+  async function url() {
+    return Config.get().then((x) => x.enterprise?.url ?? "https://opncd.ai")
+  }
+
+  const disabled = process.env["OPENCODE_DISABLE_SHARE"] === "true" || process.env["OPENCODE_DISABLE_SHARE"] === "1"
+
   export async function init() {
-    const config = await Config.get()
-    if (!config.enterprise) return
+    if (disabled) return
     Bus.subscribe(Session.Event.Updated, async (evt) => {
       await sync(evt.properties.info.id, [
         {
@@ -61,9 +66,9 @@ export namespace ShareNext {
   }
 
   export async function create(sessionID: string) {
+    if (disabled) return { id: "", url: "", secret: "" }
     log.info("creating share", { sessionID })
-    const url = await Config.get().then((x) => x.enterprise!.url)
-    const result = await fetch(`${url}/api/share`, {
+    const result = await fetch(`${await url()}/api/share`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -109,6 +114,7 @@ export namespace ShareNext {
 
   const queue = new Map<string, { timeout: NodeJS.Timeout; data: Map<string, Data> }>()
   async function sync(sessionID: string, data: Data[]) {
+    if (disabled) return
     const existing = queue.get(sessionID)
     if (existing) {
       for (const item of data) {
@@ -126,11 +132,10 @@ export namespace ShareNext {
       const queued = queue.get(sessionID)
       if (!queued) return
       queue.delete(sessionID)
-      const url = await Config.get().then((x) => x.enterprise!.url)
-      const share = await get(sessionID)
+      const share = await get(sessionID).catch(() => undefined)
       if (!share) return
 
-      await fetch(`${url}/api/share/${share.id}/sync`, {
+      await fetch(`${await url()}/api/share/${share.id}/sync`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -145,11 +150,11 @@ export namespace ShareNext {
   }
 
   export async function remove(sessionID: string) {
+    if (disabled) return
     log.info("removing share", { sessionID })
-    const url = await Config.get().then((x) => x.enterprise!.url)
     const share = await get(sessionID)
     if (!share) return
-    await fetch(`${url}/api/share/${share.id}`, {
+    await fetch(`${await url()}/api/share/${share.id}`, {
       method: "DELETE",
       headers: {
         "Content-Type": "application/json",
@@ -158,7 +163,7 @@ export namespace ShareNext {
         secret: share.secret,
       }),
     })
-    await Storage.remove(["session_share", share.id])
+    await Storage.remove(["session_share", sessionID])
   }
 
   async function fullSync(sessionID: string) {

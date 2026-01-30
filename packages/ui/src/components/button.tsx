@@ -4,8 +4,8 @@ import { Icon, IconProps } from "./icon"
 
 export interface ButtonProps
   extends ComponentProps<typeof Kobalte>,
-    Pick<ComponentProps<"button">, "class" | "classList" | "children"> {
-  size?: "normal" | "large"
+    Pick<ComponentProps<"button">, "class" | "classList" | "children" | "style"> {
+  size?: "small" | "normal" | "large"
   variant?: "primary" | "secondary" | "ghost"
   icon?: IconProps["name"]
 }

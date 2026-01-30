@@ -1,5 +1,5 @@
 import type { McpServer } from "@agentclientprotocol/sdk"
-import type { OpencodeClient } from "@opencode-ai/sdk"
+import type { OpencodeClient } from "@opencode-ai/sdk/v2"
 
 export interface ACPSessionState {
   id: string
@@ -10,6 +10,7 @@ export interface ACPSessionState {
     providerID: string
     modelID: string
   }
+  variant?: string
   modeId?: string
 }
 

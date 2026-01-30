@@ -27,6 +27,7 @@ export function DialogPrompt(props: DialogPromptProps) {
   onMount(() => {
     dialog.setSize("medium")
     setTimeout(() => {
+      if (!textarea || textarea.isDestroyed) return
       textarea.focus()
     }, 1)
     textarea.gotoLineEnd()
@@ -35,7 +36,9 @@ export function DialogPrompt(props: DialogPromptProps) {
   return (
     <box paddingLeft={2} paddingRight={2} gap={1}>
       <box flexDirection="row" justifyContent="space-between">
-        <text attributes={TextAttributes.BOLD}>{props.title}</text>
+        <text attributes={TextAttributes.BOLD} fg={theme.text}>
+          {props.title}
+        </text>
         <text fg={theme.textMuted}>esc</text>
       </box>
       <box gap={1}>
@@ -49,6 +52,9 @@ export function DialogPrompt(props: DialogPromptProps) {
           ref={(val: TextareaRenderable) => (textarea = val)}
           initialValue={props.value}
           placeholder={props.placeholder ?? "Enter text"}
+          textColor={theme.text}
+          focusedTextColor={theme.text}
+          cursorColor={theme.text}
         />
       </box>
       <box paddingBottom={1} gap={1} flexDirection="row">
