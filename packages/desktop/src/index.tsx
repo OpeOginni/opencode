@@ -373,7 +373,7 @@ render(() => {
             window.__OPENCODE__ ??= {}
             window.__OPENCODE__.serverPassword = data().password ?? undefined
 
-            return <AppInterface defaultUrl={data().url} />
+            return <AppInterface defaultUrl={data().url} isSidecar={true} />
           }}
         </ServerGate>
       </AppBaseProviders>
