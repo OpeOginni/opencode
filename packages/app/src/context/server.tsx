@@ -97,7 +97,6 @@ export const { use: useServer, provider: ServerProvider } = createSimpleContext(
       const url = normalizeServerUrl(props.defaultUrl)
       if (!url) return
       batch(() => {
-        console.log("createEffect", store.currentSidecarUrl, props.defaultUrl, props.isSidecar)
         // Remove the previous startup sidecar url
         if(store.currentSidecarUrl) {
           remove(store.currentSidecarUrl)
