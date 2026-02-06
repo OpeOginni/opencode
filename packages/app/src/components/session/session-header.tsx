@@ -90,14 +90,14 @@ export function SessionHeader() {
     { id: "cursor", label: "Cursor", icon: "cursor", openWith: "cursor" },
     { id: "zed", label: "Zed", icon: "zed", openWith: "zed" },
     { id: "powershell", label: "PowerShell", icon: "powershell", openWith: "powershell" },
-    { id: "sublime-text", label: "Sublime Text", icon: "sublime-text", openWith: "sublime_text" },
+    { id: "sublime-text", label: "Sublime Text", icon: "sublime-text", openWith: "Sublime Text" },
   ] as const
 
   const LINUX_APPS = [
     { id: "vscode", label: "VS Code", icon: "vscode", openWith: "code" },
     { id: "cursor", label: "Cursor", icon: "cursor", openWith: "cursor" },
     { id: "zed", label: "Zed", icon: "zed", openWith: "zed" },
-    { id: "sublime-text", label: "Sublime Text", icon: "sublime-text", openWith: "sublime_text" },
+    { id: "sublime-text", label: "Sublime Text", icon: "sublime-text", openWith: "Sublime Text" },
   ] as const
 
   const os = createMemo<"macos" | "windows" | "linux" | "unknown">(() => {
