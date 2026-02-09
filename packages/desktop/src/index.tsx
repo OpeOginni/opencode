@@ -386,7 +386,7 @@ render(() => {
             }
 
             return (
-              <AppInterface defaultUrl={data().url} isSidecar={true}>
+              <AppInterface defaultUrl={data().url} isSidecar>
                 <Inner />
               </AppInterface>
             )
