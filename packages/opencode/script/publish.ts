@@ -53,7 +53,7 @@ const image = "ghcr.io/anomalyco/opencode"
 const platforms = "linux/amd64,linux/arm64"
 const tags = [`${image}:${version}`, `${image}:${Script.channel}`]
 const tagFlags = tags.flatMap((t) => ["-t", t])
-await $`docker buildx build --platform ${platforms} ${tagFlags} --push ./Dockerfile`
+await $`docker buildx build --platform ${platforms} ${tagFlags} --push -f ./Dockerfile .`
 
 const debianTags = [`${image}:debian-${version}`, `${image}:debian-${Script.channel}`, `${image}:debian`]
 const debianFlags = debianTags.flatMap((t) => ["-t", t])
