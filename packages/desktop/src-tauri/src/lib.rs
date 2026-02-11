@@ -165,9 +165,13 @@ fn check_app_exists(app_name: &str) -> bool {
 }
 
 #[cfg(target_os = "windows")]
-fn check_windows_app(_app_name: &str) -> bool {
-    // Check if command exists in PATH, including .exe
-    return true;
+fn check_windows_app(app_name: &str) -> bool {
+    // Check if command exists in PATH using where.exe
+    Command::new("where.exe")
+        .arg(app_name)
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
 }
 
 #[cfg(target_os = "windows")]
