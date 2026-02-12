@@ -100,6 +100,8 @@ import type {
   SessionAbortResponses,
   SessionChildrenErrors,
   SessionChildrenResponses,
+  SessionCloudPromptErrors,
+  SessionCloudPromptResponses,
   SessionCommandErrors,
   SessionCommandResponses,
   SessionCreateErrors,
@@ -922,6 +924,68 @@ export class Experimental extends HeyApiClient {
   private _resource?: Resource
   get resource(): Resource {
     return (this._resource ??= new Resource({ client: this.client }))
+  }
+}
+
+export class Cloud extends HeyApiClient {
+  /**
+   * Send cloud prompt
+   *
+   * Send a prompt to a remote session and mirror its stream locally.
+   */
+  public prompt<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      messageID?: string
+      model?: {
+        providerID: string
+        modelID: string
+      }
+      agent?: string
+      noReply?: boolean
+      tools?: {
+        [key: string]: boolean
+      }
+      system?: string
+      variant?: string
+      parts?: Array<TextPartInput | FilePartInput | AgentPartInput | SubtaskPartInput>
+      serverUrl?: string
+      remoteSessionID?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "body", key: "messageID" },
+            { in: "body", key: "model" },
+            { in: "body", key: "agent" },
+            { in: "body", key: "noReply" },
+            { in: "body", key: "tools" },
+            { in: "body", key: "system" },
+            { in: "body", key: "variant" },
+            { in: "body", key: "parts" },
+            { in: "body", key: "serverUrl" },
+            { in: "body", key: "remoteSessionID" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<SessionCloudPromptResponses, SessionCloudPromptErrors, ThrowOnError>({
+      url: "/session/{sessionID}/cloud/prompt",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
   }
 }
 
@@ -1765,6 +1829,11 @@ export class Session extends HeyApiClient {
       ...options,
       ...params,
     })
+  }
+
+  private _cloud?: Cloud
+  get cloud(): Cloud {
+    return (this._cloud ??= new Cloud({ client: this.client }))
   }
 }
 

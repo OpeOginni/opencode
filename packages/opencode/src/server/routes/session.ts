@@ -14,6 +14,7 @@ import { Agent } from "../../agent/agent"
 import { Snapshot } from "@/snapshot"
 import { Log } from "../../util/log"
 import { PermissionNext } from "@/permission/next"
+import { CloudSession } from "@/session/cloud"
 import { errors } from "../error"
 import { lazy } from "../../util/lazy"
 
@@ -763,6 +764,47 @@ export const SessionRoutes = lazy(() =>
           const sessionID = c.req.valid("param").sessionID
           const body = c.req.valid("json")
           SessionPrompt.prompt({ ...body, sessionID })
+        })
+      },
+    )
+    .post(
+      "/:sessionID/cloud/prompt",
+      describeRoute({
+        summary: "Send cloud prompt",
+        description: "Send a prompt to a remote session and mirror its stream locally.",
+        operationId: "session.cloud.prompt",
+        responses: {
+          200: {
+            description: "Created message",
+            content: {
+              "application/json": {
+                schema: resolver(
+                  z.object({
+                    info: MessageV2.Assistant,
+                    parts: MessageV2.Part.array(),
+                  }),
+                ),
+              },
+            },
+          },
+          ...errors(400, 404),
+        },
+      }),
+      validator(
+        "param",
+        z.object({
+          sessionID: z.string().meta({ description: "Session ID" }),
+        }),
+      ),
+      validator("json", CloudSession.PromptInput),
+      async (c) => {
+        c.status(200)
+        c.header("Content-Type", "application/json")
+        return stream(c, async (stream) => {
+          const sessionID = c.req.valid("param").sessionID
+          const body = c.req.valid("json")
+          const msg = await CloudSession.prompt({ sessionID, ...body })
+          stream.write(JSON.stringify(msg))
         })
       },
     )

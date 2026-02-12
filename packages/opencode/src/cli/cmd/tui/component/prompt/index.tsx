@@ -32,6 +32,7 @@ import { useToast } from "../../ui/toast"
 import { useKV } from "../../context/kv"
 import { useTextareaKeybindings } from "../textarea-keybindings"
 import { DialogSkill } from "../dialog-skill"
+import { Flag } from "@/flag/flag"
 
 export type PromptProps = {
   sessionID?: string
@@ -75,6 +76,7 @@ export function Prompt(props: PromptProps) {
   const renderer = useRenderer()
   const { theme, syntax } = useTheme()
   const kv = useKV()
+  const cloudApi = Flag.OPENCODE_CLOUD_API
 
   function promptModelWarning() {
     toast.show({
@@ -328,6 +330,22 @@ export function Prompt(props: PromptProps) {
         },
       },
       {
+        title: "Cloud prompt",
+        value: "prompt.cloud",
+        category: "Prompt",
+        hidden: !cloudApi,
+        enabled: !!cloudApi,
+        slash: {
+          name: "cloud",
+        },
+        onSelect: (dialog) => {
+          dialog.clear()
+          input.setText("/cloud ")
+          setStore("prompt", { input: "/cloud ", parts: [] })
+          input.gotoBufferEnd()
+        },
+      },
+      {
         title: "Skills",
         value: "prompt.skills",
         category: "Prompt",
@@ -537,12 +555,6 @@ export function Prompt(props: PromptProps) {
       promptModelWarning()
       return
     }
-    const sessionID = props.sessionID
-      ? props.sessionID
-      : await (async () => {
-          const sessionID = await sdk.client.session.create({}).then((x) => x.data!.id)
-          return sessionID
-        })()
     const messageID = Identifier.ascending("message")
     let inputText = store.prompt.input
 
@@ -569,6 +581,22 @@ export function Prompt(props: PromptProps) {
     const currentMode = store.mode
     const variant = local.model.variant.current()
 
+    const cloudSessions = kv.get("cloud.sessions", {}) as Record<string, boolean>
+    const cloudActive = props.sessionID ? cloudSessions[props.sessionID] === true : false
+    const isCloudCommand = inputText.startsWith("/cloud")
+    const sessionID = await (async () => {
+      if (isCloudCommand && !cloudActive) {
+        const sessionID = await sdk.client.session.create({}).then((x) => x.data!.id)
+        route.navigate({
+          type: "session",
+          sessionID,
+        })
+        return sessionID
+      }
+      if (props.sessionID) return props.sessionID
+      return await sdk.client.session.create({}).then((x) => x.data!.id)
+    })()
+
     if (store.mode === "shell") {
       sdk.client.session.shell({
         sessionID,
@@ -580,6 +608,167 @@ export function Prompt(props: PromptProps) {
         command: inputText,
       })
       setStore("mode", "normal")
+    } else if (inputText.startsWith("/cloud")) {
+      if (!cloudApi) {
+        toast.show({
+          variant: "error",
+          message: "OPENCODE_CLOUD_API is not set",
+        })
+        return
+      }
+
+      const firstLineEnd = inputText.indexOf("\n")
+      const firstLine = firstLineEnd === -1 ? inputText : inputText.slice(0, firstLineEnd)
+      const restOfInput = firstLineEnd === -1 ? "" : inputText.slice(firstLineEnd + 1)
+      const [, ...firstLineArgs] = firstLine.split(" ")
+      const cloudText = firstLineArgs.join(" ") + (restOfInput ? "\n" + restOfInput : "")
+
+      if (!cloudText.trim()) {
+        toast.show({
+          variant: "error",
+          message: "Add a prompt after /cloud",
+        })
+        return
+      }
+
+      const worktree = sync.data.path.worktree || sync.data.path.directory
+
+      const git = async (args: string[]) => {
+        const proc = Bun.spawn(["git", ...args], {
+          cwd: worktree,
+          stdout: "pipe",
+          stderr: "pipe",
+        })
+        const text = await new Response(proc.stdout)
+          .text()
+          .then((value) => value.trim())
+          .catch(() => "")
+        const code = await proc.exited
+        if (code !== 0) return undefined
+        return text
+      }
+
+      const remoteUrl = await git(["remote", "get-url", "origin"])
+      if (!remoteUrl) {
+        toast.show({
+          variant: "error",
+          message: "Failed to resolve git remote origin",
+        })
+        return
+      }
+
+      const cleaned = remoteUrl.replace(/\.git$/, "")
+      const sshMatch = cleaned.match(/^git@[^:]+:([^/]+)\/(.+)$/)
+      const sshUrlMatch = cleaned.match(/^ssh:\/\/git@[^/]+\/([^/]+)\/(.+)$/)
+      const httpsMatch = cleaned.match(/^https?:\/\/[^/]+\/([^/]+)\/(.+)$/)
+      const match = sshMatch ?? sshUrlMatch ?? httpsMatch
+      if (!match) {
+        toast.show({
+          variant: "error",
+          message: "Failed to parse git remote origin",
+        })
+        return
+      }
+
+      const remoteRepoOwner = match[1]
+      const remoteRepoName = match[2]
+      const remoteBranch = sync.data.vcs?.branch ?? (await git(["rev-parse", "--abbrev-ref", "HEAD"]))
+      if (!remoteBranch) {
+        toast.show({
+          variant: "error",
+          message: "Failed to resolve git branch",
+        })
+        return
+      }
+
+      const baseCommitSha = await git(["rev-parse", "HEAD"])
+      if (!baseCommitSha) {
+        toast.show({
+          variant: "error",
+          message: "Failed to resolve git commit",
+        })
+        return
+      }
+
+      const cloudHistory = cloudActive
+        ? (sync.data.message[sessionID] ?? []).map((msg) => ({
+            info: msg,
+            parts: sync.data.part[msg.id] ?? [],
+          }))
+        : undefined
+
+      const cloudUrl = cloudActive ? new URL("./spawn", cloudApi).toString() : cloudApi
+      const cloudResponse = await fetch(cloudUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          remoteRepoOwner,
+          remoteRepoName,
+          remoteBranch,
+          baseCommitSha,
+          providerId: selectedModel.providerID,
+          ...(cloudHistory ? { history: cloudHistory } : {}),
+        }),
+      })
+
+      const cloudData = await cloudResponse.json().catch(() => undefined)
+      if (!cloudResponse.ok || !cloudData?.serverUrl || !cloudData?.sessionId) {
+        toast.show({
+          variant: "error",
+          message: "Failed to create cloud sandbox",
+        })
+        return
+      }
+
+      kv.set("cloud.sessions", {
+        ...cloudSessions,
+        [sessionID]: true,
+      })
+
+      const client = sdk.client as unknown as {
+        cloud: {
+          prompt: (input: {
+            sessionID: string
+            directory?: string
+            serverUrl: string
+            remoteSessionID: string
+            messageID?: string
+            agent?: string
+            model?: {
+              providerID: string
+              modelID: string
+            }
+            variant?: string
+            parts?: Array<Record<string, unknown> & { id: string }>
+          }) => Promise<unknown>
+        }
+      }
+
+      client.cloud
+        .prompt({
+          sessionID,
+          directory: sync.data.path.directory,
+          serverUrl: cloudData.serverUrl,
+          remoteSessionID: cloudData.sessionId,
+          messageID,
+          agent: local.agent.current().name,
+          model: selectedModel,
+          variant,
+          parts: [
+            {
+              id: Identifier.ascending("part"),
+              type: "text",
+              text: cloudText,
+            },
+            ...nonTextParts.map((part) => ({
+              id: Identifier.ascending("part"),
+              ...part,
+            })),
+          ],
+        })
+        .catch(() => {})
     } else if (
       inputText.startsWith("/") &&
       iife(() => {

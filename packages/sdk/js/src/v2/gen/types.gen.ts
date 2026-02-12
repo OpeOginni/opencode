@@ -3627,6 +3627,64 @@ export type SessionPromptAsyncResponses = {
 
 export type SessionPromptAsyncResponse = SessionPromptAsyncResponses[keyof SessionPromptAsyncResponses]
 
+export type SessionCloudPromptData = {
+  body?: {
+    messageID?: string
+    model?: {
+      providerID: string
+      modelID: string
+    }
+    agent?: string
+    noReply?: boolean
+    /**
+     * @deprecated tools and permissions have been merged, you can set permissions on the session itself now
+     */
+    tools?: {
+      [key: string]: boolean
+    }
+    system?: string
+    variant?: string
+    parts: Array<TextPartInput | FilePartInput | AgentPartInput | SubtaskPartInput>
+    serverUrl: string
+    remoteSessionID: string
+  }
+  path: {
+    /**
+     * Session ID
+     */
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+  }
+  url: "/session/{sessionID}/cloud/prompt"
+}
+
+export type SessionCloudPromptErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type SessionCloudPromptError = SessionCloudPromptErrors[keyof SessionCloudPromptErrors]
+
+export type SessionCloudPromptResponses = {
+  /**
+   * Created message
+   */
+  200: {
+    info: AssistantMessage
+    parts: Array<Part>
+  }
+}
+
+export type SessionCloudPromptResponse = SessionCloudPromptResponses[keyof SessionCloudPromptResponses]
+
 export type SessionCommandData = {
   body?: {
     messageID?: string
