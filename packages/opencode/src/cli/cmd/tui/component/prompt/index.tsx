@@ -739,7 +739,6 @@ export function Prompt(props: PromptProps) {
       const cloudResult = cloudJson?.result
       const cloudData = cloudResult?.data
       const serverUrl = cloudData?.serverUrl
-      const cloudSessionId = cloudData?.cloudSessionId
       const sandboxServerSessionId = cloudData?.sessionId
       const cloudError = cloudResult?.error || cloudResult?.message
 
@@ -747,11 +746,10 @@ export function Prompt(props: PromptProps) {
         status: cloudResponse.status,
         ok: cloudResponse.ok,
         serverUrl,
-        cloudSessionId,
         error: cloudError,
       })
 
-      if (!cloudResponse.ok || !serverUrl || !cloudSessionId || !sandboxServerSessionId) {
+      if (!cloudResponse.ok || !serverUrl || !sandboxServerSessionId) {
         sdk.client.session.delete({ sessionID })
 
         cloudSessionLog.info("Error", { error: cloudError })
