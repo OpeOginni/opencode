@@ -16,8 +16,22 @@ import { Log } from "../../util/log"
 import { PermissionNext } from "@/permission/next"
 import { errors } from "../error"
 import { lazy } from "../../util/lazy"
+import { Storage } from "@/storage/storage"
+import { Instance } from "@/project/instance"
 
 const log = Log.create({ service: "server" })
+
+const SessionExport = z
+  .object({
+    info: Session.Info,
+    messages: z.array(
+      z.object({
+        info: MessageV2.Info,
+        parts: MessageV2.Part.array(),
+      }),
+    ),
+  })
+  .meta({ ref: "SessionExport" })
 
 export const SessionRoutes = lazy(() =>
   new Hono()
@@ -87,6 +101,75 @@ export const SessionRoutes = lazy(() =>
       async (c) => {
         const result = SessionStatus.list()
         return c.json(result)
+      },
+    )
+    .post(
+      "/import",
+      describeRoute({
+        summary: "Import session",
+        description: "Import session data from an export payload.",
+        operationId: "session.import",
+        responses: {
+          200: {
+            description: "Imported session",
+            content: {
+              "application/json": {
+                schema: resolver(Session.Info),
+              },
+            },
+          },
+          ...errors(400),
+        },
+      }),
+      validator("json", SessionExport),
+      async (c) => {
+        const body = c.req.valid("json")
+        body.info.time.updated = Date.now() // Moved in now
+        await Storage.write(["session", Instance.project.id, body.info.id], body.info)
+        for (const msg of body.messages) {
+          await Storage.write(["message", body.info.id, msg.info.id], msg.info)
+          for (const part of msg.parts) {
+            await Storage.write(["part", msg.info.id, part.id], part)
+          }
+        }
+        return c.json(body.info)
+      },
+    )
+    .get(
+      "/:sessionID/export",
+      describeRoute({
+        summary: "Export session",
+        description: "Export session data, including messages and parts, as JSON.",
+        operationId: "session.export",
+        responses: {
+          200: {
+            description: "Exported session data",
+            content: {
+              "application/json": {
+                schema: resolver(SessionExport),
+              },
+            },
+          },
+          ...errors(400, 404),
+        },
+      }),
+      validator(
+        "param",
+        z.object({
+          sessionID: Session.get.schema,
+        }),
+      ),
+      async (c) => {
+        const sessionID = c.req.valid("param").sessionID
+        const session = await Session.get(sessionID)
+        const messages = await Session.messages({ sessionID })
+        return c.json({
+          info: session,
+          messages: messages.map((msg) => ({
+            info: msg.info,
+            parts: msg.parts,
+          })),
+        })
       },
     )
     .get(

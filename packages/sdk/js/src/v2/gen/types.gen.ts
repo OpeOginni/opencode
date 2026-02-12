@@ -2045,6 +2045,14 @@ export type McpResource = {
   client: string
 }
 
+export type SessionExport = {
+  info: Session
+  messages: Array<{
+    info: Message
+    parts: Array<Part>
+  }>
+}
+
 export type TextPartInput = {
   id?: string
   type: "text"
@@ -2980,6 +2988,66 @@ export type SessionStatusResponses = {
 }
 
 export type SessionStatusResponse = SessionStatusResponses[keyof SessionStatusResponses]
+
+export type SessionImportData = {
+  body?: SessionExport
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/session/import"
+}
+
+export type SessionImportErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type SessionImportError = SessionImportErrors[keyof SessionImportErrors]
+
+export type SessionImportResponses = {
+  /**
+   * Imported session
+   */
+  200: Session
+}
+
+export type SessionImportResponse = SessionImportResponses[keyof SessionImportResponses]
+
+export type SessionExportData = {
+  body?: never
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+  }
+  url: "/session/{sessionID}/export"
+}
+
+export type SessionExportErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type SessionExportError = SessionExportErrors[keyof SessionExportErrors]
+
+export type SessionExportResponses = {
+  /**
+   * Exported session data
+   */
+  200: SessionExport
+}
+
+export type SessionExportResponse = SessionExportResponses[keyof SessionExportResponses]
 
 export type SessionDeleteData = {
   body?: never
