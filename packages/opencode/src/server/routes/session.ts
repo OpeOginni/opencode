@@ -124,15 +124,24 @@ export const SessionRoutes = lazy(() =>
       validator("json", SessionExport),
       async (c) => {
         const body = c.req.valid("json")
-        body.info.time.updated = Date.now() // Moved in now
-        await Storage.write(["session", Instance.project.id, body.info.id], body.info)
+        const info = {
+          ...body.info,
+          projectID: Instance.project.id,
+          directory: Instance.directory,
+          share: undefined,
+          time: {
+            ...body.info.time,
+            updated: Date.now(),
+          },
+        }
+        await Storage.write(["session", Instance.project.id, info.id], info)
         for (const msg of body.messages) {
-          await Storage.write(["message", body.info.id, msg.info.id], msg.info)
+          await Storage.write(["message", info.id, msg.info.id], msg.info)
           for (const part of msg.parts) {
             await Storage.write(["part", msg.info.id, part.id], part)
           }
         }
-        return c.json(body.info)
+        return c.json(info)
       },
     )
     .get(
