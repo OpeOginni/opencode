@@ -33,6 +33,7 @@ import { useKV } from "../../context/kv"
 import { useTextareaKeybindings } from "../textarea-keybindings"
 import { DialogSkill } from "../dialog-skill"
 import { Flag } from "@/flag/flag"
+import { Log } from "@/util/log.ts"
 
 export type PromptProps = {
   sessionID?: string
@@ -52,6 +53,24 @@ export type PromptRef = {
   blur(): void
   focus(): void
   submit(): void
+}
+
+type CloudSessionData = {
+  cloudSessionId?: string
+  serverUrl?: string
+  sessionId?: string
+}
+
+type CloudSessionResult = {
+  data?: CloudSessionData
+  error?: string
+  message?: string
+}
+
+type CloudSessionResponse = {
+  result?: CloudSessionResult
+  error?: string
+  message?: string
 }
 
 const PLACEHOLDERS = ["Fix a TODO in the codebase", "What is the tech stack of this project?", "Fix broken tests"]
@@ -77,6 +96,7 @@ export function Prompt(props: PromptProps) {
   const { theme, syntax } = useTheme()
   const kv = useKV()
   const cloudApi = Flag.OPENCODE_CLOUD_API
+  const cloudSessionLog = Log.create({ service: "cloud-sessions" })
 
   function promptModelWarning() {
     toast.show({
@@ -697,11 +717,12 @@ export function Prompt(props: PromptProps) {
           }))
         : undefined
 
-      const cloudUrl = cloudActive ? new URL("./spawn", cloudApi).toString() : cloudApi
+      const cloudUrl = cloudActive ? `${cloudApi}/trpc/cloudSessions.spawn` : `${cloudApi}/trpc/cloudSessions.create`
       const cloudResponse = await fetch(cloudUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: "Bearer ",
         },
         body: JSON.stringify({
           remoteRepoOwner,
@@ -713,11 +734,31 @@ export function Prompt(props: PromptProps) {
         }),
       })
 
-      const cloudData = await cloudResponse.json().catch(() => undefined)
-      if (!cloudResponse.ok || !cloudData?.serverUrl || !cloudData?.sessionId) {
+      const cloudJson = (await cloudResponse.json().catch(() => undefined)) as CloudSessionResponse | undefined
+
+      const cloudResult = cloudJson?.result
+      const cloudData = cloudResult?.data
+      const serverUrl = cloudData?.serverUrl
+      const cloudSessionId = cloudData?.cloudSessionId
+      const sandboxServerSessionId = cloudData?.sessionId
+      const cloudError = cloudResult?.error || cloudResult?.message
+
+      cloudSessionLog.info("Data", {
+        status: cloudResponse.status,
+        ok: cloudResponse.ok,
+        serverUrl,
+        cloudSessionId,
+        error: cloudError,
+      })
+
+      if (!cloudResponse.ok || !serverUrl || !cloudSessionId || !sandboxServerSessionId) {
+        sdk.client.session.delete({ sessionID })
+
+        cloudSessionLog.info("Error", { error: cloudError })
+
         toast.show({
           variant: "error",
-          message: "Failed to create cloud sandbox",
+          message: cloudError ? `Failed to create cloud sandbox: ${cloudError}` : "Failed to create cloud sandbox",
         })
         return
       }
@@ -727,26 +768,7 @@ export function Prompt(props: PromptProps) {
         [sessionID]: true,
       })
 
-      const client = sdk.client as unknown as {
-        cloud: {
-          prompt: (input: {
-            sessionID: string
-            directory?: string
-            serverUrl: string
-            remoteSessionID: string
-            messageID?: string
-            agent?: string
-            model?: {
-              providerID: string
-              modelID: string
-            }
-            variant?: string
-            parts?: Array<Record<string, unknown> & { id: string }>
-          }) => Promise<unknown>
-        }
-      }
-
-      client.cloud
+      sdk.client.session.cloud
         .prompt({
           sessionID,
           directory: sync.data.path.directory,
@@ -768,7 +790,13 @@ export function Prompt(props: PromptProps) {
             })),
           ],
         })
-        .catch(() => {})
+        .catch((err) => {
+          cloudSessionLog.error("Error", err)
+          toast.show({
+            variant: "error",
+            message: err,
+          })
+        })
     } else if (
       inputText.startsWith("/") &&
       iife(() => {
@@ -826,6 +854,7 @@ export function Prompt(props: PromptProps) {
       ...store.prompt,
       mode: currentMode,
     })
+    if (!input || input.isDestroyed) return
     input.extmarks.clear()
     setStore("prompt", {
       input: "",
