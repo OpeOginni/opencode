@@ -718,7 +718,7 @@ export function Prompt(props: PromptProps) {
       //     }))
       //   : undefined
 
-      const existingSessionExport = await sdk.client.session.export({sessionID})
+      // const existingSessionExport = await sdk.client.session.export({sessionID})
 
       SessionStatus.set(sessionID, { type: "busy" })
 
