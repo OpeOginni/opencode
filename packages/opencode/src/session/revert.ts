@@ -58,8 +58,13 @@ export namespace SessionRevert {
       revert.snapshot = session.revert?.snapshot ?? (await Snapshot.track())
       await Snapshot.revert(patches)
       if (revert.snapshot) revert.diff = await Snapshot.diff(revert.snapshot)
-      const rangeMessages = all.filter((msg) => msg.info.id >= revert!.messageID)
-      const diffs = await SessionSummary.computeDiff({ messages: rangeMessages })
+      const remainingMessages = all.filter((msg) =>
+        revert?.partID ? msg.info.id <= revert.messageID : msg.info.id < revert!.messageID,
+      )
+      // Make sure new summary is made up of remainingMessgaes, messages with id less (<) then the reverted one
+      // If reverting a part, we add in the message itself
+
+      const diffs = await SessionSummary.computeDiff({ messages: remainingMessages })
       await Storage.write(["session_diff", input.sessionID], diffs)
       Bus.publish(Session.Event.Diff, {
         sessionID: input.sessionID,
@@ -85,6 +90,20 @@ export namespace SessionRevert {
     if (session.revert.snapshot) await Snapshot.restore(session.revert.snapshot)
     const next = await Session.update(input.sessionID, (draft) => {
       draft.revert = undefined
+    })
+    const messages = await Session.messages({ sessionID: input.sessionID })
+    const diffs = await SessionSummary.computeDiff({ messages })
+    await Storage.write(["session_diff", input.sessionID], diffs)
+    Bus.publish(Session.Event.Diff, {
+      sessionID: input.sessionID,
+      diff: diffs,
+    })
+    await Session.update(input.sessionID, (draft) => {
+      draft.summary = {
+        additions: diffs.reduce((sum, x) => sum + x.additions, 0),
+        deletions: diffs.reduce((sum, x) => sum + x.deletions, 0),
+        files: diffs.length,
+      }
     })
     return next
   }
