@@ -33,9 +33,6 @@ import { useKV } from "../../context/kv"
 import { useTextareaKeybindings } from "../textarea-keybindings"
 import { DialogSkill } from "../dialog-skill"
 import { Flag } from "@/flag/flag"
-import { Log } from "@/util/log.ts"
-import { SessionStatus } from "@/session/status.ts"
-
 export type PromptProps = {
   sessionID?: string
   visible?: boolean
@@ -44,6 +41,7 @@ export type PromptProps = {
   ref?: (ref: PromptRef) => void
   hint?: JSX.Element
   showPlaceholder?: boolean
+  cloud?: boolean
 }
 
 export type PromptRef = {
@@ -54,24 +52,6 @@ export type PromptRef = {
   blur(): void
   focus(): void
   submit(): void
-}
-
-type CloudSessionData = {
-  cloudSessionId?: string
-  serverUrl?: string
-  sessionId?: string
-}
-
-type CloudSessionResult = {
-  data?: CloudSessionData
-  error?: string
-  message?: string
-}
-
-type CloudSessionResponse = {
-  result?: CloudSessionResult
-  error?: string
-  message?: string
 }
 
 const PLACEHOLDERS = ["Fix a TODO in the codebase", "What is the tech stack of this project?", "Fix broken tests"]
@@ -97,7 +77,6 @@ export function Prompt(props: PromptProps) {
   const { theme, syntax } = useTheme()
   const kv = useKV()
   const cloudApi = Flag.OPENCODE_CLOUD_API
-  const cloudSessionLog = Log.create({ service: "cloud-sessions" })
 
   function promptModelWarning() {
     toast.show({
@@ -603,11 +582,35 @@ export function Prompt(props: PromptProps) {
     const variant = local.model.variant.current()
 
     const cloudSessions = kv.get("cloud.sessions", {}) as Record<string, boolean>
-    const cloudActive = props.sessionID ? cloudSessions[props.sessionID] === true : false
-    const isCloudCommand = inputText.startsWith("/cloud")
+    const cloudMode = props.cloud === true
+    const isCloudCommand = !cloudMode && inputText.startsWith("/cloud")
+
+    const cloudText = (() => {
+      if (isCloudCommand) {
+        const firstLineEnd = inputText.indexOf("\n")
+        const firstLine = firstLineEnd === -1 ? inputText : inputText.slice(0, firstLineEnd)
+        const restOfInput = firstLineEnd === -1 ? "" : inputText.slice(firstLineEnd + 1)
+        const [, ...firstLineArgs] = firstLine.split(" ")
+        return firstLineArgs.join(" ") + (restOfInput ? "\n" + restOfInput : "")
+      }
+      return inputText
+    })()
+
+    if (!cloudText.trim()) {
+      toast.show({
+        variant: "error",
+        message: isCloudCommand ? "Add a prompt after /cloud" : "Enter a message to send",
+      })
+      return
+    }
+
     const sessionID = await (async () => {
-      if (isCloudCommand && !cloudActive) {
+      if (isCloudCommand) {
         const sessionID = await sdk.client.session.create({}).then((x) => x.data!.id)
+        kv.set("cloud.sessions", {
+          ...cloudSessions,
+          [sessionID]: true,
+        })
         route.navigate({
           type: "session",
           sessionID,
@@ -617,8 +620,10 @@ export function Prompt(props: PromptProps) {
       if (props.sessionID) return props.sessionID
       return await sdk.client.session.create({}).then((x) => x.data!.id)
     })()
+    const cloudActive = (sync.data.message[sessionID]?.length ?? 0) > 0
+    const useCloud = cloudMode || isCloudCommand
 
-    if (store.mode === "shell") {
+    if (store.mode === "shell" && !cloudMode) {
       sdk.client.session.shell({
         sessionID,
         agent: local.agent.current().name,
@@ -629,25 +634,11 @@ export function Prompt(props: PromptProps) {
         command: inputText,
       })
       setStore("mode", "normal")
-    } else if (inputText.startsWith("/cloud")) {
+    } else if (useCloud) {
       if (!cloudApi) {
         toast.show({
           variant: "error",
           message: "OPENCODE_CLOUD_API is not set",
-        })
-        return
-      }
-
-      const firstLineEnd = inputText.indexOf("\n")
-      const firstLine = firstLineEnd === -1 ? inputText : inputText.slice(0, firstLineEnd)
-      const restOfInput = firstLineEnd === -1 ? "" : inputText.slice(firstLineEnd + 1)
-      const [, ...firstLineArgs] = firstLine.split(" ")
-      const cloudText = firstLineArgs.join(" ") + (restOfInput ? "\n" + restOfInput : "")
-
-      if (!cloudText.trim()) {
-        toast.show({
-          variant: "error",
-          message: "Add a prompt after /cloud",
         })
         return
       }
@@ -711,94 +702,45 @@ export function Prompt(props: PromptProps) {
         return
       }
 
-      // const cloudHistory = cloudActive
-      //   ? (sync.data.message[sessionID] ?? []).map((msg) => ({
-      //       info: msg,
-      //       parts: sync.data.part[msg.id] ?? [],
-      //     }))
-      //   : undefined
-
-      // const existingSessionExport = await sdk.client.session.export({sessionID})
-
-      SessionStatus.set(sessionID, { type: "busy" })
-
-      const cloudUrl = cloudActive ? `${cloudApi}/trpc/cloudSessions.spawn` : `${cloudApi}/trpc/cloudSessions.create`
-      const cloudResponse = await fetch(cloudUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer ",
-        },
-        body: JSON.stringify({
-          remoteRepoOwner,
-          remoteRepoName,
-          remoteBranch,
-          baseCommitSha,
-          providerId: selectedModel.providerID,
-          // ...(existingSessionExport. ? { history: cloudHistory } : {}), // Check if more than one message then pass full session
-        }),
-      })
-
-      const cloudJson = (await cloudResponse.json().catch(() => undefined)) as CloudSessionResponse | undefined
-
-      const cloudResult = cloudJson?.result
-      const cloudData = cloudResult?.data
-      const serverUrl = cloudData?.serverUrl
-      const sandboxServerSessionId = cloudData?.sessionId
-      const cloudError = cloudResult?.error || cloudResult?.message
-
-      cloudSessionLog.info("Data", {
-        status: cloudResponse.status,
-        ok: cloudResponse.ok,
-        serverUrl,
-        error: cloudError,
-      })
-
-      if (!cloudResponse.ok || !serverUrl || !sandboxServerSessionId) {
-        sdk.client.session.delete({ sessionID })
-
-        cloudSessionLog.info("Error", { error: cloudError })
-
-        toast.show({
-          variant: "error",
-          message: cloudError ? `Failed to create cloud sandbox: ${cloudError}` : "Failed to create cloud sandbox",
-        })
-        return
-      }
-
-      kv.set("cloud.sessions", {
-        ...cloudSessions,
-        [sessionID]: true,
-      })
-
       sdk.client.session.cloud
-        .prompt({
-          sessionID,
-          directory: sync.data.path.directory,
-          serverUrl: cloudData.serverUrl,
-          remoteSessionID: cloudData.sessionId,
-          messageID,
-          agent: local.agent.current().name,
-          model: selectedModel,
-          variant,
-          parts: [
-            {
-              id: Identifier.ascending("part"),
-              type: "text",
-              text: cloudText,
-            },
-            ...nonTextParts.map((part) => ({
-              id: Identifier.ascending("part"),
-              ...part,
-            })),
-          ],
+        .prompt(
+          {
+            sessionID,
+            directory: sync.data.path.directory,
+            remoteRepoOwner,
+            remoteRepoName,
+            remoteBranch,
+            baseCommitSha,
+            cloudActive,
+            messageID,
+            agent: local.agent.current().name,
+            model: selectedModel,
+            variant,
+            parts: [
+              {
+                id: Identifier.ascending("part"),
+                type: "text",
+                text: cloudText,
+              },
+              ...nonTextParts.map((part) => ({
+                id: Identifier.ascending("part"),
+                ...part,
+              })),
+            ],
+          },
+          { throwOnError: true },
+        )
+        .then(() => {
+          kv.set("cloud.sessions", {
+            ...cloudSessions,
+            [sessionID]: true,
+          })
         })
         .catch((err) => {
-          cloudSessionLog.error("Error", err)
-          toast.show({
-            variant: "error",
-            message: err,
-          })
+          if (isCloudCommand && !cloudActive) {
+            sdk.client.session.delete({ sessionID })
+          }
+          toast.error(err)
         })
     } else if (
       inputText.startsWith("/") &&
@@ -1090,7 +1032,7 @@ export function Prompt(props: PromptProps) {
                     return
                   }
                 }
-                if (e.name === "!" && input.visualCursor.offset === 0) {
+                if (!props.cloud && e.name === "!" && input.visualCursor.offset === 0) {
                   setStore("placeholder", Math.floor(Math.random() * SHELL_PLACEHOLDERS.length))
                   setStore("mode", "shell")
                   e.preventDefault()
@@ -1219,6 +1161,9 @@ export function Prompt(props: PromptProps) {
               <text fg={highlight()}>
                 {store.mode === "shell" ? "Shell" : Locale.titlecase(local.agent.current().name)}{" "}
               </text>
+              <Show when={props.cloud}>
+                <text fg={theme.textMuted}>(cloud)</text>
+              </Show>
               <Show when={store.mode === "normal"}>
                 <box flexDirection="row" gap={1}>
                   <text flexShrink={0} fg={keybind.leader ? theme.textMuted : theme.text}>
@@ -1371,4 +1316,8 @@ export function Prompt(props: PromptProps) {
       </box>
     </>
   )
+}
+
+export function CloudPrompt(props: PromptProps) {
+  return <Prompt {...props} cloud />
 }

@@ -950,8 +950,11 @@ export class Cloud extends HeyApiClient {
       system?: string
       variant?: string
       parts?: Array<TextPartInput | FilePartInput | AgentPartInput | SubtaskPartInput>
-      serverUrl?: string
-      remoteSessionID?: string
+      remoteRepoOwner?: string
+      remoteRepoName?: string
+      remoteBranch?: string
+      baseCommitSha?: string
+      cloudActive?: boolean
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -970,8 +973,11 @@ export class Cloud extends HeyApiClient {
             { in: "body", key: "system" },
             { in: "body", key: "variant" },
             { in: "body", key: "parts" },
-            { in: "body", key: "serverUrl" },
-            { in: "body", key: "remoteSessionID" },
+            { in: "body", key: "remoteRepoOwner" },
+            { in: "body", key: "remoteRepoName" },
+            { in: "body", key: "remoteBranch" },
+            { in: "body", key: "baseCommitSha" },
+            { in: "body", key: "cloudActive" },
           ],
         },
       ],

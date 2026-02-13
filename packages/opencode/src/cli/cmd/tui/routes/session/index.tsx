@@ -27,7 +27,7 @@ import {
   TextAttributes,
   RGBA,
 } from "@opentui/core"
-import { Prompt, type PromptRef } from "@tui/component/prompt"
+import { CloudPrompt, Prompt, type PromptRef } from "@tui/component/prompt"
 import type { AssistantMessage, Part, ToolPart, UserMessage, TextPart, ReasoningPart } from "@opencode-ai/sdk/v2"
 import { useLocal } from "@tui/context/local"
 import { Locale } from "@/util/locale"
@@ -116,6 +116,11 @@ export function Session() {
   const { theme } = useTheme()
   const promptRef = usePromptRef()
   const session = createMemo(() => sync.session.get(route.sessionID))
+  const cloudPrompt = createMemo(() => {
+    const cloudSessions = kv.get("cloud.sessions", {}) as Record<string, boolean>
+    return cloudSessions[route.sessionID] === true
+  })
+  const promptComponent = createMemo(() => (cloudPrompt() ? CloudPrompt : Prompt))
   const children = createMemo(() => {
     const parentID = session()?.parentID ?? session()?.id
     return sync.data.session
@@ -1087,7 +1092,8 @@ export function Session() {
               <Show when={permissions().length === 0 && questions().length > 0}>
                 <QuestionPrompt request={questions()[0]} />
               </Show>
-              <Prompt
+              <Dynamic
+                component={promptComponent()}
                 visible={!session()?.parentID && permissions().length === 0 && questions().length === 0}
                 ref={(r) => {
                   prompt = r

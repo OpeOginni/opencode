@@ -1,27 +1,59 @@
-import { createOpencodeClient, type Event } from "@opencode-ai/sdk/v2"
+import { createOpencodeClient, type AssistantMessage, type Event, type Part } from "@opencode-ai/sdk/v2"
 import z from "zod"
 import { Session } from "./index"
 import { SessionStatus } from "./status"
 import { MessageV2 } from "./message-v2"
 import { Log } from "@/util/log"
-import { Identifier } from "@/id/id"
 import { SessionPrompt } from "./prompt"
+import { Flag } from "@/flag/flag"
+import { Bus } from "@/bus"
+import { NamedError } from "@opencode-ai/util/error"
 
 export namespace CloudSession {
   const log = Log.create({ service: "cloud-session" })
 
   export const PromptInput = SessionPrompt.PromptInput.omit({ sessionID: true }).extend({
-    serverUrl: z.url(),
-    remoteSessionID: Identifier.schema("session"),
+    remoteRepoOwner: z.string(),
+    remoteRepoName: z.string(),
+    remoteBranch: z.string(),
+    baseCommitSha: z.string(),
+    cloudActive: z.boolean().optional(),
   })
 
   export type PromptInput = z.infer<typeof PromptInput>
 
-  export async function prompt(input: PromptInput & { sessionID: string }) {
-    await Session.get(input.sessionID)
+  type PromptError = NonNullable<MessageV2.Assistant["error"]>
+  type PromptResult =
+    | {
+        info: AssistantMessage
+        parts: Part[]
+      }
+    | {
+        error: PromptError
+      }
+
+  type CloudResult =
+    | {
+        serverUrl: string
+        remoteSessionID: string
+      }
+    | {
+        error: string
+      }
+
+  export async function prompt(input: PromptInput & { sessionID: string }): Promise<PromptResult> {
+    const session = await Session.get(input.sessionID)
     SessionStatus.set(input.sessionID, { type: "busy" })
 
-    const client = createOpencodeClient({ baseUrl: input.serverUrl })
+    const cloud = await createCloudSession(input, session)
+    if ("error" in cloud) {
+      const error = new NamedError.Unknown({ message: cloud.error }).toObject() as PromptError
+      Bus.publish(Session.Event.Error, { sessionID: input.sessionID, error })
+      SessionStatus.set(input.sessionID, { type: "idle" })
+      return { error }
+    }
+
+    const client = createOpencodeClient({ baseUrl: cloud.serverUrl })
     const controller = new AbortController()
 
     let resolveDone = () => {}
@@ -32,12 +64,12 @@ export namespace CloudSession {
     const stream = streamEvents({
       client,
       sessionID: input.sessionID,
-      remoteSessionID: input.remoteSessionID,
+      remoteSessionID: cloud.remoteSessionID,
       signal: controller.signal,
       done: resolveDone,
     })
 
-    const { serverUrl: _, remoteSessionID, sessionID, ...promptInput } = input
+    const { sessionID, ...promptInput } = input
 
     const result = await (async () => {
       try {
@@ -45,7 +77,7 @@ export namespace CloudSession {
           .prompt(
             {
               ...promptInput,
-              sessionID: remoteSessionID,
+              sessionID: cloud.remoteSessionID,
             },
             { throwOnError: true },
           )
@@ -60,7 +92,7 @@ export namespace CloudSession {
       }
     })()
 
-    await sync({ client, sessionID, remoteSessionID })
+    await sync({ client, sessionID, remoteSessionID: cloud.remoteSessionID })
 
     return {
       info: {
@@ -72,6 +104,91 @@ export namespace CloudSession {
         sessionID,
       })),
     }
+  }
+
+  async function createCloudSession(
+    input: PromptInput & { sessionID: string },
+    session: Session.Info,
+  ): Promise<CloudResult> {
+    const cloudApi = Flag.OPENCODE_CLOUD_API
+    if (!cloudApi) return { error: "OPENCODE_CLOUD_API is not set" }
+
+    const providerId = input.model?.providerID
+    if (!providerId) return { error: "Model provider is required for cloud sessions" }
+
+    const existingSessionExport = await (async () => {
+      if (!input.cloudActive) return undefined
+      const messages = await Session.messages({ sessionID: session.id })
+      if (messages.length === 0) return undefined
+      return {
+        info: session,
+        messages: messages.map((msg) => ({
+          info: msg.info,
+          parts: msg.parts,
+        })),
+      }
+    })()
+
+    log.info("existingSessionExport", { existingSessionExport: existingSessionExport })
+
+    const body = input.cloudActive ? {
+      opencodeSessionId: input.sessionID,
+      ...(existingSessionExport ? { existingSessionExport } : {}),
+    } : {
+      localSessionId: session.id,
+      remoteRepoOwner: input.remoteRepoOwner,
+      remoteRepoName: input.remoteRepoName,
+      remoteBranch: input.remoteBranch,
+      baseCommitSha: input.baseCommitSha,
+      providerId,
+    }
+    log.info("body", { body: body })
+
+    const cloudUrl = input.cloudActive
+      ? `${cloudApi}/trpc/cloudSessions.spawn`
+      : `${cloudApi}/trpc/cloudSessions.create`
+    const cloudResponse = await fetch(cloudUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization:
+          "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJ0Nlk3bXA4UjdpNnVXTGJlM0FkaUN1R3FjZVl1NWpjZyIsInNjb3BlIjpbInR1bm5lbDpzeW5jOioiXSwiaWF0IjoxNzY5MzgwMTc2LCJleHAiOjE3NzE5NzIxNzZ9.Dr_TbfiS3aMtqDaQSWYc6KzSgW2i-TabzK30eN4KBkg",
+      },
+      body: JSON.stringify(body),
+    })
+
+    const cloudJson = (await cloudResponse.json().catch(() => undefined)) as
+      | {
+          result?: {
+            data?: { serverUrl?: string; sessionId?: string }
+            error?: string
+            message?: string
+          }
+          error?: string
+          message?: string
+        }
+      | undefined
+
+    const cloudResult = cloudJson?.result
+    const cloudData = cloudResult?.data
+    const serverUrl = cloudData?.serverUrl
+    const remoteSessionID = cloudData?.sessionId
+    const cloudError = cloudResult?.error ?? cloudResult?.message ?? cloudJson?.error ?? cloudJson?.message
+
+    log.info("Data", {
+      status: cloudResponse.status,
+      ok: cloudResponse.ok,
+      serverUrl,
+      error: cloudError,
+    })
+
+    if (!cloudResponse.ok || !serverUrl || !remoteSessionID) {
+      const message = cloudError ? `Failed to create cloud sandbox: ${cloudError}` : "Failed to create cloud sandbox"
+      log.info("Error", { error: message })
+      return { error: message }
+    }
+
+    return { serverUrl, remoteSessionID }
   }
 
   async function streamEvents(input: {

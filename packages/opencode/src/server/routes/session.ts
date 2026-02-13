@@ -798,14 +798,26 @@ export const SessionRoutes = lazy(() =>
       ),
       validator("json", CloudSession.PromptInput),
       async (c) => {
+        const sessionID = c.req.valid("param").sessionID
+        const body = c.req.valid("json")
+        const msg = await CloudSession.prompt({ sessionID, ...body })
+        if ("error" in msg) {
+          const errorMessage = (() => {
+            const data = msg.error.data
+            if (data && typeof data === "object" && "message" in data && typeof data.message === "string") {
+              return data.message
+            }
+            return msg.error.name
+          })()
+          c.status(400)
+          return c.json({
+            success: false,
+            data: msg.error,
+            errors: [{ message: errorMessage }],
+          })
+        }
         c.status(200)
-        c.header("Content-Type", "application/json")
-        return stream(c, async (stream) => {
-          const sessionID = c.req.valid("param").sessionID
-          const body = c.req.valid("json")
-          const msg = await CloudSession.prompt({ sessionID, ...body })
-          stream.write(JSON.stringify(msg))
-        })
+        return c.json(msg)
       },
     )
     .post(

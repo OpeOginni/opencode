@@ -2965,16 +2965,23 @@
                       ]
                     }
                   },
-                  "serverUrl": {
-                    "type": "string",
-                    "format": "uri"
+                  "remoteRepoOwner": {
+                    "type": "string"
                   },
-                  "remoteSessionID": {
-                    "type": "string",
-                    "pattern": "^ses.*"
+                  "remoteRepoName": {
+                    "type": "string"
+                  },
+                  "remoteBranch": {
+                    "type": "string"
+                  },
+                  "baseCommitSha": {
+                    "type": "string"
+                  },
+                  "cloudActive": {
+                    "type": "boolean"
                   }
                 },
-                "required": ["parts", "serverUrl", "remoteSessionID"]
+                "required": ["parts", "remoteRepoOwner", "remoteRepoName", "remoteBranch", "baseCommitSha"]
               }
             }
           }

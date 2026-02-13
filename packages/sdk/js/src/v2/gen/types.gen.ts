@@ -3645,8 +3645,11 @@ export type SessionCloudPromptData = {
     system?: string
     variant?: string
     parts: Array<TextPartInput | FilePartInput | AgentPartInput | SubtaskPartInput>
-    serverUrl: string
-    remoteSessionID: string
+    remoteRepoOwner: string
+    remoteRepoName: string
+    remoteBranch: string
+    baseCommitSha: string
+    cloudActive?: boolean
   }
   path: {
     /**
