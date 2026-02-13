@@ -912,7 +912,8 @@ export function Session() {
     try {
       const patches = parsePatch(diffText)
       return patches.map((patch) => {
-        const filename = patch.newFileName || patch.oldFileName || "unknown"
+        const newFileName = patch.newFileName !== "/dev/null" ? patch.newFileName : undefined
+        const filename = newFileName || patch.oldFileName || "unknown"
         const cleanFilename = filename.replace(/^[ab]\//, "")
         return {
           filename: cleanFilename,
