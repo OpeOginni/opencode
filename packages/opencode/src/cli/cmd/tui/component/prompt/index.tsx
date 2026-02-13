@@ -34,6 +34,7 @@ import { useTextareaKeybindings } from "../textarea-keybindings"
 import { DialogSkill } from "../dialog-skill"
 import { Flag } from "@/flag/flag"
 import { Log } from "@/util/log.ts"
+import { SessionStatus } from "@/session/status.ts"
 
 export type PromptProps = {
   sessionID?: string
@@ -710,12 +711,16 @@ export function Prompt(props: PromptProps) {
         return
       }
 
-      const cloudHistory = cloudActive
-        ? (sync.data.message[sessionID] ?? []).map((msg) => ({
-            info: msg,
-            parts: sync.data.part[msg.id] ?? [],
-          }))
-        : undefined
+      // const cloudHistory = cloudActive
+      //   ? (sync.data.message[sessionID] ?? []).map((msg) => ({
+      //       info: msg,
+      //       parts: sync.data.part[msg.id] ?? [],
+      //     }))
+      //   : undefined
+
+      const existingSessionExport = await sdk.client.session.export({sessionID})
+
+      SessionStatus.set(sessionID, { type: "busy" })
 
       const cloudUrl = cloudActive ? `${cloudApi}/trpc/cloudSessions.spawn` : `${cloudApi}/trpc/cloudSessions.create`
       const cloudResponse = await fetch(cloudUrl, {
@@ -730,7 +735,7 @@ export function Prompt(props: PromptProps) {
           remoteBranch,
           baseCommitSha,
           providerId: selectedModel.providerID,
-          ...(cloudHistory ? { history: cloudHistory } : {}),
+          // ...(existingSessionExport. ? { history: cloudHistory } : {}), // Check if more than one message then pass full session
         }),
       })
 
