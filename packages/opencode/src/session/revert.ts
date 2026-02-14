@@ -97,12 +97,15 @@ export namespace SessionRevert {
       sessionID: input.sessionID,
       diff: diffs,
     })
-    await Session.update(input.sessionID, (draft) => {
-      draft.summary = {
+
+    await Session.setSummary({
+      sessionID: input.sessionID,
+      summary: {
+        ...session.summary,
         additions: diffs.reduce((sum, x) => sum + x.additions, 0),
         deletions: diffs.reduce((sum, x) => sum + x.deletions, 0),
         files: diffs.length,
-      }
+      },
     })
     return Session.clearRevert(input.sessionID)
   }
