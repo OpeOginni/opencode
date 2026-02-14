@@ -8,6 +8,17 @@ import { SessionPrompt } from "./prompt"
 import { Flag } from "@/flag/flag"
 import { Bus } from "@/bus"
 import { NamedError } from "@opencode-ai/util/error"
+import { Storage } from "@/storage/storage"
+import { Snapshot } from "@/snapshot"
+import { LSP } from "@/lsp"
+import { File } from "@/file"
+import { SessionCompaction } from "@/session/compaction"
+import { Todo } from "@/session/todo"
+import { MCP } from "@/mcp"
+import { Command } from "@/command"
+import { Instance } from "@/project/instance"
+import { CloudPatch } from "@/session/cloud-patch"
+import { CloudStore } from "@/session/cloud-store"
 
 export namespace CloudSession {
   const log = Log.create({ service: "cloud-session" })
@@ -36,6 +47,7 @@ export namespace CloudSession {
     | {
         serverUrl: string
         remoteSessionID: string
+        cloudSessionID?: string
       }
     | {
         error: string
@@ -52,6 +64,8 @@ export namespace CloudSession {
       SessionStatus.set(input.sessionID, { type: "idle" })
       return { error }
     }
+
+    await CloudStore.mark(session.id)
 
     const client = createOpencodeClient({ baseUrl: cloud.serverUrl })
     const controller = new AbortController()
@@ -93,6 +107,7 @@ export namespace CloudSession {
     })()
 
     await sync({ client, sessionID, remoteSessionID: cloud.remoteSessionID })
+    await destroyCloudSession(session)
 
     return {
       info: {
@@ -112,6 +127,8 @@ export namespace CloudSession {
   ): Promise<CloudResult> {
     const cloudApi = Flag.OPENCODE_CLOUD_API
     if (!cloudApi) return { error: "OPENCODE_CLOUD_API is not set" }
+    const cloudToken = Flag.OPENCODE_CLOUD_TOKEN
+    if (!cloudToken) return { error: "OPENCODE_CLOUD_TOKEN is not set" }
 
     const providerId = input.model?.providerID
     if (!providerId) return { error: "Model provider is required for cloud sessions" }
@@ -131,17 +148,19 @@ export namespace CloudSession {
 
     log.info("existingSessionExport", { existingSessionExport: existingSessionExport })
 
-    const body = input.cloudActive ? {
-      opencodeSessionId: input.sessionID,
-      ...(existingSessionExport ? { existingSessionExport } : {}),
-    } : {
-      localSessionId: session.id,
-      remoteRepoOwner: input.remoteRepoOwner,
-      remoteRepoName: input.remoteRepoName,
-      remoteBranch: input.remoteBranch,
-      baseCommitSha: input.baseCommitSha,
-      providerId,
-    }
+    const body = input.cloudActive
+      ? {
+          opencodeSessionId: session.id,
+          ...(existingSessionExport ? { existingSessionExport } : {}),
+        }
+      : {
+          localSessionId: session.id,
+          remoteRepoOwner: input.remoteRepoOwner,
+          remoteRepoName: input.remoteRepoName,
+          remoteBranch: input.remoteBranch,
+          baseCommitSha: input.baseCommitSha,
+          providerId,
+        }
     log.info("body", { body: body })
 
     const cloudUrl = input.cloudActive
@@ -151,8 +170,7 @@ export namespace CloudSession {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization:
-          "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJ0Nlk3bXA4UjdpNnVXTGJlM0FkaUN1R3FjZVl1NWpjZyIsInNjb3BlIjpbInR1bm5lbDpzeW5jOioiXSwiaWF0IjoxNzY5MzgwMTc2LCJleHAiOjE3NzE5NzIxNzZ9.Dr_TbfiS3aMtqDaQSWYc6KzSgW2i-TabzK30eN4KBkg",
+        Authorization: `Bearer ${cloudToken}`,
       },
       body: JSON.stringify(body),
     })
@@ -160,7 +178,7 @@ export namespace CloudSession {
     const cloudJson = (await cloudResponse.json().catch(() => undefined)) as
       | {
           result?: {
-            data?: { serverUrl?: string; sessionId?: string }
+            data?: { serverUrl?: string; sessionId?: string; cloudSessionId?: string }
             error?: string
             message?: string
           }
@@ -173,6 +191,7 @@ export namespace CloudSession {
     const cloudData = cloudResult?.data
     const serverUrl = cloudData?.serverUrl
     const remoteSessionID = cloudData?.sessionId
+    const cloudSessionID = cloudData?.cloudSessionId
     const cloudError = cloudResult?.error ?? cloudResult?.message ?? cloudJson?.error ?? cloudJson?.message
 
     log.info("Data", {
@@ -188,7 +207,63 @@ export namespace CloudSession {
       return { error: message }
     }
 
-    return { serverUrl, remoteSessionID }
+    return { serverUrl, remoteSessionID, cloudSessionID }
+  }
+
+  async function destroyCloudSession(session: Session.Info) {
+    const cloudApi = Flag.OPENCODE_CLOUD_API
+    if (!cloudApi) return
+    const cloudToken = Flag.OPENCODE_CLOUD_TOKEN
+    if (!cloudToken) return
+
+    const body = {
+      opencodeSessionId: session.id,
+    }
+
+    const response = await fetch(`${cloudApi}/trpc/cloudSessions.destroyCLI`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${cloudToken}`,
+      },
+      body: JSON.stringify(body),
+    }).catch((error) => {
+      log.error("cloud destroy request failed", { error })
+      return undefined
+    })
+
+    if (!response?.ok) {
+      log.error("cloud destroy failed", { status: response?.status })
+      return
+    }
+
+    const json = (await response.json().catch(() => undefined)) as
+      | {
+          result?: {
+            data: {
+              success: boolean
+              patches?: {
+                apply?: string | null
+                revert?: string | null
+              }
+            }
+          }
+        }
+      | undefined
+
+    log.info("response_json", { json })
+
+    const apply = json?.result?.data.patches?.apply ?? undefined
+    const revert = json?.result?.data.patches?.revert ?? undefined
+
+    log.info("patches_apply", { apply })
+    log.info("patches_revert", { revert })
+    if (apply === undefined && revert === undefined) return
+
+    await CloudPatch.write({
+      sessionID: session.id,
+      patch: apply ?? revert ?? undefined,
+    })
   }
 
   async function streamEvents(input: {
@@ -214,6 +289,85 @@ export namespace CloudSession {
       done: () => void
     },
   ) {
+    if (event.type === "session.updated") {
+      const info = Session.Info.parse(event.properties.info)
+      if (info.id !== input.remoteSessionID) return
+      if (!info.summary) return
+      await Session.setSummary({
+        sessionID: input.sessionID,
+        summary: info.summary,
+      })
+      return
+    }
+
+    if (event.type === "session.diff") {
+      const { sessionID, diff } = event.properties as { sessionID: string; diff: Snapshot.FileDiff[] }
+      if (sessionID !== input.remoteSessionID) return
+      const next = Snapshot.FileDiff.array().parse(diff)
+      await Storage.write(["session_diff", input.sessionID], next).catch(() => {})
+      Bus.publish(Session.Event.Diff, {
+        sessionID: input.sessionID,
+        diff: next,
+      })
+      await Session.setSummary({
+        sessionID: input.sessionID,
+        summary: next.reduce(
+          (sum, item) => ({
+            additions: sum.additions + item.additions,
+            deletions: sum.deletions + item.deletions,
+            files: sum.files + 1,
+          }),
+          { additions: 0, deletions: 0, files: 0 },
+        ),
+      })
+      return
+    }
+
+    if (event.type === "lsp.updated") {
+      Bus.publish(LSP.Event.Updated, {})
+      return
+    }
+
+    if (event.type === "file.edited") {
+      const file = (event.properties as { file: string }).file
+      if (!Instance.containsPath(file)) return
+      Bus.publish(File.Event.Edited, { file })
+      return
+    }
+
+    if (event.type === "session.compacted") {
+      const props = event.properties as { sessionID: string }
+      if (props.sessionID !== input.remoteSessionID) return
+      Bus.publish(SessionCompaction.Event.Compacted, { sessionID: input.sessionID })
+      return
+    }
+
+    if (event.type === "todo.updated") {
+      const props = event.properties as { sessionID: string; todos: Todo.Info[] }
+      if (props.sessionID !== input.remoteSessionID) return
+      const todos = Todo.Info.array().parse(props.todos)
+      Todo.update({ sessionID: input.sessionID, todos })
+      return
+    }
+
+    if (event.type === "mcp.tools.changed") {
+      const props = event.properties as { server: string }
+      Bus.publish(MCP.ToolsChanged, props)
+      return
+    }
+
+    if (event.type === "command.executed") {
+      const props = event.properties as { name: string; sessionID: string; arguments: string; messageID: string }
+      if (props.sessionID !== input.remoteSessionID) return
+      Bus.publish(Command.Event.Executed, {
+        name: props.name,
+        sessionID: input.sessionID,
+        arguments: props.arguments,
+        messageID: props.messageID,
+      })
+      return
+    }
+
     if (event.type === "message.updated") {
       const info = MessageV2.Info.parse(event.properties.info)
       if (info.sessionID !== input.remoteSessionID) return
@@ -227,30 +381,28 @@ export namespace CloudSession {
     if (event.type === "message.part.updated") {
       const part = MessageV2.Part.parse(event.properties.part)
       if (part.sessionID !== input.remoteSessionID) return
-      const delta = event.properties.delta
-      if (delta && part.type === "text") {
-        await Session.updatePart({
-          part: {
-            ...part,
-            sessionID: input.sessionID,
-          },
-          delta,
-        })
-        return
-      }
-      if (delta && part.type === "reasoning") {
-        await Session.updatePart({
-          part: {
-            ...part,
-            sessionID: input.sessionID,
-          },
-          delta,
-        })
-        return
-      }
       await Session.updatePart({
         ...part,
         sessionID: input.sessionID,
+      })
+      return
+    }
+
+    if (event.type === "message.part.delta") {
+      const props = event.properties as {
+        sessionID: string
+        messageID: string
+        partID: string
+        field: string
+        delta: string
+      }
+      if (props.sessionID !== input.remoteSessionID) return
+      await Session.updatePartDelta({
+        sessionID: input.sessionID,
+        messageID: props.messageID,
+        partID: props.partID,
+        field: props.field,
+        delta: props.delta,
       })
       return
     }

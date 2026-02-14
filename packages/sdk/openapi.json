@@ -2946,6 +2946,9 @@
                       "type": "boolean"
                     }
                   },
+                  "format": {
+                    "$ref": "#/components/schemas/OutputFormat"
+                  },
                   "system": {
                     "type": "string"
                   },
@@ -2996,6 +2999,390 @@
           {
             "lang": "js",
             "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.session.cloud.prompt({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/session/{sessionID}/cloud": {
+      "get": {
+        "operationId": "session.cloud.status",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "directory",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "sessionID",
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "description": "Session ID"
+          }
+        ],
+        "summary": "Cloud session status",
+        "description": "Check whether the session is marked as a cloud session.",
+        "responses": {
+          "200": {
+            "description": "Cloud session status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "cloud": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["cloud"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundError"
+                }
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.session.cloud.status({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/session/{sessionID}/cloud/patch": {
+      "get": {
+        "operationId": "session.cloud.patch.status",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "directory",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "sessionID",
+            "schema": {
+              "type": "string",
+              "pattern": "^ses.*"
+            },
+            "required": true
+          }
+        ],
+        "summary": "Cloud patch status",
+        "description": "Get the cloud patch status for a session.",
+        "responses": {
+          "200": {
+            "description": "Patch status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "hasApply": {
+                      "type": "boolean"
+                    },
+                    "hasRevert": {
+                      "type": "boolean"
+                    },
+                    "applied": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["hasApply", "hasRevert", "applied"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundError"
+                }
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.session.cloud.patch.status({\n  ...\n})"
+          }
+        ]
+      },
+      "post": {
+        "operationId": "session.cloud.patch.store",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "directory",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "sessionID",
+            "schema": {
+              "type": "string",
+              "pattern": "^ses.*"
+            },
+            "required": true
+          }
+        ],
+        "summary": "Store cloud patch",
+        "description": "Store cloud patch data for a session.",
+        "responses": {
+          "200": {
+            "description": "Stored patch",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "hasApply": {
+                      "type": "boolean"
+                    },
+                    "hasRevert": {
+                      "type": "boolean"
+                    },
+                    "applied": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["hasApply", "hasRevert", "applied"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "patch": {
+                    "type": "string"
+                  },
+                  "revert": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.session.cloud.patch.store({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/session/{sessionID}/cloud/patch/apply": {
+      "post": {
+        "operationId": "session.cloud.patch.apply",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "directory",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "sessionID",
+            "schema": {
+              "type": "string",
+              "pattern": "^ses.*"
+            },
+            "required": true
+          }
+        ],
+        "summary": "Apply cloud patch",
+        "description": "Apply the latest cloud patch to the local project.",
+        "responses": {
+          "200": {
+            "description": "Applied patch",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "hasApply": {
+                      "type": "boolean"
+                    },
+                    "hasRevert": {
+                      "type": "boolean"
+                    },
+                    "applied": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["hasApply", "hasRevert", "applied"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundError"
+                }
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.session.cloud.patch.apply({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/session/{sessionID}/cloud/patch/revert": {
+      "post": {
+        "operationId": "session.cloud.patch.revert",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "directory",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "sessionID",
+            "schema": {
+              "type": "string",
+              "pattern": "^ses.*"
+            },
+            "required": true
+          }
+        ],
+        "summary": "Revert cloud patch",
+        "description": "Revert the latest cloud patch locally.",
+        "responses": {
+          "200": {
+            "description": "Reverted patch",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "hasApply": {
+                      "type": "boolean"
+                    },
+                    "hasRevert": {
+                      "type": "boolean"
+                    },
+                    "applied": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["hasApply", "hasRevert", "applied"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundError"
+                }
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.session.cloud.patch.revert({\n  ...\n})"
           }
         ]
       }

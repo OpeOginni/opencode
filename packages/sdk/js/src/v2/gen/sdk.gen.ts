@@ -101,8 +101,18 @@ import type {
   SessionAbortResponses,
   SessionChildrenErrors,
   SessionChildrenResponses,
+  SessionCloudPatchApplyErrors,
+  SessionCloudPatchApplyResponses,
+  SessionCloudPatchRevertErrors,
+  SessionCloudPatchRevertResponses,
+  SessionCloudPatchStatusErrors,
+  SessionCloudPatchStatusResponses,
+  SessionCloudPatchStoreErrors,
+  SessionCloudPatchStoreResponses,
   SessionCloudPromptErrors,
   SessionCloudPromptResponses,
+  SessionCloudStatusErrors,
+  SessionCloudStatusResponses,
   SessionCommandErrors,
   SessionCommandResponses,
   SessionCreateErrors,
@@ -928,6 +938,153 @@ export class Experimental extends HeyApiClient {
   }
 }
 
+export class Patch extends HeyApiClient {
+  /**
+   * Cloud patch status
+   *
+   * Get the cloud patch status for a session.
+   */
+  public status<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      SessionCloudPatchStatusResponses,
+      SessionCloudPatchStatusErrors,
+      ThrowOnError
+    >({
+      url: "/session/{sessionID}/cloud/patch",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Store cloud patch
+   *
+   * Store cloud patch data for a session.
+   */
+  public store<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      patch?: string
+      revert?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "body", key: "patch" },
+            { in: "body", key: "revert" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      SessionCloudPatchStoreResponses,
+      SessionCloudPatchStoreErrors,
+      ThrowOnError
+    >({
+      url: "/session/{sessionID}/cloud/patch",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Apply cloud patch
+   *
+   * Apply the latest cloud patch to the local project.
+   */
+  public apply<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      SessionCloudPatchApplyResponses,
+      SessionCloudPatchApplyErrors,
+      ThrowOnError
+    >({
+      url: "/session/{sessionID}/cloud/patch/apply",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Revert cloud patch
+   *
+   * Revert the latest cloud patch locally.
+   */
+  public revert<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      SessionCloudPatchRevertResponses,
+      SessionCloudPatchRevertErrors,
+      ThrowOnError
+    >({
+      url: "/session/{sessionID}/cloud/patch/revert",
+      ...options,
+      ...params,
+    })
+  }
+}
+
 export class Cloud extends HeyApiClient {
   /**
    * Send cloud prompt
@@ -948,6 +1105,7 @@ export class Cloud extends HeyApiClient {
       tools?: {
         [key: string]: boolean
       }
+      format?: OutputFormat
       system?: string
       variant?: string
       parts?: Array<TextPartInput | FilePartInput | AgentPartInput | SubtaskPartInput>
@@ -971,6 +1129,7 @@ export class Cloud extends HeyApiClient {
             { in: "body", key: "agent" },
             { in: "body", key: "noReply" },
             { in: "body", key: "tools" },
+            { in: "body", key: "format" },
             { in: "body", key: "system" },
             { in: "body", key: "variant" },
             { in: "body", key: "parts" },
@@ -993,6 +1152,41 @@ export class Cloud extends HeyApiClient {
         ...params.headers,
       },
     })
+  }
+
+  /**
+   * Cloud session status
+   *
+   * Check whether the session is marked as a cloud session.
+   */
+  public status<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<SessionCloudStatusResponses, SessionCloudStatusErrors, ThrowOnError>({
+      url: "/session/{sessionID}/cloud",
+      ...options,
+      ...params,
+    })
+  }
+
+  private _patch?: Patch
+  get patch(): Patch {
+    return (this._patch ??= new Patch({ client: this.client }))
   }
 }
 

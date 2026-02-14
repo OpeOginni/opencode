@@ -1,5 +1,17 @@
 import { BoxRenderable, TextareaRenderable, MouseEvent, PasteEvent, t, dim, fg } from "@opentui/core"
-import { createEffect, createMemo, type JSX, onMount, createSignal, onCleanup, on, Show, Switch, Match } from "solid-js"
+import {
+  createEffect,
+  createMemo,
+  createResource,
+  type JSX,
+  onMount,
+  createSignal,
+  onCleanup,
+  on,
+  Show,
+  Switch,
+  Match,
+} from "solid-js"
 import "opentui-spinner/solid"
 import { useLocal } from "@tui/context/local"
 import { useTheme } from "@tui/context/theme"
@@ -77,6 +89,49 @@ export function Prompt(props: PromptProps) {
   const { theme, syntax } = useTheme()
   const kv = useKV()
   const cloudApi = Flag.OPENCODE_CLOUD_API
+
+  const [cloud, cloudActions] = createResource(
+    () => props.sessionID,
+    async (sessionID) => {
+      if (!sessionID) return
+      const result = await sdk.client.session.cloud.status({ sessionID })
+      return result.data
+    },
+  )
+
+  const [patch, patchActions] = createResource(
+    () => props.sessionID,
+    async (sessionID) => {
+      if (!sessionID) return
+      const result = await sdk.client.session.cloud.patch.status({ sessionID })
+      return result.data
+    },
+  )
+
+  const showPatch = createMemo(() => (cloud()?.cloud === true || patch()?.hasApply === true) && patch()?.hasApply)
+  const patchLabel = createMemo(() => (patch()?.applied ? "revert patch" : "apply patch"))
+
+  const togglePatch = async () => {
+    const sessionID = props.sessionID
+    if (!sessionID || !patch()?.hasApply) return
+    const result = patch()?.applied
+      ? await sdk.client.session.cloud.patch.revert({ sessionID })
+      : await sdk.client.session.cloud.patch.apply({ sessionID })
+    if (result.error) {
+      toast.show({ message: "Failed to apply patch", variant: "error" })
+      return
+    }
+    const applied = result.data?.applied ?? patch()?.applied
+    toast.show({ message: applied ? "Patch applied" : "Patch reverted", variant: "success" })
+    patchActions.refetch()
+  }
+
+  createEffect(() => {
+    const type = status()?.type
+    if (type !== "idle") return
+    patchActions.refetch()
+    cloudActions.refetch()
+  })
 
   function promptModelWarning() {
     toast.show({
@@ -997,6 +1052,11 @@ export function Prompt(props: PromptProps) {
                   e.preventDefault()
                   return
                 }
+                if (keybind.match("session_cloud_patch" as any, e)) {
+                  e.preventDefault()
+                  await togglePatch()
+                  return
+                }
                 // Handle clipboard paste (Ctrl+V) - check for images first on Windows
                 // This is needed because Windows terminal doesn't properly send image data
                 // through bracketed paste, so we need to intercept the keypress and
@@ -1303,6 +1363,12 @@ export function Prompt(props: PromptProps) {
                   <text fg={theme.text}>
                     {keybind.print("command_list")} <span style={{ fg: theme.textMuted }}>commands</span>
                   </text>
+                  <Show when={showPatch()}>
+                    <text fg={theme.text}>
+                      {keybind.print("session_cloud_patch" as any)}{" "}
+                      <span style={{ fg: theme.textMuted }}>{patchLabel()}</span>
+                    </text>
+                  </Show>
                 </Match>
                 <Match when={store.mode === "shell"}>
                   <text fg={theme.text}>

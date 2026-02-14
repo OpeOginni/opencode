@@ -3680,6 +3680,7 @@ export type SessionCloudPromptData = {
     tools?: {
       [key: string]: boolean
     }
+    format?: OutputFormat
     system?: string
     variant?: string
     parts: Array<TextPartInput | FilePartInput | AgentPartInput | SubtaskPartInput>
@@ -3725,6 +3726,195 @@ export type SessionCloudPromptResponses = {
 }
 
 export type SessionCloudPromptResponse = SessionCloudPromptResponses[keyof SessionCloudPromptResponses]
+
+export type SessionCloudStatusData = {
+  body?: never
+  path: {
+    /**
+     * Session ID
+     */
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+  }
+  url: "/session/{sessionID}/cloud"
+}
+
+export type SessionCloudStatusErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type SessionCloudStatusError = SessionCloudStatusErrors[keyof SessionCloudStatusErrors]
+
+export type SessionCloudStatusResponses = {
+  /**
+   * Cloud session status
+   */
+  200: {
+    cloud: boolean
+  }
+}
+
+export type SessionCloudStatusResponse = SessionCloudStatusResponses[keyof SessionCloudStatusResponses]
+
+export type SessionCloudPatchStatusData = {
+  body?: never
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+  }
+  url: "/session/{sessionID}/cloud/patch"
+}
+
+export type SessionCloudPatchStatusErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type SessionCloudPatchStatusError = SessionCloudPatchStatusErrors[keyof SessionCloudPatchStatusErrors]
+
+export type SessionCloudPatchStatusResponses = {
+  /**
+   * Patch status
+   */
+  200: {
+    hasApply: boolean
+    hasRevert: boolean
+    applied: boolean
+  }
+}
+
+export type SessionCloudPatchStatusResponse = SessionCloudPatchStatusResponses[keyof SessionCloudPatchStatusResponses]
+
+export type SessionCloudPatchStoreData = {
+  body?: {
+    patch?: string
+    revert?: string
+  }
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+  }
+  url: "/session/{sessionID}/cloud/patch"
+}
+
+export type SessionCloudPatchStoreErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type SessionCloudPatchStoreError = SessionCloudPatchStoreErrors[keyof SessionCloudPatchStoreErrors]
+
+export type SessionCloudPatchStoreResponses = {
+  /**
+   * Stored patch
+   */
+  200: {
+    hasApply: boolean
+    hasRevert: boolean
+    applied: boolean
+  }
+}
+
+export type SessionCloudPatchStoreResponse = SessionCloudPatchStoreResponses[keyof SessionCloudPatchStoreResponses]
+
+export type SessionCloudPatchApplyData = {
+  body?: never
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+  }
+  url: "/session/{sessionID}/cloud/patch/apply"
+}
+
+export type SessionCloudPatchApplyErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type SessionCloudPatchApplyError = SessionCloudPatchApplyErrors[keyof SessionCloudPatchApplyErrors]
+
+export type SessionCloudPatchApplyResponses = {
+  /**
+   * Applied patch
+   */
+  200: {
+    hasApply: boolean
+    hasRevert: boolean
+    applied: boolean
+  }
+}
+
+export type SessionCloudPatchApplyResponse = SessionCloudPatchApplyResponses[keyof SessionCloudPatchApplyResponses]
+
+export type SessionCloudPatchRevertData = {
+  body?: never
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+  }
+  url: "/session/{sessionID}/cloud/patch/revert"
+}
+
+export type SessionCloudPatchRevertErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type SessionCloudPatchRevertError = SessionCloudPatchRevertErrors[keyof SessionCloudPatchRevertErrors]
+
+export type SessionCloudPatchRevertResponses = {
+  /**
+   * Reverted patch
+   */
+  200: {
+    hasApply: boolean
+    hasRevert: boolean
+    applied: boolean
+  }
+}
+
+export type SessionCloudPatchRevertResponse = SessionCloudPatchRevertResponses[keyof SessionCloudPatchRevertResponses]
 
 export type SessionCommandData = {
   body?: {

@@ -15,10 +15,27 @@ import { Snapshot } from "@/snapshot"
 import { Log } from "../../util/log"
 import { PermissionNext } from "@/permission/next"
 import { CloudSession } from "@/session/cloud"
+import { CloudPatch } from "@/session/cloud-patch"
+import { CloudStore } from "@/session/cloud-store"
 import { errors } from "../error"
 import { lazy } from "../../util/lazy"
 
 const log = Log.create({ service: "server" })
+
+const CloudPatchInput = z
+  .object({
+    patch: z.string().optional(),
+    revert: z.string().optional(),
+  })
+  .refine((value) => value.patch !== undefined || value.revert !== undefined, {
+    message: "patch or revert is required",
+  })
+
+const CloudPatchStatus = z.object({
+  hasApply: z.boolean(),
+  hasRevert: z.boolean(),
+  applied: z.boolean(),
+})
 
 export const SessionRoutes = lazy(() =>
   new Hono()
@@ -815,6 +832,198 @@ export const SessionRoutes = lazy(() =>
         }
         c.status(200)
         return c.json(msg)
+      },
+    )
+    .get(
+      "/:sessionID/cloud",
+      describeRoute({
+        summary: "Cloud session status",
+        description: "Check whether the session is marked as a cloud session.",
+        operationId: "session.cloud.status",
+        responses: {
+          200: {
+            description: "Cloud session status",
+            content: {
+              "application/json": {
+                schema: resolver(
+                  z.object({
+                    cloud: z.boolean(),
+                  }),
+                ),
+              },
+            },
+          },
+          ...errors(400, 404),
+        },
+      }),
+      validator(
+        "param",
+        z.object({
+          sessionID: z.string().meta({ description: "Session ID" }),
+        }),
+      ),
+      async (c) => {
+        const sessionID = c.req.valid("param").sessionID
+        const info = await Session.get(sessionID)
+        if (!info) return c.notFound()
+        const status = await CloudStore.status(sessionID)
+        return c.json(status)
+      },
+    )
+    .get(
+      "/:sessionID/cloud/patch",
+      describeRoute({
+        summary: "Cloud patch status",
+        description: "Get the cloud patch status for a session.",
+        operationId: "session.cloud.patch.status",
+        responses: {
+          200: {
+            description: "Patch status",
+            content: {
+              "application/json": {
+                schema: resolver(CloudPatchStatus),
+              },
+            },
+          },
+          ...errors(400, 404),
+        },
+      }),
+      validator(
+        "param",
+        z.object({
+          sessionID: Session.get.schema,
+        }),
+      ),
+      async (c) => {
+        const sessionID = c.req.valid("param").sessionID
+        const info = await Session.get(sessionID)
+        if (!info) return c.notFound()
+        const status = await CloudPatch.status(sessionID)
+        log.info("cloud_ses_status", { status })
+        return c.json(status)
+      },
+    )
+    .post(
+      "/:sessionID/cloud/patch",
+      describeRoute({
+        summary: "Store cloud patch",
+        description: "Store cloud patch data for a session.",
+        operationId: "session.cloud.patch.store",
+        responses: {
+          200: {
+            description: "Stored patch",
+            content: {
+              "application/json": {
+                schema: resolver(CloudPatchStatus),
+              },
+            },
+          },
+          ...errors(400, 404),
+        },
+      }),
+      validator(
+        "param",
+        z.object({
+          sessionID: Session.get.schema,
+        }),
+      ),
+      validator("json", CloudPatchInput),
+      async (c) => {
+        const sessionID = c.req.valid("param").sessionID
+        const info = await Session.get(sessionID)
+        if (!info) return c.notFound()
+        const body = c.req.valid("json")
+        await CloudPatch.write({ sessionID, patch: body.patch ?? body.revert })
+        const status = await CloudPatch.status(sessionID)
+        return c.json(status)
+      },
+    )
+    .post(
+      "/:sessionID/cloud/patch/apply",
+      describeRoute({
+        summary: "Apply cloud patch",
+        description: "Apply the latest cloud patch to the local project.",
+        operationId: "session.cloud.patch.apply",
+        responses: {
+          200: {
+            description: "Applied patch",
+            content: {
+              "application/json": {
+                schema: resolver(CloudPatchStatus),
+              },
+            },
+          },
+          ...errors(400, 404),
+        },
+      }),
+      validator(
+        "param",
+        z.object({
+          sessionID: Session.get.schema,
+        }),
+      ),
+      async (c) => {
+        const sessionID = c.req.valid("param").sessionID
+        const info = await Session.get(sessionID)
+        if (!info) return c.notFound()
+        const result = await CloudPatch.apply(sessionID, "apply")
+        if (!result.ok) {
+          log.error("cloud patch apply failed", { sessionID, error: result.error })
+          return c.json(
+            {
+              success: false,
+              data: { message: result.error },
+              errors: [{ message: result.error }],
+            },
+            400,
+          )
+        }
+        const status = await CloudPatch.status(sessionID)
+        return c.json(status)
+      },
+    )
+    .post(
+      "/:sessionID/cloud/patch/revert",
+      describeRoute({
+        summary: "Revert cloud patch",
+        description: "Revert the latest cloud patch locally.",
+        operationId: "session.cloud.patch.revert",
+        responses: {
+          200: {
+            description: "Reverted patch",
+            content: {
+              "application/json": {
+                schema: resolver(CloudPatchStatus),
+              },
+            },
+          },
+          ...errors(400, 404),
+        },
+      }),
+      validator(
+        "param",
+        z.object({
+          sessionID: Session.get.schema,
+        }),
+      ),
+      async (c) => {
+        const sessionID = c.req.valid("param").sessionID
+        const info = await Session.get(sessionID)
+        if (!info) return c.notFound()
+        const result = await CloudPatch.apply(sessionID, "revert")
+        if (!result.ok) {
+          log.error("cloud patch revert failed", { sessionID, error: result.error })
+          return c.json(
+            {
+              success: false,
+              data: { message: result.error },
+              errors: [{ message: result.error }],
+            },
+            400,
+          )
+        }
+        const status = await CloudPatch.status(sessionID)
+        return c.json(status)
       },
     )
     .post(
