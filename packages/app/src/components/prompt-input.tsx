@@ -280,6 +280,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   }
 
   const isFocused = createFocusSignal(() => editorRef)
+  const escBlur = () => platform.platform === "desktop" && platform.os === "macos"
 
   const closePopover = () => setStore("popover", null)
 
@@ -842,13 +843,39 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         return
       }
     }
-    if (store.mode === "shell") {
-      const { collapsed, cursorPosition, textLength } = getCaretState()
-      if (event.key === "Escape") {
-        setStore("mode", "normal")
+
+    if (event.key === "Escape") {
+      if (store.popover) {
+        closePopover()
         event.preventDefault()
+        event.stopPropagation()
         return
       }
+
+      if (store.mode === "shell") {
+        setStore("mode", "normal")
+        event.preventDefault()
+        event.stopPropagation()
+        return
+      }
+
+      if (working()) {
+        abort()
+        event.preventDefault()
+        event.stopPropagation()
+        return
+      }
+
+      if (escBlur()) {
+        editorRef.blur()
+        event.preventDefault()
+        event.stopPropagation()
+        return
+      }
+    }
+
+    if (store.mode === "shell") {
+      const { collapsed, cursorPosition, textLength } = getCaretState()
       if (event.key === "Backspace" && collapsed && cursorPosition === 0 && textLength === 0) {
         setStore("mode", "normal")
         event.preventDefault()
@@ -911,31 +938,13 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       if (!collapsed) return
 
       const cursorPosition = getCursorPosition(editorRef)
-      const textLength = promptLength(prompt.current())
       const textContent = prompt
         .current()
         .map((part) => ("content" in part ? part.content : ""))
         .join("")
       const direction = event.key === "ArrowUp" ? "up" : "down"
-      if (!canNavigateHistoryAtCursor(direction, textContent, cursorPosition)) return
-      const isEmpty = textContent.trim() === "" || textLength <= 1
-      const hasNewlines = textContent.includes("\n")
-      const inHistory = store.historyIndex >= 0
-      const atStart = cursorPosition <= (isEmpty ? 1 : 0)
-      const atEnd = cursorPosition >= (isEmpty ? textLength - 1 : textLength)
-      const allowUp = isEmpty || atStart || (!hasNewlines && !inHistory) || (inHistory && atEnd)
-      const allowDown = isEmpty || atEnd || (!hasNewlines && !inHistory) || (inHistory && atStart)
-
-      if (direction === "up") {
-        if (!allowUp) return
-        if (navigateHistory("up")) {
-          event.preventDefault()
-        }
-        return
-      }
-
-      if (!allowDown) return
-      if (navigateHistory("down")) {
+      if (!canNavigateHistoryAtCursor(direction, textContent, cursorPosition, store.historyIndex >= 0)) return
+      if (navigateHistory(direction)) {
         event.preventDefault()
       }
       return
@@ -944,13 +953,6 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     // Note: Shift+Enter is handled earlier, before IME check
     if (event.key === "Enter" && !event.shiftKey) {
       handleSubmit(event)
-    }
-    if (event.key === "Escape") {
-      if (store.popover) {
-        closePopover()
-      } else if (working()) {
-        abort()
-      }
     }
   }
 
