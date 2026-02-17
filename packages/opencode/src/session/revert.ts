@@ -56,7 +56,12 @@ export namespace SessionRevert {
 
     if (revert) {
       const session = await Session.get(input.sessionID)
-      revert.snapshot = session.revert?.snapshot ?? (await Snapshot.track())
+      const snapshot = session.revert?.snapshot ?? (await Snapshot.track())
+      // When stacking reverts, ensure we restore the original snapshot baseline so the
+      // next diff only reflects the newly reverted content, not prior revert state.
+      if (session.revert?.snapshot) await Snapshot.restore(session.revert.snapshot)
+      // Preserve the baseline snapshot for future redo/unrevert operations.
+      revert.snapshot = snapshot
       await Snapshot.revert(patches)
       if (revert.snapshot) revert.diff = await Snapshot.diff(revert.snapshot)
       const remainingMessages = all.filter((msg) =>
