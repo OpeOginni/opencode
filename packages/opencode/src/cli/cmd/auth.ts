@@ -388,6 +388,24 @@ export const AuthLoginCommand = cmd({
           )
         }
 
+        if (provider === "azure") {
+          prompts.log.info(
+            "Azure OpenAI requires AZURE_RESOURCE_NAME (your Azure resource name).\n" +
+              "Example: AZURE_RESOURCE_NAME=XXX opencode\n" +
+              "Or add to your shell profile: export AZURE_RESOURCE_NAME=XXX\n" +
+              "Docs: https://opencode.ai/docs/providers/#azure-openai",
+          )
+        }
+
+        if (provider === "azure-cognitive-services") {
+          prompts.log.info(
+            "Azure Cognitive Services requires AZURE_COGNITIVE_SERVICES_RESOURCE_NAME (your Azure resource name).\n" +
+              "Example: AZURE_COGNITIVE_SERVICES_RESOURCE_NAME=XXX opencode\n" +
+              "Or add to your shell profile: export AZURE_COGNITIVE_SERVICES_RESOURCE_NAME=XXX\n" +
+              "Docs: https://opencode.ai/docs/providers/#azure-cognitive-services",
+          )
+        }
+
         if (provider === "opencode") {
           prompts.log.info("Create an api key at https://opencode.ai/auth")
         }
