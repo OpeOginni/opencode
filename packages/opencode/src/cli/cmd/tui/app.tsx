@@ -332,6 +332,13 @@ function App(props: { onSnapshot?: () => Promise<string[]> }) {
   })
 
   const args = useArgs()
+  const seedInitialPrompt = () =>
+    args.prompt
+      ? {
+          prompt: { input: args.prompt, parts: [] },
+          autoSubmit: true,
+        }
+      : {}
   onMount(() => {
     batch(() => {
       if (args.agent) local.agent.set(args.agent)
@@ -349,6 +356,7 @@ function App(props: { onSnapshot?: () => Promise<string[]> }) {
         route.navigate({
           type: "session",
           sessionID: args.sessionID,
+          ...seedInitialPrompt(),
         })
       }
     })
@@ -366,13 +374,13 @@ function App(props: { onSnapshot?: () => Promise<string[]> }) {
       if (args.fork) {
         void sdk.client.session.fork({ sessionID: match }).then((result) => {
           if (result.data?.id) {
-            route.navigate({ type: "session", sessionID: result.data.id })
+            route.navigate({ type: "session", sessionID: result.data.id, ...seedInitialPrompt() })
           } else {
             toast.show({ message: "Failed to fork session", variant: "error" })
           }
         })
       } else {
-        route.navigate({ type: "session", sessionID: match })
+        route.navigate({ type: "session", sessionID: match, ...seedInitialPrompt() })
       }
     }
   })
@@ -386,7 +394,7 @@ function App(props: { onSnapshot?: () => Promise<string[]> }) {
     forked = true
     void sdk.client.session.fork({ sessionID: args.sessionID }).then((result) => {
       if (result.data?.id) {
-        route.navigate({ type: "session", sessionID: result.data.id })
+        route.navigate({ type: "session", sessionID: result.data.id, ...seedInitialPrompt() })
       } else {
         toast.show({ message: "Failed to fork session", variant: "error" })
       }

@@ -11,6 +11,7 @@ export type SessionRoute = {
   type: "session"
   sessionID: string
   prompt?: PromptInfo
+  autoSubmit?: boolean
 }
 
 export type PluginRoute = {

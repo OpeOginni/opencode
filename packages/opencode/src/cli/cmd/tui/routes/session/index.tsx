@@ -116,6 +116,9 @@ function use() {
   return ctx
 }
 
+// TODO: what is the best way to do this?
+let once = false
+
 export function Session() {
   const route = useRouteData("session")
   const { navigate } = useRoute()
@@ -248,6 +251,7 @@ export function Session() {
     if (seeded || !route.prompt || !r) return
     seeded = true
     r.set(route.prompt)
+    if (route.autoSubmit) r.submit()
   }
   const keybind = useKeybind()
   const dialog = useDialog()
