@@ -342,6 +342,21 @@ If you encounter "I'm sorry, but I cannot assist with that request" errors, try 
    export AZURE_RESOURCE_NAME=XXX
    ```
 
+   Or set it in your `opencode.json` config:
+
+   ```json title="opencode.json"
+   {
+     "$schema": "https://opencode.ai/config.json",
+     "provider": {
+       "azure": {
+         "options": {
+           "resourceName": "xxx"
+         }
+       }
+     }
+   }
+   ```
+
 6. Run the `/models` command to select your deployed model.
 
    ```txt
@@ -387,6 +402,21 @@ If you encounter "I'm sorry, but I cannot assist with that request" errors, try 
 
    ```bash title="~/.bash_profile"
    export AZURE_COGNITIVE_SERVICES_RESOURCE_NAME=XXX
+   ```
+
+   Or set it in your `opencode.json` config:
+
+   ```json title="opencode.json"
+   {
+     "$schema": "https://opencode.ai/config.json",
+     "provider": {
+       "azure-cognitive-services": {
+         "options": {
+           "resourceName": "xxx"
+         }
+       }
+     }
+   }
    ```
 
 6. Run the `/models` command to select your deployed model.

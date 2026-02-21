@@ -393,6 +393,7 @@ export const AuthLoginCommand = cmd({
             "Azure OpenAI requires AZURE_RESOURCE_NAME (your Azure resource name).\n" +
               "Example: AZURE_RESOURCE_NAME=XXX opencode\n" +
               "Or add to your shell profile: export AZURE_RESOURCE_NAME=XXX\n" +
+              "You can also set provider.azure.options.resourceName in opencode.json\n" +
               "Docs: https://opencode.ai/docs/providers/#azure-openai",
           )
         }
@@ -402,6 +403,7 @@ export const AuthLoginCommand = cmd({
             "Azure Cognitive Services requires AZURE_COGNITIVE_SERVICES_RESOURCE_NAME (your Azure resource name).\n" +
               "Example: AZURE_COGNITIVE_SERVICES_RESOURCE_NAME=XXX opencode\n" +
               "Or add to your shell profile: export AZURE_COGNITIVE_SERVICES_RESOURCE_NAME=XXX\n" +
+              "You can also set provider.azure-cognitive-services.options.resourceName in opencode.json\n" +
               "Docs: https://opencode.ai/docs/providers/#azure-cognitive-services",
           )
         }
