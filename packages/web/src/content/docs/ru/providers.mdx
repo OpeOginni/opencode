@@ -295,6 +295,8 @@ OpenCode Zen — это список моделей, предоставленн�
 Если вы столкнулись с ошибками «Извините, но я не могу помочь с этим запросом», попробуйте изменить фильтр содержимого с **DefaultV2** на **Default** в своем ресурсе Azure.
 :::
 
+Если вы используете модели, отличные от OpenAI, или видите ошибки, отдайте предпочтение провайдеру [Azure Cognitive Services](#azure-cognitive-services) с `@ai-sdk/openai-compatible` и `options.baseURL`; если вы в основном используете модели OpenAI, этот провайдер подойдет.
+
 1. Перейдите на [портал Azure](https://portal.azure.com/) и создайте ресурс **Azure OpenAI**. Вам понадобится:
    - **Имя ресурса**: оно становится частью вашей конечной точки API (`https://RESOURCE_NAME.openai.azure.com/`).
    - **Ключ API**: `KEY 1` или `KEY 2` из вашего ресурса.
@@ -330,6 +332,21 @@ OpenCode Zen — это список моделей, предоставленн�
 
    ```bash title="~/.bash_profile"
    export AZURE_RESOURCE_NAME=XXX
+   ```
+
+   Или переопределите его в конфигурации `opencode.json`:
+
+   ```json title="opencode.json"
+   {
+     "$schema": "https://opencode.ai/config.json",
+     "provider": {
+       "azure": {
+         "options": {
+           "resourceName": "xxx"
+         }
+       }
+     }
+   }
    ```
 
 6. Запустите команду `/models`, чтобы выбрать развернутую модель.
@@ -378,6 +395,40 @@ OpenCode Zen — это список моделей, предоставленн�
    ```bash title="~/.bash_profile"
    export AZURE_COGNITIVE_SERVICES_RESOURCE_NAME=XXX
    ```
+
+:::note
+Используйте конфигурацию переопределения ниже для моделей, отличных от OpenAI, или повторяющихся ошибок.
+:::
+
+```json title="opencode.json"
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "azure-cognitive-services": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "https://<resource-name>.openai.azure.com/openai/v1",
+        "useCompletionUrls": true // If getting "This model is not supported by Responses API" error
+      },
+      "models": {
+        "kimi-k2.5": {
+          "id": "Kimi-K2.5",
+          "limit": {
+            "output": 10000, // Reduce limit.output for models where you get rate-limit errors
+            "context": 262144
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+Ключ API `/connect` все еще используется.
+
+:::tip
+Достигаете лимитов скорости? Уменьшите `models.<id>.limit.output`, чтобы оставаться ниже лимитов токенов в минуту Azure.
+:::
 
 6. Запустите команду `/models`, чтобы выбрать развернутую модель.
 

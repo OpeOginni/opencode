@@ -291,6 +291,8 @@ OpenCode Zen 是由 OpenCode 團隊提供的模型列表，這些模型已經過
 如果遇到 "I'm sorry, but I cannot assist with that request" 錯誤，請嘗試將 Azure 資源中的內容篩選器從 **DefaultV2** 更改為 **Default**。
 :::
 
+如果您使用非 OpenAI 模型或看到錯誤，請優先使用 [Azure Cognitive Services](#azure-cognitive-services) 提供商，並搭配 `@ai-sdk/openai-compatible` 和 `options.baseURL`；如果您主要使用 OpenAI 模型，則此提供商即可。
+
 1. 前往 [Azure 入口網站](https://portal.azure.com/)並建立 **Azure OpenAI** 資源。您需要：
    - **資源名稱**：這會成為您的 API 端點的一部分（`https://RESOURCE_NAME.openai.azure.com/`）
    - **API 金鑰**：資源中的 `KEY 1` 或 `KEY 2`
@@ -326,6 +328,21 @@ OpenCode Zen 是由 OpenCode 團隊提供的模型列表，這些模型已經過
 
    ```bash title="~/.bash_profile"
    export AZURE_RESOURCE_NAME=XXX
+   ```
+
+   或者在您的 `opencode.json` 設定中覆蓋它：
+
+   ```json title="opencode.json"
+   {
+     "$schema": "https://opencode.ai/config.json",
+     "provider": {
+       "azure": {
+         "options": {
+           "resourceName": "xxx"
+         }
+       }
+     }
+   }
    ```
 
 6. 執行 `/models` 指令選擇您已部署的模型。
@@ -374,6 +391,40 @@ OpenCode Zen 是由 OpenCode 團隊提供的模型列表，這些模型已經過
    ```bash title="~/.bash_profile"
    export AZURE_COGNITIVE_SERVICES_RESOURCE_NAME=XXX
    ```
+
+:::note
+對於非 OpenAI 模型或反覆出現的錯誤，請使用以下覆蓋設定。
+:::
+
+```json title="opencode.json"
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "azure-cognitive-services": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "https://<resource-name>.openai.azure.com/openai/v1",
+        "useCompletionUrls": true // If getting "This model is not supported by Responses API" error
+      },
+      "models": {
+        "kimi-k2.5": {
+          "id": "Kimi-K2.5",
+          "limit": {
+            "output": 10000, // Reduce limit.output for models where you get rate-limit errors
+            "context": 262144
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+`/connect` API 金鑰仍會被使用。
+
+:::tip
+遇到速率限制？降低 `models.<id>.limit.output` 以保持在 Azure 每分鐘權杖上限之下。
+:::
 
 6. 執行 `/models` 指令選擇您已部署的模型。
 

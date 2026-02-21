@@ -299,6 +299,8 @@ Ou si vous disposez déjà d'une clé API, vous pouvez sélectionner **Entrer ma
 Si vous rencontrez des erreurs « Je suis désolé, mais je ne peux pas vous aider avec cette demande », essayez de modifier le filtre de contenu de **DefaultV2** à **Default** dans votre ressource Azure.
 :::
 
+Si vous utilisez des modèles non-OpenAI ou rencontrez des erreurs, préférez le fournisseur [Azure Cognitive Services](#azure-cognitive-services) avec `@ai-sdk/openai-compatible` et `options.baseURL` ; si vous utilisez principalement des modèles OpenAI, ce fournisseur convient très bien.
+
 1. Rendez-vous sur le [portail Azure](https://portal.azure.com/) et créez une ressource **Azure OpenAI**. Vous aurez besoin de :
    - **Nom de la ressource** : cela fait partie de votre point de terminaison API (`https://RESOURCE_NAME.openai.azure.com/`)
    - **Clé API** : soit `KEY 1` ou `KEY 2` de votre ressource
@@ -377,11 +379,45 @@ Ou ajoutez-le à votre profil bash :
    AZURE_COGNITIVE_SERVICES_RESOURCE_NAME=XXX opencode
    ```
 
-Ou ajoutez-le à votre profil bash :
+   Ou ajoutez-le à votre profil bash :
 
-```bash title="~/.bash_profile"
+   ```bash title="~/.bash_profile"
    export AZURE_COGNITIVE_SERVICES_RESOURCE_NAME=XXX
+   ```
+
+:::note
+Utilisez la configuration de remplacement ci-dessous pour les modèles non-OpenAI ou les erreurs récurrentes.
+:::
+
+```json title="opencode.json"
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "azure-cognitive-services": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "https://<resource-name>.openai.azure.com/openai/v1",
+        "useCompletionUrls": true // If getting "This model is not supported by Responses API" error
+      },
+      "models": {
+        "kimi-k2.5": {
+          "id": "Kimi-K2.5",
+          "limit": {
+            "output": 10000, // Reduce limit.output for models where you get rate-limit errors
+            "context": 262144
+          }
+        }
+      }
+    }
+  }
+}
 ```
+
+La clé API `/connect` est toujours utilisée.
+
+:::tip
+Vous atteignez les limites de débit ? Réduisez `models.<id>.limit.output` pour rester sous les limites de jetons par minute d'Azure.
+:::
 
 6. Exécutez la commande `/models` pour sélectionner votre modèle déployé.
 

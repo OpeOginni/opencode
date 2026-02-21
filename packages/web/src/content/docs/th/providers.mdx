@@ -296,6 +296,8 @@ OpenCode Zen คือรายชื่อโมเดลที่จัดท�
 หากคุณพบข้อผิดพลาด "ฉันขอโทษ แต่ฉันไม่สามารถช่วยเหลือคำขอนั้นได้" ให้ลองเปลี่ยนตัวกรองเนื้อหาจาก **DefaultV2** เป็น **Default** ในทรัพยากร Azure ของคุณ
 :::
 
+หากคุณใช้โมเดลที่ไม่ใช่ OpenAI หรือพบข้อผิดพลาด ให้เลือกผู้ให้บริการ [Azure Cognitive Services](#azure-cognitive-services) ที่มี `@ai-sdk/openai-compatible` และ `options.baseURL` หากคุณใช้โมเดล OpenAI เป็นหลัก ผู้ให้บริการรายนี้ก็ใช้ได้
+
 1. ไปที่ [พอร์ทัล Azure](https://portal.azure.com/) และสร้างทรัพยากร **Azure OpenAI** คุณจะต้องการ:
    - **ชื่อทรัพยากร**: นี่จะกลายเป็นส่วนหนึ่งของจุดสิ้นสุด API ของคุณ (`https://RESOURCE_NAME.openai.azure.com/`)
    - **API key**: `KEY 1` หรือ `KEY 2` จากทรัพยากรของคุณ
@@ -331,6 +333,21 @@ OpenCode Zen คือรายชื่อโมเดลที่จัดท�
 
    ```bash title="~/.bash_profile"
    export AZURE_RESOURCE_NAME=XXX
+   ```
+
+   หรือแทนที่ในการกำหนดค่า `opencode.json` ของคุณ:
+
+   ```json title="opencode.json"
+   {
+     "$schema": "https://opencode.ai/config.json",
+     "provider": {
+       "azure": {
+         "options": {
+           "resourceName": "xxx"
+         }
+       }
+     }
+   }
    ```
 
 6. รันคำสั่ง `/models` เพื่อเลือกโมเดลที่ปรับใช้ของคุณ
@@ -379,6 +396,40 @@ OpenCode Zen คือรายชื่อโมเดลที่จัดท�
    ```bash title="~/.bash_profile"
    export AZURE_COGNITIVE_SERVICES_RESOURCE_NAME=XXX
    ```
+
+:::note
+ใช้การกำหนดค่าแทนที่ด้านล่างสำหรับโมเดลที่ไม่ใช่ OpenAI หรือข้อผิดพลาดที่เกิดซ้ำ
+:::
+
+```json title="opencode.json"
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "azure-cognitive-services": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "https://<resource-name>.openai.azure.com/openai/v1",
+        "useCompletionUrls": true // If getting "This model is not supported by Responses API" error
+      },
+      "models": {
+        "kimi-k2.5": {
+          "id": "Kimi-K2.5",
+          "limit": {
+            "output": 10000, // Reduce limit.output for models where you get rate-limit errors
+            "context": 262144
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+คีย์ API `/connect` ยังคงถูกใช้งานอยู่
+
+:::tip
+ถึงขีดจำกัดอัตราแล้วใช่ไหม? ลด `models.<id>.limit.output` เพื่อให้อยู่ภายใต้ขีดจำกัดโทเค็นต่อนาทีของ Azure
+:::
 
 6. รันคำสั่ง `/models` เพื่อเลือกโมเดลที่ปรับใช้ของคุณ
 

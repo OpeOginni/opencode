@@ -294,6 +294,8 @@ OpenCode Zen هي قائمة نماذج يوفّرها فريق OpenCode وقد 
 إذا واجهت أخطاء "I'm sorry, but I cannot assist with that request"، فجرّب تغيير مرشح المحتوى من **DefaultV2** إلى **Default** في مورد Azure الخاص بك.
 :::
 
+إذا كنت تستخدم نماذج غير OpenAI أو ترى أخطاء، ففضل موفّر [Azure Cognitive Services](#azure-cognitive-services) مع `@ai-sdk/openai-compatible` و`options.baseURL`؛ إذا كنت تستخدم نماذج OpenAI بشكل أساسي، فهذا الموفّر جيد.
+
 1. توجّه إلى [Azure portal](https://portal.azure.com/) وأنشئ موردا من نوع **Azure OpenAI**. ستحتاج إلى:
    - **Resource name**: يصبح جزءا من نقطة نهاية API لديك (`https://RESOURCE_NAME.openai.azure.com/`)
    - **API key**: إما `KEY 1` أو `KEY 2` من موردك
@@ -329,6 +331,21 @@ OpenCode Zen هي قائمة نماذج يوفّرها فريق OpenCode وقد 
 
    ```bash title="~/.bash_profile"
    export AZURE_RESOURCE_NAME=XXX
+   ```
+
+   أو قم بتجاوزها في ملف إعدادات `opencode.json`:
+
+   ```json title="opencode.json"
+   {
+     "$schema": "https://opencode.ai/config.json",
+     "provider": {
+       "azure": {
+         "options": {
+           "resourceName": "xxx"
+         }
+       }
+     }
+   }
    ```
 
 6. شغّل الأمر `/models` لاختيار النموذج الذي قمت بنشره.
@@ -377,6 +394,40 @@ OpenCode Zen هي قائمة نماذج يوفّرها فريق OpenCode وقد 
    ```bash title="~/.bash_profile"
    export AZURE_COGNITIVE_SERVICES_RESOURCE_NAME=XXX
    ```
+
+:::note
+استخدم إعداد التجاوز أدناه للنماذج غير OpenAI أو الأخطاء المتكررة.
+:::
+
+```json title="opencode.json"
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "azure-cognitive-services": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "https://<resource-name>.openai.azure.com/openai/v1",
+        "useCompletionUrls": true // If getting "This model is not supported by Responses API" error
+      },
+      "models": {
+        "kimi-k2.5": {
+          "id": "Kimi-K2.5",
+          "limit": {
+            "output": 10000, // Reduce limit.output for models where you get rate-limit errors
+            "context": 262144
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+يستمر استخدام مفتاح API من `/connect`.
+
+:::tip
+هل تصل إلى حدود المعدل؟ قلل `models.<id>.limit.output` للبقاء تحت حدود Azure للرموز في الدقيقة.
+:::
 
 6. شغّل الأمر `/models` لاختيار النموذج الذي قمت بنشره.
 

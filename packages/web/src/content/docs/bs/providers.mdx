@@ -299,6 +299,8 @@ Ili ako već imate API ključ, možete odabrati **Ručno unesite API ključ** i 
 Ako naiđete na greške "Žao mi je, ali ne mogu pomoći s tim zahtjevom", pokušajte promijeniti filter sadržaja iz **DefaultV2** u **Default** u vašem Azure resursu.
 :::
 
+Ako koristite modele koji nisu OpenAI ili vidite greške, preferirajte provajdera [Azure Cognitive Services](#azure-cognitive-services) sa `@ai-sdk/openai-compatible` i `options.baseURL`; ako uglavnom koristite OpenAI modele, ovaj provajder je u redu.
+
 1. Idite na [Azure portal](https://portal.azure.com/) i kreirajte **Azure OpenAI** resurs. trebat će vam:
    - **Naziv resursa**: Ovo postaje dio vaše krajnje tačke API-ja (`https://RESOURCE_NAME.openai.azure.com/`)
    - **API ključ**: Ili `KEY 1` ili `KEY 2` sa vašeg izvora
@@ -334,6 +336,21 @@ Ili ga dodajte na svoj bash profil:
 
 ```bash title="~/.bash_profile"
    export AZURE_RESOURCE_NAME=XXX
+```
+
+Ili ga poništite u vašoj `opencode.json` konfiguraciji:
+
+```json title="opencode.json"
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "azure": {
+      "options": {
+        "resourceName": "xxx"
+      }
+    }
+  }
+}
 ```
 
 6. Pokrenite naredbu `/models` da odaberete svoj raspoređeni model.
@@ -382,6 +399,40 @@ Ili ga dodajte na svoj bash profil:
 ```bash title="~/.bash_profile"
    export AZURE_COGNITIVE_SERVICES_RESOURCE_NAME=XXX
 ```
+
+:::note
+Koristite konfiguraciju nadjačavanja u nastavku za modele koji nisu OpenAI ili greške koje se ponavljaju.
+:::
+
+```json title="opencode.json"
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "azure-cognitive-services": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "https://<resource-name>.openai.azure.com/openai/v1",
+        "useCompletionUrls": true // If getting "This model is not supported by Responses API" error
+      },
+      "models": {
+        "kimi-k2.5": {
+          "id": "Kimi-K2.5",
+          "limit": {
+            "output": 10000, // Reduce limit.output for models where you get rate-limit errors
+            "context": 262144
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+`/connect` API ključ se i dalje koristi.
+
+:::tip
+Dostižete ograničenja brzine? Smanjite `models.<id>.limit.output` da ostanete ispod Azure ograničenja tokena po minuti.
+:::
 
 6. Pokrenite naredbu `/models` da odaberete svoj raspoređeni model.
 

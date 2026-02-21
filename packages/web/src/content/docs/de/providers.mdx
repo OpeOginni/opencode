@@ -296,6 +296,8 @@ Wenn Sie bereits über einen API-Schlüssel verfügen, können Sie **API-Schlüs
 Wenn Sie auf die Fehlermeldung „Es tut mir leid, aber ich kann Ihnen bei dieser Anfrage nicht weiterhelfen“ stoßen, versuchen Sie, den Inhaltsfilter in Ihrer Azure-Ressource von **DefaultV2** in **Default** zu ändern.
 :::
 
+Wenn Sie Nicht-OpenAI-Modelle verwenden oder Fehler sehen, bevorzugen Sie den Anbieter [Azure Cognitive Services](#azure-cognitive-services) mit `@ai-sdk/openai-compatible` und `options.baseURL`; wenn Sie hauptsächlich OpenAI-Modelle verwenden, ist dieser Anbieter in Ordnung.
+
 1. Gehen Sie zu [Azure portal](https://portal.azure.com/) und erstellen Sie eine **Azure OpenAI**-Ressource. Sie benötigen:
    - **Ressourcenname**: Dies wird Teil Ihres API-Endpunkts (`https://RESOURCE_NAME.openai.azure.com/`)
    - **API-Schlüssel**: Entweder `KEY 1` oder `KEY 2` aus Ihrer Ressource
@@ -331,6 +333,21 @@ Wenn Sie auf die Fehlermeldung „Es tut mir leid, aber ich kann Ihnen bei diese
 
    ```bash title="~/.bash_profile"
    export AZURE_RESOURCE_NAME=XXX
+   ```
+
+   Oder überschreiben Sie es in Ihrer `opencode.json`-Konfiguration:
+
+   ```json title="opencode.json"
+   {
+     "$schema": "https://opencode.ai/config.json",
+     "provider": {
+       "azure": {
+         "options": {
+           "resourceName": "xxx"
+         }
+       }
+     }
+   }
    ```
 
 6. Führen Sie den Befehl `/models` aus, um Ihr bereitgestelltes Modell auszuwählen.
@@ -379,6 +396,40 @@ Wenn Sie auf die Fehlermeldung „Es tut mir leid, aber ich kann Ihnen bei diese
    ```bash title="~/.bash_profile"
    export AZURE_COGNITIVE_SERVICES_RESOURCE_NAME=XXX
    ```
+
+:::note
+Verwenden Sie die untenstehende Überschreibungskonfiguration für Nicht-OpenAI-Modelle oder wiederkehrende Fehler.
+:::
+
+```json title="opencode.json"
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "azure-cognitive-services": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "https://<resource-name>.openai.azure.com/openai/v1",
+        "useCompletionUrls": true // If getting "This model is not supported by Responses API" error
+      },
+      "models": {
+        "kimi-k2.5": {
+          "id": "Kimi-K2.5",
+          "limit": {
+            "output": 10000, // Reduce limit.output for models where you get rate-limit errors
+            "context": 262144
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+Der `/connect` API-Schlüssel wird weiterhin verwendet.
+
+:::tip
+Erreichen Sie Ratenlimits? Reduzieren Sie `models.<id>.limit.output`, um unter den Azure-Token-pro-Minute-Obergrenzen zu bleiben.
+:::
 
 6. Führen Sie den Befehl `/models` aus, um Ihr bereitgestelltes Modell auszuwählen.
 

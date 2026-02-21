@@ -299,6 +299,8 @@ Pro/Max サブスクリプションをお持ちでない場合は、[**API キ�
 「申し訳ありませんが、そのリクエストには対応できません」エラーが発生した場合は、Azure リソースのコンテンツフィルターを **DefaultV2** から **Default** に変更してみてください。
 :::
 
+OpenAI 以外のモデルを使用している場合やエラーが表示される場合は、`@ai-sdk/openai-compatible` と `options.baseURL` を使用する [Azure Cognitive Services](#azure-cognitive-services) プロバイダーを推奨します。主に OpenAI モデルを使用している場合は、このプロバイダーで問題ありません。
+
 1. [Azure portal](https://portal.azure.com/) に移動し、**Azure OpenAI** リソースを作成します。必要なものは次のとおりです。
    - **リソース名**: これは API エンドポイント (`https://RESOURCE_NAME.openai.azure.com/`) の一部になります。
    - **API キー**: リソースの `KEY 1` または `KEY 2` のいずれか
@@ -333,7 +335,22 @@ OpenCode が正しく動作するには、デプロイメント名がモデル�
 または、bash プロファイルに追加します。
 
 ```bash title="~/.bash_profile"
-   export AZURE_RESOURCE_NAME=XXX
+export AZURE_RESOURCE_NAME=XXX
+```
+
+または、`opencode.json` 設定で上書きします：
+
+```json title="opencode.json"
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "azure": {
+      "options": {
+        "resourceName": "xxx"
+      }
+    }
+  }
+}
 ```
 
 6. `/models` コマンドを実行して、デプロイされたモデルを選択します。
@@ -380,8 +397,42 @@ OpenCode が正しく動作するには、デプロイメント名がモデル�
 または、bash プロファイルに追加します。
 
 ```bash title="~/.bash_profile"
-   export AZURE_COGNITIVE_SERVICES_RESOURCE_NAME=XXX
+export AZURE_COGNITIVE_SERVICES_RESOURCE_NAME=XXX
 ```
+
+:::note
+OpenAI 以外のモデルや繰り返し発生するエラーについては、以下のオーバーライド設定を使用してください。
+:::
+
+```json title="opencode.json"
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "azure-cognitive-services": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "https://<resource-name>.openai.azure.com/openai/v1",
+        "useCompletionUrls": true // If getting "This model is not supported by Responses API" error
+      },
+      "models": {
+        "kimi-k2.5": {
+          "id": "Kimi-K2.5",
+          "limit": {
+            "output": 10000, // Reduce limit.output for models where you get rate-limit errors
+            "context": 262144
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+`/connect` API キーは引き続き使用されます。
+
+:::tip
+レート制限に達しましたか？ `models.<id>.limit.output` を減らして、Azure の 1 分あたりのトークン上限を下回るようにしてください。
+:::
 
 6. `/models` コマンドを実行して、デプロイされたモデルを選択します。
 

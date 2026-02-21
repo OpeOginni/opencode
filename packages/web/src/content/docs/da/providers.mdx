@@ -290,6 +290,8 @@ Eller hvis du allerede har en API-nøgle, kan du vælge **Manually enter API Key
 Hvis du støder på "Beklager, men jeg kan ikke hjælpe med den anmodning"-fejl, kan du prøve at ændre indholdsfilteret fra **DefaultV2** til **Default** i Azure-ressourcen.
 :::
 
+Hvis du bruger ikke-OpenAI-modeller eller ser fejl, foretræk [Azure Cognitive Services](#azure-cognitive-services) udbyderen med `@ai-sdk/openai-compatible` og `options.baseURL`; hvis du mest bruger OpenAI-modeller, er denne udbyder fin.
+
 1. Gå til [Azure-portalen](https://portal.azure.com/) og opret en **Azure OpenAI**-ressource. Du skal bruge:
    - **Ressourcenavn**: Dette bliver en del af API-endpointet (`https://RESOURCE_NAME.openai.azure.com/`)
    - **API-nøgle**: Enten `KEY 1` eller `KEY 2` fra din ressource
@@ -325,6 +327,21 @@ Hvis du støder på "Beklager, men jeg kan ikke hjælpe med den anmodning"-fejl,
 
    ```bash title="~/.bash_profile"
    export AZURE_RESOURCE_NAME=XXX
+   ```
+
+   Eller tilsidesæt det i din `opencode.json`-konfiguration:
+
+   ```json title="opencode.json"
+   {
+     "$schema": "https://opencode.ai/config.json",
+     "provider": {
+       "azure": {
+         "options": {
+           "resourceName": "xxx"
+         }
+       }
+     }
+   }
    ```
 
 6. Kør kommandoen `/models` for at vælge den distribuerede model.
@@ -373,6 +390,40 @@ Hvis du støder på "Beklager, men jeg kan ikke hjælpe med den anmodning"-fejl,
    ```bash title="~/.bash_profile"
    export AZURE_COGNITIVE_SERVICES_RESOURCE_NAME=XXX
    ```
+
+:::note
+Brug tilsidesættelseskonfigurationen nedenfor til ikke-OpenAI-modeller eller tilbagevendende fejl.
+:::
+
+```json title="opencode.json"
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "azure-cognitive-services": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "https://<resource-name>.openai.azure.com/openai/v1",
+        "useCompletionUrls": true // If getting "This model is not supported by Responses API" error
+      },
+      "models": {
+        "kimi-k2.5": {
+          "id": "Kimi-K2.5",
+          "limit": {
+            "output": 10000, // Reduce limit.output for models where you get rate-limit errors
+            "context": 262144
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+`/connect` API-nøglen bruges stadig.
+
+:::tip
+Rammer du hastighedsbegrænsninger? Reducer `models.<id>.limit.output` for at blive under Azure token-per-minut grænser.
+:::
 
 6. Kør kommandoen `/models` for at vælge den distribuerede model.
 

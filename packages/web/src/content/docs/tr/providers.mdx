@@ -298,6 +298,8 @@ Veya zaten bir API anahtarınız varsa **API Anahtarını Manuel Olarak Girin** 
 "Üzgünüm ama bu isteğe yardımcı olamıyorum" hatalarıyla karşılaşırsanız Azure kaynağınızda içerik filtresini **DefaultV2** yerine **Default** olarak değiştirmeyi deneyin.
 :::
 
+OpenAI olmayan modeller kullanıyorsanız veya hatalar görüyorsanız, `@ai-sdk/openai-compatible` ve `options.baseURL` ile [Azure Cognitive Services](#azure-cognitive-services) sağlayıcısını tercih edin; çoğunlukla OpenAI modelleri kullanıyorsanız, bu sağlayıcı iyidir.
+
 1. [Azure portal](https://portal.azure.com/)'a gidin ve bir **Azure OpenAI** kaynağı oluşturun. İhtiyacınız olacak:
    - **Kaynak adı**: Bu, API bitiş noktanızın (`https://RESOURCE_NAME.openai.azure.com/`) parçası olur
    - **API anahtarı**: Kaynağınızdan `KEY 1` veya `KEY 2`
@@ -333,6 +335,21 @@ Veya zaten bir API anahtarınız varsa **API Anahtarını Manuel Olarak Girin** 
 
    ```bash title="~/.bash_profile"
    export AZURE_RESOURCE_NAME=XXX
+   ```
+
+   Veya `opencode.json` yapılandırmanızda geçersiz kılın:
+
+   ```json title="opencode.json"
+   {
+     "$schema": "https://opencode.ai/config.json",
+     "provider": {
+       "azure": {
+         "options": {
+           "resourceName": "xxx"
+         }
+       }
+     }
+   }
    ```
 
 6. Dağıtılan modelinizi seçmek için `/models` komutunu çalıştırın.
@@ -381,6 +398,40 @@ Veya zaten bir API anahtarınız varsa **API Anahtarını Manuel Olarak Girin** 
    ```bash title="~/.bash_profile"
    export AZURE_COGNITIVE_SERVICES_RESOURCE_NAME=XXX
    ```
+
+:::note
+OpenAI olmayan modeller veya tekrarlayan hatalar için aşağıdaki geçersiz kılma yapılandırmasını kullanın.
+:::
+
+```json title="opencode.json"
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "azure-cognitive-services": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "https://<resource-name>.openai.azure.com/openai/v1",
+        "useCompletionUrls": true // If getting "This model is not supported by Responses API" error
+      },
+      "models": {
+        "kimi-k2.5": {
+          "id": "Kimi-K2.5",
+          "limit": {
+            "output": 10000, // Reduce limit.output for models where you get rate-limit errors
+            "context": 262144
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+`/connect` API anahtarı hala kullanılıyor.
+
+:::tip
+Hız sınırlarına mı ulaşıyorsunuz? Azure dakika başına token sınırlarının altında kalmak için `models.<id>.limit.output` değerini azaltın.
+:::
 
 6. Dağıtılan modelinizi seçmek için `/models` komutunu çalıştırın.
 

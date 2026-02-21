@@ -296,6 +296,8 @@ Lub jeśli masz już klucz API, możesz wybrać **Wprowadź klucz API ręcznie**
 Jeśli napotkasz błędy „Przykro mi, ale nie mogę pomóc w tej prośbie”, spróbuj zmienić filtr zawartości z **DefaultV2** na **Default** w zasobie platformy Azure.
 :::
 
+Jeśli używasz modeli innych niż OpenAI lub widzisz błędy, preferuj dostawcę [Azure Cognitive Services](#azure-cognitive-services) z `@ai-sdk/openai-compatible` i `options.baseURL`; jeśli używasz głównie modeli OpenAI, ten dostawca jest w porządku.
+
 1. Przejdź do [Azure portal](https://portal.azure.com/) i utwórz zasób **Azure OpenAI**. Będziesz potrzebować:
    - **Nazwa zasobu**: staje się częścią punktu końcowego API (`https://RESOURCE_NAME.openai.azure.com/`)
    - **Klucz API**: `KEY 1` lub `KEY 2` z Twojego zasobu
@@ -331,6 +333,21 @@ Jeśli napotkasz błędy „Przykro mi, ale nie mogę pomóc w tej prośbie”, 
 
    ```bash title="~/.bash_profile"
    export AZURE_RESOURCE_NAME=XXX
+   ```
+
+   Lub nadpisz go w swojej konfiguracji `opencode.json`:
+
+   ```json title="opencode.json"
+   {
+     "$schema": "https://opencode.ai/config.json",
+     "provider": {
+       "azure": {
+         "options": {
+           "resourceName": "xxx"
+         }
+       }
+     }
+   }
    ```
 
 6. Uruchom komendę `/models`, aby wybrać wdrożony model.
@@ -379,6 +396,40 @@ Jeśli napotkasz błędy „Przykro mi, ale nie mogę pomóc w tej prośbie”, 
    ```bash title="~/.bash_profile"
    export AZURE_COGNITIVE_SERVICES_RESOURCE_NAME=XXX
    ```
+
+:::note
+Użyj poniższej konfiguracji nadpisania dla modeli innych niż OpenAI lub powtarzających się błędów.
+:::
+
+```json title="opencode.json"
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "azure-cognitive-services": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "https://<resource-name>.openai.azure.com/openai/v1",
+        "useCompletionUrls": true // If getting "This model is not supported by Responses API" error
+      },
+      "models": {
+        "kimi-k2.5": {
+          "id": "Kimi-K2.5",
+          "limit": {
+            "output": 10000, // Reduce limit.output for models where you get rate-limit errors
+            "context": 262144
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+Klucz API `/connect` jest nadal używany.
+
+:::tip
+Osiągasz limity szybkości? Zmniejsz `models.<id>.limit.output`, aby pozostać poniżej limitów tokenów na minutę Azure.
+:::
 
 6. Uruchom komendę `/models`, aby wybrać wdrożony model.
 

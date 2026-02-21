@@ -303,6 +303,8 @@ Pro/Max 구독이 없는 경우 **Create an API Key**를 선택할 수 있습니
 "I'm sorry, but I can't support that request" 오류가 발생하면, Azure 리소스의 콘텐츠 필터를 **DefaultV2**에서 **Default**로 변경해 보세요.
 :::
 
+OpenAI가 아닌 모델을 사용하거나 오류가 표시되는 경우 `@ai-sdk/openai-compatible` 및 `options.baseURL`이 포함된 [Azure Cognitive Services](#azure-cognitive-services) 공급자를 선호하세요. 주로 OpenAI 모델을 사용하는 경우 이 공급자가 좋습니다.
+
 1. [Azure 포털](https://portal.azure.com/)로 이동하여 **Azure OpenAI** 리소스를 만듭니다. 다음이 필요합니다:
    - **리소스 이름**: API 엔드포인트의 일부가 됩니다 (`https://RESOURCE_NAME.openai.azure.com/`)
    - **API 키**: 리소스의 `KEY 1` 또는 `KEY 2`
@@ -338,6 +340,21 @@ Pro/Max 구독이 없는 경우 **Create an API Key**를 선택할 수 있습니
 
    ```bash title="~/.bash_profile"
    export AZURE_RESOURCE_NAME=XXX
+   ```
+
+   또는 `opencode.json` 구성에서 재정의하세요:
+
+   ```json title="opencode.json"
+   {
+     "$schema": "https://opencode.ai/config.json",
+     "provider": {
+       "azure": {
+         "options": {
+           "resourceName": "xxx"
+         }
+       }
+     }
+   }
    ```
 
 6. `/models` 명령을 실행하여 배포된 모델을 선택하십시오.
@@ -386,6 +403,40 @@ Pro/Max 구독이 없는 경우 **Create an API Key**를 선택할 수 있습니
    ```bash title="~/.bash_profile"
    export AZURE_COGNITIVE_SERVICES_RESOURCE_NAME=XXX
    ```
+
+:::note
+OpenAI가 아닌 모델이나 반복되는 오류에는 아래의 재정의 구성을 사용하십시오.
+:::
+
+```json title="opencode.json"
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "azure-cognitive-services": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "https://<resource-name>.openai.azure.com/openai/v1",
+        "useCompletionUrls": true // If getting "This model is not supported by Responses API" error
+      },
+      "models": {
+        "kimi-k2.5": {
+          "id": "Kimi-K2.5",
+          "limit": {
+            "output": 10000, // Reduce limit.output for models where you get rate-limit errors
+            "context": 262144
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+`/connect` API 키는 여전히 사용됩니다.
+
+:::tip
+속도 제한에 도달했습니까? Azure 분당 토큰 한도 미만으로 유지하려면 `models.<id>.limit.output`을 줄이십시오.
+:::
 
 6. `/models` 명령을 실행하여 배포된 모델을 선택하십시오.
 
