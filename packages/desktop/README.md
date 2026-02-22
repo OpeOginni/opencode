@@ -2,6 +2,8 @@
 
 Native OpenCode desktop app, built with Tauri v2.
 
+---
+
 ## Development
 
 From the repo root:
@@ -19,6 +21,8 @@ If you only want the web dev server (no native shell):
 bun run --cwd packages/desktop dev
 ```
 
+---
+
 ## Build
 
 To create a production `dist/` and build the native app bundle:
@@ -26,6 +30,27 @@ To create a production `dist/` and build the native app bundle:
 ```bash
 bun run --cwd packages/desktop tauri build
 ```
+
+---
+
+## Configure shell
+
+Set `OPENCODE_SIDECAR_SHELL` to `login` (default) or `interactive` (`il`).
+Use `interactive` if the desktop terminal can’t find tools (e.g., `bun`, `node`, `git`, `python`) because your PATH is initialized in `.zshrc`/`.bashrc`.
+
+Login shell example:
+
+```bash
+export OPENCODE_SIDECAR_SHELL=login
+```
+
+Interactive shell example:
+
+```bash
+export OPENCODE_SIDECAR_SHELL=interactive
+```
+
+---
 
 ## Prerequisites
 

@@ -217,6 +217,25 @@ fn get_user_shell() -> String {
     std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string())
 }
 
+enum ShellMode {
+    Login,
+    Interactive,
+}
+
+fn shell_mode() -> ShellMode {
+    match std::env::var("OPENCODE_SIDECAR_SHELL").as_deref() {
+        Ok("interactive") | Ok("il") => ShellMode::Interactive,
+        _ => ShellMode::Login,
+    }
+}
+
+fn shell_flag(mode: ShellMode) -> &'static str {
+    match mode {
+        ShellMode::Interactive => "-il",
+        ShellMode::Login => "-l",
+    }
+}
+
 fn is_wsl_enabled(_app: &tauri::AppHandle) -> bool {
     get_wsl_config(_app.clone()).is_ok_and(|v| v.enabled)
 }
@@ -320,7 +339,7 @@ pub fn spawn_command(
         };
 
         let mut cmd = Command::new(shell);
-        cmd.args(["-il", "-c", &line]);
+        cmd.args([shell_flag(shell_mode()), "-c", &line]);
 
         for (key, value) in envs {
             cmd.env(key, value);
