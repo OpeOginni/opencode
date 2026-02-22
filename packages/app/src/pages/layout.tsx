@@ -1093,18 +1093,51 @@ export default function Layout(props: ParentProps) {
     return meta?.worktree ?? directory
   }
 
+  function clearLastProjectSession(root: string) {
+    setStore(
+      "lastProjectSession",
+      produce((draft) => {
+        delete draft[root]
+      }),
+    )
+  }
+
+  function sessionKnown(session: { directory: string; id: string }) {
+    const [store] = globalSync.child(session.directory, { bootstrap: false })
+    const match = Binary.search(store.session, session.id, (item) => item.id)
+    return match.found
+  }
+
+  async function validateProjectSession(root: string, session: { directory: string; id: string }) {
+    const res = await globalSDK.client.session.get(
+      { sessionID: session.id },
+      {
+        throwOnError: false,
+      },
+    )
+    const data = res.data
+    if (data?.id) {
+      navigateWithSidebarReset(`/${base64Encode(session.directory)}/session/${session.id}`)
+      return
+    }
+    if (res.response?.status === 404) {
+      clearLastProjectSession(root)
+    }
+  }
+
   function navigateToProject(directory: string | undefined) {
     if (!directory) return
     const root = projectRoot(directory)
     server.projects.touch(root)
 
-    const projectSession = store.lastProjectSession[root]
-    if (projectSession?.id) {
-      navigateWithSidebarReset(`/${base64Encode(projectSession.directory)}/session/${projectSession.id}`)
+    const session = store.lastProjectSession[root]
+    if (session?.id && sessionKnown(session)) {
+      navigateWithSidebarReset(`/${base64Encode(session.directory)}/session/${session.id}`)
       return
     }
 
     navigateWithSidebarReset(`/${base64Encode(root)}/session`)
+    if (session?.id) void validateProjectSession(root, session)
   }
 
   function navigateToSession(session: Session | undefined) {
