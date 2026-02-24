@@ -118,5 +118,7 @@ export const dict = {
   "ui.question.review.notAnswered": "(nije odgovoreno)",
   "ui.question.multiHint": "Odaberi sve što važi",
   "ui.question.singleHint": "Odaberi jedan odgovor",
+  "ui.question.readMore": "Pročitaj više",
+  "ui.question.readLess": "Pročitaj manje",
   "ui.question.custom.placeholder": "Unesi svoj odgovor...",
 } satisfies Partial<Record<Keys, string>>

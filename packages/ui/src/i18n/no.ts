@@ -117,5 +117,7 @@ export const dict: Record<Keys, string> = {
   "ui.question.review.notAnswered": "(ikke besvart)",
   "ui.question.multiHint": "Velg alle som gjelder",
   "ui.question.singleHint": "Velg ett svar",
+  "ui.question.readMore": "Les mer",
+  "ui.question.readLess": "Les mindre",
   "ui.question.custom.placeholder": "Skriv svaret ditt...",
 }

@@ -113,5 +113,7 @@ export const dict = {
   "ui.question.review.notAnswered": "(bez odpowiedzi)",
   "ui.question.multiHint": "Zaznacz wszystkie pasujące",
   "ui.question.singleHint": "Wybierz jedną odpowiedź",
+  "ui.question.readMore": "Czytaj więcej",
+  "ui.question.readLess": "Czytaj mniej",
   "ui.question.custom.placeholder": "Wpisz swoją odpowiedź...",
 }

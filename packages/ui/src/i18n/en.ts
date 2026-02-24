@@ -114,5 +114,7 @@ export const dict = {
   "ui.question.review.notAnswered": "(not answered)",
   "ui.question.multiHint": "Select all answers that apply",
   "ui.question.singleHint": "Select one answer",
+  "ui.question.readMore": "Read more",
+  "ui.question.readLess": "Read less",
   "ui.question.custom.placeholder": "Type your answer...",
 }

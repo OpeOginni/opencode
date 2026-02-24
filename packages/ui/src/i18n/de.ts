@@ -117,5 +117,7 @@ export const dict = {
   "ui.question.review.notAnswered": "(nicht beantwortet)",
   "ui.question.multiHint": "Alle zutreffenden auswählen",
   "ui.question.singleHint": "Eine Antwort auswählen",
+  "ui.question.readMore": "Mehr lesen",
+  "ui.question.readLess": "Weniger lesen",
   "ui.question.custom.placeholder": "Geben Sie Ihre Antwort ein...",
 } satisfies Partial<Record<Keys, string>>

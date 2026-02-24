@@ -1101,13 +1101,57 @@
     line-height: var(--line-height-large);
     color: var(--text-base);
     min-width: 0;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  [data-slot="option-description"][data-expanded="true"] {
+    display: block;
+    -webkit-line-clamp: unset;
+    line-clamp: unset;
+    overflow: visible;
+  }
+
+  [data-slot="option-description"][data-clamped="true"][data-expanded="false"] {
+    -webkit-mask-image: linear-gradient(180deg, #000 60%, transparent);
+    mask-image: linear-gradient(180deg, #000 60%, transparent);
+  }
+
+  [data-slot="option-description-wrap"] {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  [data-slot="option-more"] {
+    font-family: var(--font-family-sans);
+    font-size: 12px;
+    font-weight: var(--font-weight-medium);
+    line-height: var(--line-height-large);
+    color: var(--text-weak);
+    align-self: flex-start;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  [data-slot="option-more"]:hover {
+    color: var(--text-interactive-base);
   }
 
   [data-slot="question-option"][data-custom="true"] {
     [data-slot="option-description"] {
+      display: block;
+      -webkit-line-clamp: unset;
+      line-clamp: unset;
+      -webkit-mask-image: none;
+      mask-image: none;
       overflow: visible;
       text-overflow: clip;
       white-space: normal;

@@ -115,5 +115,7 @@ export const dict = {
   "ui.question.review.notAnswered": "(ไม่ได้ตอบ)",
   "ui.question.multiHint": "เลือกทั้งหมดที่ใช้",
   "ui.question.singleHint": "เลือกหนึ่งคำตอบ",
+  "ui.question.readMore": "อ่านเพิ่มเติม",
+  "ui.question.readLess": "ย่อ",
   "ui.question.custom.placeholder": "พิมพ์คำตอบของคุณ...",
 }

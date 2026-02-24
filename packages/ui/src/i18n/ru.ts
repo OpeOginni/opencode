@@ -113,5 +113,7 @@ export const dict = {
   "ui.question.review.notAnswered": "(не отвечено)",
   "ui.question.multiHint": "Выберите все подходящие",
   "ui.question.singleHint": "Выберите один ответ",
+  "ui.question.readMore": "Читать далее",
+  "ui.question.readLess": "Свернуть",
   "ui.question.custom.placeholder": "Введите ваш ответ...",
 }

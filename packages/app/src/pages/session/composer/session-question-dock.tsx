@@ -1,4 +1,4 @@
-import { For, Show, createMemo, onCleanup, onMount, type Component } from "solid-js"
+import { For, Show, createMemo, createSignal, onCleanup, onMount, type Component } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Button } from "@opencode-ai/ui/button"
 import { DockPrompt } from "@opencode-ai/ui/dock-prompt"
@@ -287,6 +287,31 @@ export const SessionQuestionDock: Component<{ request: QuestionRequest; onSubmit
         <For each={options()}>
           {(opt, i) => {
             const picked = () => store.answers[store.tab]?.includes(opt.label) ?? false
+            const [clamped, setClamped] = createSignal(false)
+            const [expanded, setExpanded] = createSignal(false)
+            let desc: HTMLSpanElement | undefined
+
+            const check = () => {
+              const el = desc
+              if (!el || expanded()) return
+              setClamped(el.scrollHeight > el.clientHeight + 1)
+            }
+
+            const toggleMore = () => {
+              if (store.sending) return
+              const next = !expanded()
+              setExpanded(next)
+              if (!next) queueMicrotask(check)
+            }
+
+            onMount(() => {
+              queueMicrotask(check)
+              if (typeof ResizeObserver !== "function") return
+              const observer = new ResizeObserver(check)
+              if (desc) observer.observe(desc)
+              onCleanup(() => observer.disconnect())
+            })
+
             return (
               <button
                 data-slot="question-option"
@@ -307,12 +332,40 @@ export const SessionQuestionDock: Component<{ request: QuestionRequest; onSubmit
                     </Show>
                   </span>
                 </span>
-                <span data-slot="question-option-main">
+                <div data-slot="question-option-main">
                   <span data-slot="option-label">{opt.label}</span>
                   <Show when={opt.description}>
-                    <span data-slot="option-description">{opt.description}</span>
+                    {(text) => (
+                      <div data-slot="option-description-wrap">
+                        <span
+                          ref={(el) => (desc = el)}
+                          data-slot="option-description"
+                          data-expanded={expanded()}
+                          data-clamped={clamped()}
+                        >
+                          {text()}
+                        </span>
+                        <Show when={clamped() || expanded()}>
+                          <span
+                            data-slot="option-more"
+                            data-expanded={expanded()}
+                            onMouseDown={(event) => {
+                              event.preventDefault()
+                              event.stopPropagation()
+                            }}
+                            onClick={(event) => {
+                              event.preventDefault()
+                              event.stopPropagation()
+                              toggleMore()
+                            }}
+                          >
+                            {expanded() ? language.t("ui.question.readLess") : language.t("ui.question.readMore")}
+                          </span>
+                        </Show>
+                      </div>
+                    )}
                   </Show>
-                </span>
+                </div>
               </button>
             )
           }}
@@ -345,10 +398,10 @@ export const SessionQuestionDock: Component<{ request: QuestionRequest; onSubmit
                   </Show>
                 </span>
               </span>
-              <span data-slot="question-option-main">
+              <div data-slot="question-option-main">
                 <span data-slot="option-label">{language.t("ui.messagePart.option.typeOwnAnswer")}</span>
                 <span data-slot="option-description">{input() || language.t("ui.question.custom.placeholder")}</span>
-              </span>
+              </div>
             </button>
           }
         >
@@ -387,7 +440,7 @@ export const SessionQuestionDock: Component<{ request: QuestionRequest; onSubmit
                 </Show>
               </span>
             </span>
-            <span data-slot="question-option-main">
+            <div data-slot="question-option-main">
               <span data-slot="option-label">{language.t("ui.messagePart.option.typeOwnAnswer")}</span>
               <textarea
                 ref={(el) =>
@@ -418,7 +471,7 @@ export const SessionQuestionDock: Component<{ request: QuestionRequest; onSubmit
                   e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`
                 }}
               />
-            </span>
+            </div>
           </form>
         </Show>
       </div>
