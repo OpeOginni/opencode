@@ -36,7 +36,7 @@ import type { ProjectMeta } from "./global-sync/types"
 import { SESSION_RECENT_LIMIT } from "./global-sync/types"
 import { sanitizeProject } from "./global-sync/utils"
 import { usePlatform } from "./platform"
-import { serverErrorMessage } from "@/utils/server-errors"
+import { formatServerError } from "@/utils/server-errors"
 
 type GlobalStore = {
   ready: boolean
@@ -205,7 +205,7 @@ function createGlobalSync() {
         showToast({
           variant: "error",
           title: language.t("toast.session.listFailed.title", { project }),
-          description: serverErrorMessage(err),
+          description: formatServerError(err),
         })
       })
 

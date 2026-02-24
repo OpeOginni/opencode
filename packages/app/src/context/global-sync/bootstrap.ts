@@ -16,7 +16,7 @@ import { batch } from "solid-js"
 import { reconcile, type SetStoreFunction, type Store } from "solid-js/store"
 import type { State, VcsCache } from "./types"
 import { cmp, normalizeProviderList } from "./utils"
-import { serverErrorMessage } from "@/utils/server-errors"
+import { formatServerError } from "@/utils/server-errors"
 
 type GlobalStore = {
   ready: boolean
@@ -137,7 +137,7 @@ export async function bootstrapDirectory(input: {
     showToast({ 
       variant: "error", 
       title: `Failed to reload ${project}`, 
-      description: serverErrorMessage(err) 
+      description: formatServerError(err) 
     })
     input.setStore("status", "partial")
     return

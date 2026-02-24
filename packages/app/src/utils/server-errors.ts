@@ -7,7 +7,7 @@ export type ConfigInvalidError = {
   }
 }
 
-export function serverErrorMessage(error: unknown) {
+export function formatServerError(error: unknown) {
   if (isConfigInvalidErrorLike(error)) return parseReabaleConfigInvalidError(error)
   if (error instanceof Error && error.message) return error.message
   if (typeof error === "string" && error) return error
