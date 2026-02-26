@@ -119,4 +119,6 @@ export const dict = {
   "ui.question.multiHint": "可多選",
   "ui.question.singleHint": "選擇一個答案",
   "ui.question.custom.placeholder": "輸入你的答案...",
+  "ui.question.readMore": "閱讀更多",
+  "ui.question.readLess": "閱讀更少",
 } satisfies Partial<Record<Keys, string>>

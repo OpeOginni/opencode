@@ -115,4 +115,6 @@ export const dict = {
   "ui.question.multiHint": "Sélectionnez tout ce qui s'applique",
   "ui.question.singleHint": "Sélectionnez une réponse",
   "ui.question.custom.placeholder": "Tapez votre réponse...",
+  "ui.question.readMore": "Lire plus",
+  "ui.question.readLess": "Lire moins",
 }

@@ -114,4 +114,6 @@ export const dict = {
   "ui.question.multiHint": "Выберите все подходящие",
   "ui.question.singleHint": "Выберите один ответ",
   "ui.question.custom.placeholder": "Введите ваш ответ...",
+  "ui.question.readMore": "Читать дальше",
+  "ui.question.readLess": "Читать меньше",
 }

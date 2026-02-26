@@ -1013,6 +1013,28 @@
     white-space: nowrap;
   }
 
+  [data-slot="option-description"][data-expanded="true"] {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  [data-slot="option-description-toggle"] {
+    font-family: var(--font-family-sans);
+    font-size: 12px;
+    font-weight: var(--font-weight-medium);
+    line-height: var(--line-height-large);
+    color: var(--text-interactive-base);
+    cursor: pointer;
+    width: fit-content;
+    user-select: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
   [data-slot="question-option"][data-custom="true"] {
     [data-slot="option-description"] {
       overflow: visible;

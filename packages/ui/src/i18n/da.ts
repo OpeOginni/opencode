@@ -114,4 +114,6 @@ export const dict = {
   "ui.question.multiHint": "Vælg alle der gælder",
   "ui.question.singleHint": "Vælg ét svar",
   "ui.question.custom.placeholder": "Skriv dit svar...",
+  "ui.question.readMore": "Læs mere",
+  "ui.question.readLess": "Læs mindre",
 }

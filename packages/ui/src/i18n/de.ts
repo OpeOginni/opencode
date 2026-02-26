@@ -118,4 +118,6 @@ export const dict = {
   "ui.question.multiHint": "Alle zutreffenden auswählen",
   "ui.question.singleHint": "Eine Antwort auswählen",
   "ui.question.custom.placeholder": "Geben Sie Ihre Antwort ein...",
+  "ui.question.readMore": "Mehr lesen",
+  "ui.question.readLess": "Weniger lesen",
 } satisfies Partial<Record<Keys, string>>

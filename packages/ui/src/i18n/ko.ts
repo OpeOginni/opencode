@@ -115,4 +115,6 @@ export const dict = {
   "ui.question.multiHint": "해당하는 항목 모두 선택",
   "ui.question.singleHint": "하나의 답변을 선택",
   "ui.question.custom.placeholder": "답변 입력...",
+  "ui.question.readMore": "더 보기",
+  "ui.question.readLess": "접기",
 }

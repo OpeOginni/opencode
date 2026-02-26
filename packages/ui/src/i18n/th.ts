@@ -116,4 +116,6 @@ export const dict = {
   "ui.question.multiHint": "เลือกทั้งหมดที่ใช้",
   "ui.question.singleHint": "เลือกหนึ่งคำตอบ",
   "ui.question.custom.placeholder": "พิมพ์คำตอบของคุณ...",
+  "ui.question.readMore": "อ่านเพิ่มเติม",
+  "ui.question.readLess": "อ่านน้อยลง",
 }

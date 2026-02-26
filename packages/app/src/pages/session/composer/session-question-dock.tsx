@@ -1,4 +1,4 @@
-import { For, Show, createMemo, onCleanup, onMount, type Component } from "solid-js"
+import { For, Show, createEffect, createMemo, onCleanup, onMount, type Component } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Button } from "@opencode-ai/ui/button"
 import { DockPrompt } from "@opencode-ai/ui/dock-prompt"
@@ -20,6 +20,8 @@ export const SessionQuestionDock: Component<{ request: QuestionRequest; onSubmit
     answers: [] as QuestionAnswer[],
     custom: [] as string[],
     customOn: [] as boolean[],
+    expanded: {} as Record<string, boolean>,
+    clipped: {} as Record<string, boolean>,
     editing: false,
     sending: false,
   })
@@ -81,6 +83,27 @@ export const SessionQuestionDock: Component<{ request: QuestionRequest; onSubmit
     root.style.setProperty("--question-prompt-max-height", `${max}px`)
   }
 
+  const clip = () => {
+    if (!root) return
+
+    root.querySelectorAll(`[data-slot="option-description"][data-tab="${store.tab}"]`).forEach((item) => {
+      if (!(item instanceof HTMLElement)) return
+      if (item.dataset.expanded === "true") return
+      if (!item.dataset.opt) return
+      const opt = Number(item.dataset.opt)
+      if (Number.isNaN(opt)) return
+      const key = `${store.tab}:${opt}`
+      setStore("clipped", key, item.scrollWidth > item.clientWidth + 1)
+      // if content width is bigger than visible width, it is clipped/truncated.
+    })
+  }
+
+  createEffect(() => {
+    store.tab
+    options()
+    requestAnimationFrame(() => clip())
+  })
+
   onMount(() => {
     let raf: number | undefined
     const update = () => {
@@ -88,6 +111,7 @@ export const SessionQuestionDock: Component<{ request: QuestionRequest; onSubmit
       raf = requestAnimationFrame(() => {
         raf = undefined
         measure()
+        clip()
       })
     }
 
@@ -203,6 +227,15 @@ export const SessionQuestionDock: Component<{ request: QuestionRequest; onSubmit
     pick(opt.label)
   }
 
+  const expand = (event: MouseEvent, opt: number) => {
+    event.preventDefault()
+    event.stopPropagation()
+    if (store.sending) return
+    const key = `${store.tab}:${opt}`
+    setStore("expanded", key, (value) => !value)
+    requestAnimationFrame(() => clip())
+  }
+
   const commitCustom = () => {
     setStore("editing", false)
     customUpdate(input())
@@ -287,6 +320,10 @@ export const SessionQuestionDock: Component<{ request: QuestionRequest; onSubmit
         <For each={options()}>
           {(opt, i) => {
             const picked = () => store.answers[store.tab]?.includes(opt.label) ?? false
+            const text = opt.description?.trim() ?? ""
+            const key = () => `${store.tab}:${i()}`
+            const opened = () => store.expanded[key()] === true
+            const clipped = () => store.clipped[key()] === true
             return (
               <button
                 data-slot="question-option"
@@ -309,8 +346,23 @@ export const SessionQuestionDock: Component<{ request: QuestionRequest; onSubmit
                 </span>
                 <span data-slot="question-option-main">
                   <span data-slot="option-label">{opt.label}</span>
-                  <Show when={opt.description}>
-                    <span data-slot="option-description">{opt.description}</span>
+                  <Show when={text}>
+                    <span data-slot="option-description" data-expanded={opened()} data-tab={store.tab} data-opt={i()}>
+                      {text}
+                    </span>
+                    <Show when={clipped() || opened()}>
+                      <span
+                        data-slot="option-description-toggle"
+                        data-expanded={opened()}
+                        onMouseDown={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                        }}
+                        onClick={(e) => expand(e, i())}
+                      >
+                        {opened() ? language.t("ui.question.readLess") : language.t("ui.question.readMore")}
+                      </span>
+                    </Show>
                   </Show>
                 </span>
               </button>

@@ -115,4 +115,6 @@ export const dict = {
   "ui.question.multiHint": "حدد كل ما ينطبق",
   "ui.question.singleHint": "حدد إجابة واحدة",
   "ui.question.custom.placeholder": "اكتب إجابتك...",
+  "ui.question.readMore": "اقرأ المزيد",
+  "ui.question.readLess": "اقرأ أقل",
 }

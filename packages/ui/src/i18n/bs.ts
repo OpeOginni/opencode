@@ -119,4 +119,6 @@ export const dict = {
   "ui.question.multiHint": "Odaberi sve što važi",
   "ui.question.singleHint": "Odaberi jedan odgovor",
   "ui.question.custom.placeholder": "Unesi svoj odgovor...",
+  "ui.question.readMore": "Pročitaj više",
+  "ui.question.readLess": "Pročitaj manje",
 } satisfies Partial<Record<Keys, string>>
