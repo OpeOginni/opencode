@@ -1,5 +1,5 @@
 import { createStore } from "solid-js/store"
-import { batch, createEffect, createMemo } from "solid-js"
+import { batch, createEffect, createMemo, on } from "solid-js"
 import { useSync } from "@tui/context/sync"
 import { useTheme } from "@tui/context/theme"
 import { uniqueBy } from "remeda"
@@ -321,6 +321,11 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           })
         },
         variant: {
+          default() {
+            const a = agent.current()
+            if (a.variant) return a.variant
+            return undefined
+          },
           current() {
             const m = currentModel()
             if (!m) return undefined
@@ -378,23 +383,39 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       },
     }
 
-    // Automatically update model when agent changes
-    createEffect(() => {
-      const value = agent.current()
-      if (value.model) {
-        if (isModelValid(value.model))
-          model.set({
-            providerID: value.model.providerID,
-            modelID: value.model.modelID,
-          })
-        else
-          toast.show({
-            variant: "warning",
-            message: `Agent ${value.name}'s configured model ${value.model.providerID}/${value.model.modelID} is not valid`,
-            duration: 3000,
-          })
-      }
-    })
+    // Automatically update model and variant when agent changes
+    createEffect(
+      on(
+        () => agent.current().name,
+        () => {
+          const value = agent.current()
+          if (value.model) {
+            if (isModelValid(value.model))
+              model.set({
+                providerID: value.model.providerID,
+                modelID: value.model.modelID,
+              })
+            else
+              toast.show({
+                variant: "warning",
+                message: `Agent ${value.name}'s configured model ${value.model.providerID}/${value.model.modelID} is not valid`,
+                duration: 3000,
+              })
+          }
+
+          if (value.variant) {
+            if (model.variant.list().includes(value.variant)) model.variant.set(value.variant)
+            else
+              toast.show({
+                variant: "warning",
+                message: `Agent ${value.name}'s configured variant ${value.variant} is not valid`,
+                duration: 3000,
+              })
+          }
+        },
+        { defer: true },
+      ),
+    )
 
     const result = {
       model,

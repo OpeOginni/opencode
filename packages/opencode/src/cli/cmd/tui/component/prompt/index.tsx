@@ -159,11 +159,17 @@ export function Prompt(props: PromptProps) {
       syncedSessionID = sessionID
 
       // Only set agent if it's a primary agent (not a subagent)
-      const isPrimaryAgent = local.agent.list().some((x) => x.name === msg.agent)
-      if (msg.agent && isPrimaryAgent) {
+      const lastPrimaryAgent = local.agent.list().find((x) => x.name === msg.agent && x.mode === "primary")
+      if (msg.agent && lastPrimaryAgent) {
         local.agent.set(msg.agent)
         if (msg.model) local.model.set(msg.model)
-        if (msg.variant) local.model.variant.set(msg.variant)
+
+        if (lastPrimaryAgent.variant) {
+          local.model.variant.set(lastPrimaryAgent.variant)
+        } else if (msg.variant) {
+          local.model.variant.set(msg.variant)
+        }
+
       }
     }
   })
