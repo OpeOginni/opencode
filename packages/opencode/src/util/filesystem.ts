@@ -2,7 +2,7 @@ import { chmod, mkdir, readFile, writeFile } from "fs/promises"
 import { createWriteStream, existsSync, statSync } from "fs"
 import { lookup } from "mime-types"
 import { realpathSync } from "fs"
-import { dirname, join, relative } from "path"
+import { dirname, join, normalize, relative, resolve } from "path"
 import { Readable } from "stream"
 import { pipeline } from "stream/promises"
 import { Glob } from "./glob"
@@ -111,6 +111,19 @@ export namespace Filesystem {
     } catch {
       return p
     }
+  }
+
+  export function canonical(p: string): string {
+    const abs = normalize(resolve(p))
+    const real = (() => {
+      try {
+        return normalize(realpathSync.native(abs))
+      } catch {
+        return abs
+      }
+    })()
+    if (process.platform === "win32") return real.toLowerCase()
+    return real
   }
 
   export function windowsPath(p: string): string {
