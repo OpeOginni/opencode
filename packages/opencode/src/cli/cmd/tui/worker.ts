@@ -10,7 +10,6 @@ import { GlobalBus } from "@/bus/global"
 import { createOpencodeClient, type Event } from "@opencode-ai/sdk/v2"
 import type { BunWebSocketData } from "hono/bun"
 import { Flag } from "@/flag/flag"
-import { Filesystem } from "@/util/filesystem"
 
 await Log.init({
   print: process.argv.includes("--print-logs"),
@@ -95,7 +94,7 @@ const startEventStream = (directory: string) => {
   })
 }
 
-startEventStream(Filesystem.canonical(process.cwd()))
+startEventStream(process.cwd())
 
 export const rpc = {
   async fetch(input: { url: string; method: string; headers: Record<string, string>; body?: string }) {
