@@ -184,6 +184,7 @@ export namespace Provider {
       return {
         autoload: false,
         async getModel(sdk: any, modelID: string, options?: Record<string, any>) {
+          if (sdk.responses === undefined && sdk.chat === undefined) return sdk.languageModel(modelID)
           if (options?.["useCompletionUrls"]) {
             return sdk.chat(modelID)
           } else {
@@ -198,6 +199,7 @@ export namespace Provider {
       return {
         autoload: false,
         async getModel(sdk: any, modelID: string, options?: Record<string, any>) {
+          if (sdk.responses === undefined && sdk.chat === undefined) return sdk.languageModel(modelID)
           if (options?.["useCompletionUrls"]) {
             return sdk.chat(modelID)
           } else {

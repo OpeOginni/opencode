@@ -411,17 +411,24 @@ OpenCode Zen 是由 OpenCode 团队提供的模型列表，这些模型已经过
   "$schema": "https://opencode.ai/config.json",
   "provider": {
     "azure-cognitive-services": {
-      "npm": "@ai-sdk/openai-compatible",
       "options": {
-        "baseURL": "https://<resource-name>.openai.azure.com/openai/v1",
-        "useCompletionUrls": true // If getting "This model is not supported by Responses API" error
+        "baseURL": "https://<resource-name>.openai.azure.com/openai/v1"
       },
       "models": {
-        "kimi-k2.5": {
-          "id": "Kimi-K2.5",
+        "Kimi-K2.5": {
           "limit": {
             "output": 10000, // Reduce limit.output for models where you get rate-limit errors
             "context": 262144
+          },
+          "provider": {
+            "npm": "@ai-sdk/openai-compatible"
+          }
+        },
+        "claude-opus-4": {
+          "name": "claude-sonnet-4-5",
+          "provider": {
+            "npm": "@ai-sdk/anthropic",
+            "api": "https://<resource-name>.services.ai.azure.com/anthropic/v1"
           }
         }
       }
