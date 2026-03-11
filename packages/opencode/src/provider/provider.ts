@@ -413,12 +413,11 @@ export namespace Provider {
       }
     },
     "google-vertex": async (provider) => {
-      const project = String(
+      const project =
         provider.options?.project ??
-          Env.get("GOOGLE_CLOUD_PROJECT") ??
-          Env.get("GCP_PROJECT") ??
-          Env.get("GCLOUD_PROJECT"),
-      )
+        Env.get("GOOGLE_CLOUD_PROJECT") ??
+        Env.get("GCP_PROJECT") ??
+        Env.get("GCLOUD_PROJECT")
 
       const location = String(
         provider.options?.location ??
@@ -571,10 +570,14 @@ export namespace Provider {
         autoload: !!apiKey,
         options: {
           apiKey,
-          baseURL: `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1`,
         },
         async getModel(sdk: any, modelID: string) {
           return sdk.languageModel(modelID)
+        },
+        vars(_options) {
+          return {
+            CLOUDFLARE_ACCOUNT_ID: accountId,
+          }
         },
       }
     },
@@ -1131,7 +1134,13 @@ export namespace Provider {
       }
 
       const baseURL = iife(() => {
-        let url = String(options["baseURL"]) || model.api.url
+        let url =
+          typeof options["baseURL"] === "string" && options["baseURL"] !== "" ? options["baseURL"] : model.api.url
+        if (!url) return
+
+        // some models/providers have variable urls, ex: "https://${AZURE_RESOURCE_NAME}.services.ai.azure.com/anthropic/v1"
+        // We track this in models.dev, and then when we are resolving the baseURL
+        // we need to string replace that literal: "${AZURE_RESOURCE_NAME}"
         const loader = s.varsLoaders[model.providerID]
         if (loader) {
           const vars = loader(options)
