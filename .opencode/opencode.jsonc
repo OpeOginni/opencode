@@ -4,6 +4,24 @@
     "opencode": {
       "options": {},
     },
+    "azure": {
+      "models": {
+        "kimi-k2.5": {
+          "name": "kimi-k2.5",
+          "limit": {
+            "context": 262144,
+            "output": 10000,
+          },
+          "provider": {
+            "npm": "@ai-sdk/openai-compatible",
+            "api": "https://aiden-azury-group.services.ai.azure.com/models",
+          },
+        },
+      },
+      "options": {
+        "resourceName": "aiden-azury-group",
+      },
+    },
   },
   "permission": {
     "edit": {

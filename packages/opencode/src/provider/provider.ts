@@ -51,44 +51,15 @@ const DEFAULT_CHUNK_TIMEOUT = 120_000
 export namespace Provider {
   const log = Log.create({ service: "provider" })
 
-  function isGpt5OrLater(modelID: string): boolean {
-    const match = /^gpt-(\d+)/.exec(modelID)
-    if (!match) {
-      return false
-    }
-    return Number(match[1]) >= 5
-  }
-
   function shouldUseCopilotResponsesApi(modelID: string): boolean {
-    return isGpt5OrLater(modelID) && !modelID.startsWith("gpt-5-mini")
-  }
-
-  function googleVertexVars(options: Record<string, any>) {
-    const project =
-      options["project"] ?? Env.get("GOOGLE_CLOUD_PROJECT") ?? Env.get("GCP_PROJECT") ?? Env.get("GCLOUD_PROJECT")
-    const location =
-      options["location"] ??
-      Env.get("GOOGLE_VERTEX_LOCATION") ??
-      Env.get("GOOGLE_CLOUD_LOCATION") ??
-      Env.get("VERTEX_LOCATION") ??
-      "us-central1"
-    const endpoint = location === "global" ? "aiplatform.googleapis.com" : `${location}-aiplatform.googleapis.com`
-
-    return {
-      GOOGLE_VERTEX_PROJECT: project,
-      GOOGLE_VERTEX_LOCATION: location,
-      GOOGLE_VERTEX_ENDPOINT: endpoint,
-    }
-  }
-
-  function loadBaseURL(model: Model, options: Record<string, any>) {
-    const raw = options["baseURL"] ?? model.api.url
-    if (typeof raw !== "string") return raw
-    const vars = model.providerID === "google-vertex" ? googleVertexVars(options) : undefined
-    return raw.replace(/\$\{([^}]+)\}/g, (match, key) => {
-      const val = Env.get(String(key)) ?? vars?.[String(key) as keyof typeof vars]
-      return val ?? match
+    const isGpt5OrLater = iife(() => {
+      const match = /^gpt-(\d+)/.exec(modelID)
+      if (!match) {
+        return false
+      }
+      return Number(match[1]) >= 5
     })
+    return isGpt5OrLater && !modelID.startsWith("gpt-5-mini")
   }
 
   function wrapSSE(res: Response, ms: number, ctl: AbortController) {
@@ -165,9 +136,11 @@ export namespace Provider {
   }
 
   type CustomModelLoader = (sdk: any, modelID: string, options?: Record<string, any>) => Promise<any>
+  type CustomVarsLoader = (options: Record<string, any>) => Record<string, string>
   type CustomLoader = (provider: Info) => Promise<{
     autoload: boolean
     getModel?: CustomModelLoader
+    vars?: CustomVarsLoader
     options?: Record<string, any>
   }>
 
@@ -440,23 +413,33 @@ export namespace Provider {
       }
     },
     "google-vertex": async (provider) => {
-      const project =
+      const project = String(
         provider.options?.project ??
-        Env.get("GOOGLE_CLOUD_PROJECT") ??
-        Env.get("GCP_PROJECT") ??
-        Env.get("GCLOUD_PROJECT")
+          Env.get("GOOGLE_CLOUD_PROJECT") ??
+          Env.get("GCP_PROJECT") ??
+          Env.get("GCLOUD_PROJECT"),
+      )
 
-      const location =
+      const location = String(
         provider.options?.location ??
-        Env.get("GOOGLE_VERTEX_LOCATION") ??
-        Env.get("GOOGLE_CLOUD_LOCATION") ??
-        Env.get("VERTEX_LOCATION") ??
-        "us-central1"
+          Env.get("GOOGLE_VERTEX_LOCATION") ??
+          Env.get("GOOGLE_CLOUD_LOCATION") ??
+          Env.get("VERTEX_LOCATION") ??
+          "us-central1",
+      )
 
       const autoload = Boolean(project)
       if (!autoload) return { autoload: false }
       return {
         autoload: true,
+        vars(_options: Record<string, any>) {
+          const endpoint = location === "global" ? "aiplatform.googleapis.com" : `${location}-aiplatform.googleapis.com`
+          return {
+            GOOGLE_VERTEX_PROJECT: project,
+            GOOGLE_VERTEX_LOCATION: location,
+            GOOGLE_VERTEX_ENDPOINT: endpoint,
+          }
+        },
         options: {
           project,
           location,
@@ -861,6 +844,9 @@ export namespace Provider {
     const modelLoaders: {
       [providerID: string]: CustomModelLoader
     } = {}
+    const varsLoaders: {
+      [providerID: string]: CustomVarsLoader
+    } = {}
     const sdk = new Map<string, SDK>()
 
     log.info("init")
@@ -1057,6 +1043,7 @@ export namespace Provider {
       const result = await fn(data)
       if (result && (result.autoload || providers[providerID])) {
         if (result.getModel) modelLoaders[providerID] = result.getModel
+        if (result.vars) varsLoaders[providerID] = result.vars
         const opts = result.options ?? {}
         const patch: Partial<Info> = providers[providerID] ? { options: opts } : { source: "custom", options: opts }
         mergeProvider(providerID, patch)
@@ -1118,6 +1105,7 @@ export namespace Provider {
       providers,
       sdk,
       modelLoaders,
+      varsLoaders,
     }
   })
 
@@ -1142,7 +1130,19 @@ export namespace Provider {
         options["includeUsage"] = true
       }
 
-      const baseURL = loadBaseURL(model, options)
+      const baseURL = iife(() => {
+        let url = String(options["baseURL"]) || model.api.url
+        const loader = s.varsLoaders[model.providerID]
+        if (loader) {
+          const vars = loader(options)
+          for (const [key, value] of Object.entries(vars)) {
+            const field = `\$\{${key}\}`
+            url = url.replaceAll(field, value)
+          }
+        }
+        return url
+      })
+
       if (baseURL !== undefined) options["baseURL"] = baseURL
       if (options["apiKey"] === undefined && provider.key) options["apiKey"] = provider.key
       if (model.headers)
