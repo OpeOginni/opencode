@@ -167,6 +167,10 @@ export namespace Provider {
     options?: Record<string, any>
   }>
 
+  function useLanguageModel(sdk: any) {
+    return sdk.responses === undefined && sdk.chat === undefined
+  }
+
   const CUSTOM_LOADERS: Record<string, CustomLoader> = {
     async anthropic() {
       return {
@@ -214,7 +218,7 @@ export namespace Provider {
       return {
         autoload: false,
         async getModel(sdk: any, modelID: string, _options?: Record<string, any>) {
-          if (sdk.responses === undefined && sdk.chat === undefined) return sdk.languageModel(modelID)
+          if (useLanguageModel(sdk)) return sdk.languageModel(modelID)
           return shouldUseCopilotResponsesApi(modelID) ? sdk.responses(modelID) : sdk.chat(modelID)
         },
         options: {},
@@ -224,7 +228,7 @@ export namespace Provider {
       return {
         autoload: false,
         async getModel(sdk: any, modelID: string, _options?: Record<string, any>) {
-          if (sdk.responses === undefined && sdk.chat === undefined) return sdk.languageModel(modelID)
+          if (useLanguageModel(sdk)) return sdk.languageModel(modelID)
           return shouldUseCopilotResponsesApi(modelID) ? sdk.responses(modelID) : sdk.chat(modelID)
         },
         options: {},
@@ -234,6 +238,7 @@ export namespace Provider {
       return {
         autoload: false,
         async getModel(sdk: any, modelID: string, options?: Record<string, any>) {
+          if (useLanguageModel(sdk)) return sdk.languageModel(modelID)
           if (options?.["useCompletionUrls"]) {
             return sdk.chat(modelID)
           } else {
@@ -248,6 +253,7 @@ export namespace Provider {
       return {
         autoload: false,
         async getModel(sdk: any, modelID: string, options?: Record<string, any>) {
+          if (useLanguageModel(sdk)) return sdk.languageModel(modelID)
           if (options?.["useCompletionUrls"]) {
             return sdk.chat(modelID)
           } else {
