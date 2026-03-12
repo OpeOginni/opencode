@@ -52,14 +52,9 @@ export namespace Provider {
   const log = Log.create({ service: "provider" })
 
   function shouldUseCopilotResponsesApi(modelID: string): boolean {
-    const isGpt5OrLater = iife(() => {
-      const match = /^gpt-(\d+)/.exec(modelID)
-      if (!match) {
-        return false
-      }
-      return Number(match[1]) >= 5
-    })
-    return isGpt5OrLater && !modelID.startsWith("gpt-5-mini")
+    const match = /^gpt-(\d+)/.exec(modelID)
+    if (!match) return false
+    return Number(match[1]) >= 5 && !modelID.startsWith("gpt-5-mini")
   }
 
   function wrapSSE(res: Response, ms: number, ctl: AbortController) {
