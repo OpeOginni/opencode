@@ -212,7 +212,11 @@ export namespace Provider {
       }
     },
     azure: async (provider) => {
-      const resource = provider.options?.resourceName ?? Env.get("AZURE_RESOURCE_NAME")
+      const resource = iife(() => {
+        const name = provider.options?.resourceName
+        if (typeof name === "string" && name.trim() !== "") return name
+        return Env.get("AZURE_RESOURCE_NAME")
+      })
 
       return {
         autoload: false,
@@ -227,7 +231,7 @@ export namespace Provider {
         options: {},
         vars(_options) {
           return {
-            AZURE_RESOURCE_NAME: resource,
+            ...(resource && { AZURE_RESOURCE_NAME: resource }),
           }
         },
       }
@@ -441,7 +445,7 @@ export namespace Provider {
         vars(_options: Record<string, any>) {
           const endpoint = location === "global" ? "aiplatform.googleapis.com" : `${location}-aiplatform.googleapis.com`
           return {
-            GOOGLE_VERTEX_PROJECT: project,
+            ...(project && { GOOGLE_VERTEX_PROJECT: project }),
             GOOGLE_VERTEX_LOCATION: location,
             GOOGLE_VERTEX_ENDPOINT: endpoint,
           }
@@ -1156,6 +1160,11 @@ export namespace Provider {
             url = url.replaceAll(field, value)
           }
         }
+
+        url = url.replace(/\$\{([^}]+)\}/g, (item, key) => {
+          const val = Env.get(String(key))
+          return val ?? item
+        })
         return url
       })
 
