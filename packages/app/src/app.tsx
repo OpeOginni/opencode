@@ -129,6 +129,15 @@ function RouterRoot(props: ParentProps<{ appChildren?: JSX.Element }>) {
   )
 }
 
+function ServerScope(props: ParentProps) {
+  const server = useServer()
+  return (
+    <Show when={server.key} keyed>
+      {props.children}
+    </Show>
+  )
+}
+
 export function AppBaseProviders(props: ParentProps) {
   return (
     <MetaProvider>
@@ -265,20 +274,22 @@ export function AppInterface(props: {
   return (
     <ServerProvider defaultServer={props.defaultServer} servers={props.servers}>
       <ConnectionGate>
-        <GlobalSDKProvider>
-          <GlobalSyncProvider>
-            <Dynamic
-              component={props.router ?? Router}
-              root={(routerProps) => <RouterRoot appChildren={props.children}>{routerProps.children}</RouterRoot>}
-            >
-              <Route path="/" component={HomeRoute} />
-              <Route path="/:dir" component={DirectoryLayout}>
-                <Route path="/" component={SessionIndexRoute} />
-                <Route path="/session/:id?" component={SessionRoute} />
-              </Route>
-            </Dynamic>
-          </GlobalSyncProvider>
-        </GlobalSDKProvider>
+        <ServerScope>
+          <GlobalSDKProvider>
+            <GlobalSyncProvider>
+              <Dynamic
+                component={props.router ?? Router}
+                root={(routerProps) => <RouterRoot appChildren={props.children}>{routerProps.children}</RouterRoot>}
+              >
+                <Route path="/" component={HomeRoute} />
+                <Route path="/:dir" component={DirectoryLayout}>
+                  <Route path="/" component={SessionIndexRoute} />
+                  <Route path="/session/:id?" component={SessionRoute} />
+                </Route>
+              </Dynamic>
+            </GlobalSyncProvider>
+          </GlobalSDKProvider>
+        </ServerScope>
       </ConnectionGate>
     </ServerProvider>
   )
