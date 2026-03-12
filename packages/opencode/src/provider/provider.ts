@@ -1156,7 +1156,7 @@ export namespace Provider {
         if (loader) {
           const vars = loader(options)
           for (const [key, value] of Object.entries(vars)) {
-            const field = `\$\{${key}\}`
+            const field = "${" + key + "}"
             url = url.replaceAll(field, value)
           }
         }
