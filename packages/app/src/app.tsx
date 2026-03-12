@@ -131,11 +131,7 @@ function RouterRoot(props: ParentProps<{ appChildren?: JSX.Element }>) {
 
 function ServerScope(props: ParentProps) {
   const server = useServer()
-  return (
-    <Show when={server.key} keyed>
-      {props.children}
-    </Show>
-  )
+  return <For each={[server.key]}>{() => props.children}</For>
 }
 
 export function AppBaseProviders(props: ParentProps) {
