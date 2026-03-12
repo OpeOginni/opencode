@@ -26,7 +26,6 @@ import { ProviderIcon } from "@opencode-ai/ui/provider-icon"
 import { Tooltip, TooltipKeybind } from "@opencode-ai/ui/tooltip"
 import { IconButton } from "@opencode-ai/ui/icon-button"
 import { Select } from "@opencode-ai/ui/select"
-import { RadioGroup } from "@opencode-ai/ui/radio-group"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { ModelSelectorPopover } from "@/components/dialog-select-model"
 import { DialogSelectModelUnpaid } from "@/components/dialog-select-model-unpaid"
@@ -49,7 +48,7 @@ import {
   type PromptHistoryStoredEntry,
   promptLength,
 } from "./prompt-input/history"
-import { createPromptSubmit } from "./prompt-input/submit"
+import { createPromptSubmit, type FollowupDraft } from "./prompt-input/submit"
 import { PromptPopover, type AtOption, type SlashCommand } from "./prompt-input/slash-popover"
 import { PromptContextItems } from "./prompt-input/context-items"
 import { PromptImageAttachments } from "./prompt-input/image-attachments"
@@ -62,6 +61,11 @@ interface PromptInputProps {
   ref?: (el: HTMLDivElement) => void
   newSessionWorktree?: string
   onNewSessionWorktreeReset?: () => void
+  edit?: { id: string; prompt: Prompt; context: FollowupDraft["context"] }
+  onEditLoaded?: () => void
+  shouldQueue?: () => boolean
+  onQueue?: (draft: FollowupDraft) => void
+  onAbort?: () => void
   onSubmit?: () => void
 }
 
@@ -948,6 +952,45 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     setCurrentHistory("entries", next)
   }
 
+  createEffect(
+    on(
+      () => props.edit?.id,
+      (id) => {
+        const edit = props.edit
+        if (!id || !edit) return
+
+        for (const item of prompt.context.items()) {
+          prompt.context.remove(item.key)
+        }
+
+        for (const item of edit.context) {
+          prompt.context.add({
+            type: item.type,
+            path: item.path,
+            selection: item.selection,
+            comment: item.comment,
+            commentID: item.commentID,
+            commentOrigin: item.commentOrigin,
+            preview: item.preview,
+          })
+        }
+
+        setStore("mode", "normal")
+        setStore("popover", null)
+        setStore("historyIndex", -1)
+        setStore("savedPrompt", null)
+        prompt.set(edit.prompt, promptLength(edit.prompt))
+        requestAnimationFrame(() => {
+          editorRef.focus()
+          setCursorPosition(editorRef, promptLength(edit.prompt))
+          queueScroll()
+        })
+        props.onEditLoaded?.()
+      },
+      { defer: true },
+    ),
+  )
+
   const navigateHistory = (direction: "up" | "down") => {
     const result = navigatePromptHistory({
       direction,
@@ -1002,6 +1045,9 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     setPopover: (popover) => setStore("popover", popover),
     newSessionWorktree: () => props.newSessionWorktree,
     onNewSessionWorktreeReset: props.onNewSessionWorktreeReset,
+    shouldQueue: props.shouldQueue,
+    onQueue: props.onQueue,
+    onAbort: props.onAbort,
     onSubmit: props.onSubmit,
   })
 
@@ -1487,36 +1533,6 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                   />
                 </TooltipKeybind>
               </div>
-            </div>
-            <div class="shrink-0">
-              <RadioGroup
-                options={["shell", "normal"] as const}
-                current={store.mode}
-                value={(mode) => mode}
-                label={(mode) => (
-                  <TooltipKeybind
-                    placement="top"
-                    gutter={4}
-                    openDelay={2000}
-                    title={language.t(mode === "shell" ? "prompt.mode.shell" : "prompt.mode.normal")}
-                    keybind={command.keybind(mode === "shell" ? "prompt.mode.shell" : "prompt.mode.normal")}
-                    class="size-full flex items-center justify-center"
-                  >
-                    <Icon
-                      name={mode === "shell" ? "console" : "prompt"}
-                      class="size-[18px]"
-                      classList={{
-                        "text-icon-strong-base": store.mode === mode,
-                        "text-icon-weak": store.mode !== mode,
-                      }}
-                    />
-                  </TooltipKeybind>
-                )}
-                onSelect={(mode) => mode && setMode(mode)}
-                fill
-                pad="none"
-                class="w-[68px]"
-              />
             </div>
           </div>
         </DockTray>
