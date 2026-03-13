@@ -129,16 +129,6 @@ function RouterRoot(props: ParentProps<{ appChildren?: JSX.Element }>) {
   )
 }
 
-// Destroys and recreates its children when `on` changes.
-// <Show when={key} keyed> does not reliably tear down complex owner trees
-// (routers + nested providers) and causes:
-//   TypeError: null is not an object (evaluating 'node.owned[i]')
-// <For> over a single-item array is the standard Solid workaround:
-// the old item is removed and the new item added, fully disposing the old scope.
-function Remount(props: ParentProps<{ on: string }>) {
-  return <For each={[props.on]}>{() => props.children}</For>
-}
-
 export function AppBaseProviders(props: ParentProps) {
   return (
     <MetaProvider>
@@ -266,6 +256,15 @@ function ConnectionError(props: { onRetry?: () => void; onServerSelected?: (key:
   )
 }
 
+function ServerKey(props: ParentProps) {
+  const server = useServer()
+  return (
+    <Show when={server.key} keyed>
+      {props.children}
+    </Show>
+  )
+}
+
 export function AppInterface(props: {
   children?: JSX.Element
   defaultServer: ServerConnection.Key
@@ -275,7 +274,7 @@ export function AppInterface(props: {
   return (
     <ServerProvider defaultServer={props.defaultServer} servers={props.servers}>
       <ConnectionGate>
-        <Remount on={useServer().key}>
+        <ServerKey>
           <GlobalSDKProvider>
             <GlobalSyncProvider>
               <Dynamic
@@ -290,7 +289,7 @@ export function AppInterface(props: {
               </Dynamic>
             </GlobalSyncProvider>
           </GlobalSDKProvider>
-        </Remount>
+        </ServerKey>
       </ConnectionGate>
     </ServerProvider>
   )
