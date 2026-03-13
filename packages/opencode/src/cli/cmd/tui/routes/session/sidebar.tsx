@@ -61,6 +61,15 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
   })
 
   const directory = useDirectory()
+  const dirParts = createMemo(() => {
+    const dir = directory()
+    const hasBranch = dir.includes(":")
+    const [path, branch] = hasBranch ? dir.split(":") : [dir, null]
+    const parts = path.split("/")
+    const parent = parts.slice(0, -1).join("/")
+    const repo = parts.at(-1)
+    return { parent, repo, branch }
+  })
   const kv = useKV()
 
   const hasProviders = createMemo(() =>
@@ -304,13 +313,11 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
             </box>
           </Show>
           <text>
-            <Show
-              when={directory().includes(":")}
-              fallback={<span style={{ fg: theme.textMuted }}>{directory()}</span>}
-            >
-              <span style={{ fg: theme.textMuted }}>{directory().split(":")[0]}:</span>
-              <span style={{ fg: theme.text }}>{directory().split(":").slice(1).join(":")}</span>
-            </Show>
+            <span style={{ fg: theme.textMuted }}>{dirParts().parent ? `${dirParts().parent}/` : ""}</span>
+            <span style={{ fg: theme.text }}>
+              {dirParts().repo}
+              {dirParts().branch ? `:${dirParts().branch}` : ""}
+            </span>
           </text>
           <text fg={theme.textMuted}>
             <span style={{ fg: theme.success }}>•</span> <b>Open</b>
