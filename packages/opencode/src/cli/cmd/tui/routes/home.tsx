@@ -133,7 +133,12 @@ export function Home() {
         <Toast />
       </box>
       <box paddingTop={1} paddingBottom={1} paddingLeft={2} paddingRight={2} flexDirection="row" flexShrink={0} gap={2}>
-        <text fg={theme.textMuted}>{directory()}</text>
+        <text>
+          <Show when={directory().includes(":")} fallback={<span style={{ fg: theme.textMuted }}>{directory()}</span>}>
+            <span style={{ fg: theme.textMuted }}>{directory().split(":")[0]}:</span>
+            <span style={{ fg: theme.text }}>{directory().split(":").slice(1).join(":")}</span>
+          </Show>
+        </text>
         <box gap={1} flexDirection="row" flexShrink={0}>
           <Show when={mcp()}>
             <text fg={theme.text}>
