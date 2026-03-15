@@ -87,7 +87,7 @@ export namespace Installation {
   }
 
   export function isLocal() {
-    return CHANNEL === "local"
+    return CHANNEL === "local" || (VERSION.startsWith("0.0.0-") && !VERSION.startsWith("0.0.0-beta")) // Prevents all other versions exepct beta from being installed
   }
 
   export async function method() {
