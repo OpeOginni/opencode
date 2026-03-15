@@ -65,16 +65,6 @@ const debugTerminal = (...values: unknown[]) => {
   console.debug("[terminal]", ...values)
 }
 
-const errorStatus = (err: unknown) => {
-  if (!err || typeof err !== "object") return
-  if (!("data" in err)) return
-  const data = err.data
-  if (!data || typeof data !== "object") return
-  if (!("statusCode" in data)) return
-  const status = data.statusCode
-  return typeof status === "number" ? status : undefined
-}
-
 const errorName = (err: unknown) => {
   if (!err || typeof err !== "object") return
   if (!("name" in err)) return
