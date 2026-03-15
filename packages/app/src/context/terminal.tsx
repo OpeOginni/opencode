@@ -3,6 +3,7 @@ import { createSimpleContext } from "@opencode-ai/ui/context"
 import { batch, createEffect, createMemo, createRoot, on, onCleanup } from "solid-js"
 import { useParams } from "@solidjs/router"
 import { useSDK } from "./sdk"
+import { useServer } from "./server"
 import type { Platform } from "./platform"
 import { defaultTitle, titleNumber } from "./terminal-title"
 import { Persist, persisted, removePersisted } from "@/utils/persist"
@@ -82,8 +83,16 @@ export function migrateTerminalState(value: unknown) {
   }
 }
 
-export function getWorkspaceTerminalCacheKey(dir: string) {
-  return `${dir}:${WORKSPACE_KEY}`
+export function getTerminalServerKey(local: boolean, key: string) {
+  return local ? "local" : key
+}
+
+export function getWorkspaceTerminalCacheKey(serverKey: string, dir: string) {
+  return `${serverKey}:${dir}:${WORKSPACE_KEY}`
+}
+
+function getWorkspaceTerminalPersistKey(serverKey: string) {
+  return `terminal:${serverKey}`
 }
 
 export function getLegacyTerminalStorageKeys(dir: string, legacySessionID?: string) {
@@ -110,14 +119,14 @@ const trimTerminal = (pty: LocalPTY) => {
   }
 }
 
-export function clearWorkspaceTerminals(dir: string, sessionIDs?: string[], platform?: Platform) {
-  const key = getWorkspaceTerminalCacheKey(dir)
+export function clearWorkspaceTerminals(serverKey: string, dir: string, sessionIDs?: string[], platform?: Platform) {
+  const key = getWorkspaceTerminalCacheKey(serverKey, dir)
   for (const cache of caches) {
     const entry = cache.get(key)
     entry?.value.clear()
   }
 
-  removePersisted(Persist.workspace(dir, "terminal"), platform)
+  removePersisted(Persist.workspace(dir, getWorkspaceTerminalPersistKey(serverKey)), platform)
 
   const legacy = new Set(getLegacyTerminalStorageKeys(dir))
   for (const id of sessionIDs ?? []) {
@@ -130,12 +139,17 @@ export function clearWorkspaceTerminals(dir: string, sessionIDs?: string[], plat
   }
 }
 
-function createWorkspaceTerminalSession(sdk: ReturnType<typeof useSDK>, dir: string, legacySessionID?: string) {
+function createWorkspaceTerminalSession(
+  sdk: ReturnType<typeof useSDK>,
+  serverKey: string,
+  dir: string,
+  legacySessionID?: string,
+) {
   const legacy = getLegacyTerminalStorageKeys(dir, legacySessionID)
 
   const [store, setStore, _, ready] = persisted(
     {
-      ...Persist.workspace(dir, "terminal", legacy),
+      ...Persist.workspace(dir, getWorkspaceTerminalPersistKey(serverKey), legacy),
       migrate: migrateTerminalState,
     },
     createStore<{
@@ -334,6 +348,7 @@ export const { use: useTerminal, provider: TerminalProvider } = createSimpleCont
   gate: false,
   init: () => {
     const sdk = useSDK()
+    const server = useServer()
     const params = useParams()
     const cache = new Map<string, TerminalCacheEntry>()
 
@@ -359,9 +374,9 @@ export const { use: useTerminal, provider: TerminalProvider } = createSimpleCont
       }
     }
 
-    const loadWorkspace = (dir: string, legacySessionID?: string) => {
+    const loadWorkspace = (serverKey: string, dir: string, legacySessionID?: string) => {
       // Terminals are workspace-scoped so tabs persist while switching sessions in the same directory.
-      const key = getWorkspaceTerminalCacheKey(dir)
+      const key = getWorkspaceTerminalCacheKey(serverKey, dir)
       const existing = cache.get(key)
       if (existing) {
         cache.delete(key)
@@ -370,7 +385,7 @@ export const { use: useTerminal, provider: TerminalProvider } = createSimpleCont
       }
 
       const entry = createRoot((dispose) => ({
-        value: createWorkspaceTerminalSession(sdk, dir, legacySessionID),
+        value: createWorkspaceTerminalSession(sdk, serverKey, dir, legacySessionID),
         dispose,
       }))
 
@@ -379,16 +394,18 @@ export const { use: useTerminal, provider: TerminalProvider } = createSimpleCont
       return entry.value
     }
 
-    const workspace = createMemo(() => loadWorkspace(params.dir!, params.id))
+    const serverKey = createMemo(() => getTerminalServerKey(!!server.isLocal(), server.key))
+
+    const workspace = createMemo(() => loadWorkspace(serverKey(), params.dir!, params.id))
 
     createEffect(
       on(
-        () => ({ dir: params.dir, id: params.id }),
+        () => ({ serverKey: serverKey(), dir: params.dir, id: params.id }),
         (next, prev) => {
-          if (!prev?.dir) return
-          if (next.dir === prev.dir && next.id === prev.id) return
-          if (next.dir === prev.dir && next.id) return
-          loadWorkspace(prev.dir, prev.id).trimAll()
+          if (!prev?.dir || !prev.serverKey) return
+          if (next.serverKey === prev.serverKey && next.dir === prev.dir && next.id === prev.id) return
+          if (next.serverKey === prev.serverKey && next.dir === prev.dir && next.id) return
+          loadWorkspace(prev.serverKey, prev.dir, prev.id).trimAll()
         },
         { defer: true },
       ),

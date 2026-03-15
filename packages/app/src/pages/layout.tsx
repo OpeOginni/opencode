@@ -33,7 +33,7 @@ import type { DragEvent } from "@thisbeyond/solid-dnd"
 import { useProviders } from "@/hooks/use-providers"
 import { showToast, Toast, toaster } from "@opencode-ai/ui/toast"
 import { useGlobalSDK } from "@/context/global-sdk"
-import { clearWorkspaceTerminals } from "@/context/terminal"
+import { clearWorkspaceTerminals, getTerminalServerKey } from "@/context/terminal"
 import { dropSessionCaches, pickSessionCacheEvictions } from "@/context/global-sync/session-cache"
 import {
   clearSessionPrefetchInflight,
@@ -1504,6 +1504,7 @@ export default function Layout(props: ParentProps) {
       .catch(() => [])
 
     clearWorkspaceTerminals(
+      getTerminalServerKey(!!server.isLocal(), server.key),
       directory,
       sessions.map((s) => s.id),
       platform,

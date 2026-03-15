@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, mock, test } from "bun:test"
 
-let getWorkspaceTerminalCacheKey: (dir: string) => string
+let getTerminalServerKey: (local: boolean, key: string) => string
+let getWorkspaceTerminalCacheKey: (scope: string, dir: string) => string
 let getLegacyTerminalStorageKeys: (dir: string, legacySessionID?: string) => string[]
 let migrateTerminalState: (value: unknown) => unknown
 
@@ -16,14 +17,25 @@ beforeAll(async () => {
     }),
   }))
   const mod = await import("./terminal")
+  getTerminalServerKey = mod.getTerminalServerKey
   getWorkspaceTerminalCacheKey = mod.getWorkspaceTerminalCacheKey
   getLegacyTerminalStorageKeys = mod.getLegacyTerminalStorageKeys
   migrateTerminalState = mod.migrateTerminalState
 })
 
+describe("getTerminalServerKey", () => {
+  test("uses local scope for local servers", () => {
+    expect(getTerminalServerKey(true, "sidecar")).toBe("local")
+  })
+
+  test("uses server key for remote servers", () => {
+    expect(getTerminalServerKey(false, "ssh:box")).toBe("ssh:box")
+  })
+})
+
 describe("getWorkspaceTerminalCacheKey", () => {
-  test("uses workspace-only directory cache key", () => {
-    expect(getWorkspaceTerminalCacheKey("/repo")).toBe("/repo:__workspace__")
+  test("uses server-scoped directory cache key", () => {
+    expect(getWorkspaceTerminalCacheKey("local", "/repo")).toBe("local:/repo:__workspace__")
   })
 })
 
