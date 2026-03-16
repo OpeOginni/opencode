@@ -9,6 +9,7 @@ export namespace Identifier {
     question: "que",
     user: "usr",
     part: "prt",
+    process: "pro",
     pty: "pty",
     tool: "tool",
     workspace: "wrk",

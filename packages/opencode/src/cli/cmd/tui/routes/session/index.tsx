@@ -46,6 +46,7 @@ import type { WebFetchTool } from "@/tool/webfetch"
 import type { TaskTool } from "@/tool/task"
 import type { QuestionTool } from "@/tool/question"
 import type { SkillTool } from "@/tool/skill"
+import { ProcessTool } from "@/tool/process"
 import { useKeyboard, useRenderer, useTerminalDimensions, type JSX } from "@opentui/solid"
 import { useSDK } from "@tui/context/sdk"
 import { useCommandDialog } from "@tui/component/dialog-command"
@@ -78,9 +79,11 @@ import { Global } from "@/global"
 import { PermissionPrompt } from "./permission"
 import { QuestionPrompt } from "./question"
 import { DialogExportOptions } from "../../ui/dialog-export-options"
+import { DialogPrompt } from "../../ui/dialog-prompt"
 import { formatTranscript } from "../../util/transcript"
 import { UI } from "@/cli/ui.ts"
 import { useTuiConfig } from "../../context/tui-config"
+import { DialogProcessList, openProcessLogs } from "./dialog-process"
 
 addDefaultParsers(parsers.parsers)
 
@@ -183,9 +186,8 @@ export function Session() {
   })
 
   createEffect(() => {
-    if (session()?.workspaceID) {
-      sdk.setWorkspace(session()?.workspaceID)
-    }
+    sdk.setWorkspace(session()?.workspaceID)
+    void sync.process.sync()
   })
 
   createEffect(async () => {
@@ -563,6 +565,51 @@ export function Session() {
           sessionID: route.sessionID,
           messageID: message.id,
         })
+      },
+    },
+    {
+      title: "Start process",
+      value: "session.process.start",
+      category: "Session",
+      slash: {
+        name: "process-start",
+      },
+      onSelect: async (dialog) => {
+        const value = await DialogPrompt.show(dialog, "Start process", {
+          placeholder: "npm run dev",
+        })
+        if (!value?.trim()) return
+        await sdk.client.process
+          .create({ command: value.trim() })
+          .then((res) => {
+            if (!res.data) return
+            toast.show({ message: `Started ${res.data.title}`, variant: "success", duration: 3000 })
+            openProcessLogs(dialog, res.data)
+          })
+          .catch((error) => {
+            toast.show({
+              message: error instanceof Error ? error.message : "Failed to start process",
+              variant: "error",
+              duration: 3000,
+            })
+          })
+      },
+    },
+    {
+      title: "Active processes",
+      value: "session.process.list",
+      category: "Session",
+      enabled: sync.data.process.length > 0,
+      slash: {
+        name: "processes",
+      },
+      onSelect: (dialog) => {
+        if (sync.data.process.length === 0) {
+          toast.show({ message: "No active processes", variant: "info", duration: 3000 })
+          dialog.clear()
+          return
+        }
+        dialog.replace(() => <DialogProcessList list={sync.data.process} />)
       },
     },
     {
@@ -1568,6 +1615,9 @@ function ToolPart(props: { last: boolean; part: ToolPart; message: AssistantMess
         <Match when={props.part.tool === "skill"}>
           <Skill {...toolprops} />
         </Match>
+        <Match when={props.part.tool === "process"}>
+          <ProcTool {...toolprops} />
+        </Match>
         <Match when={true}>
           <GenericTool {...toolprops} />
         </Match>
@@ -2223,6 +2273,103 @@ function Skill(props: ToolProps<typeof SkillTool>) {
     <InlineTool icon="→" pending="Loading skill..." complete={props.input.name} part={props.part}>
       Skill "{props.input.name}"
     </InlineTool>
+  )
+}
+
+function ProcTool(props: ToolProps<typeof ProcessTool>) {
+  const sync = useSync()
+  const dialog = useDialog()
+  const { theme } = useTheme()
+  const tail = createMemo(() => props.input.operation === "tail")
+  const watch = createMemo(() => props.input.operation === "listen" || tail())
+  const isRunning = createMemo(() => props.part.state.status === "running")
+  const live = createMemo(() => sync.data.process.find((item) => item.id === props.metadata.processID))
+  const output = createMemo(() => stripAnsi(props.metadata.output?.trim() ?? ""))
+  const [expanded, setExpanded] = createSignal(false)
+  const lines = createMemo(() => output().split("\n"))
+  const overflow = createMemo(() => lines().length > 10)
+  const limited = createMemo(() => {
+    if (expanded() || !overflow()) return output()
+    return [...lines().slice(0, 10), "…"].join("\n")
+  })
+  const workdirDisplay = createMemo(() => {
+    const cwd = props.metadata.cwd
+    if (!cwd) return undefined
+
+    const base = sync.data.path.directory
+    if (!base) return cwd
+
+    const absolute = path.resolve(base, cwd)
+    if (absolute === base) return undefined
+
+    const home = Global.Path.home
+    if (!home) return absolute
+
+    const match = absolute === home || absolute.startsWith(home + path.sep)
+    return match ? absolute.replace(home, "~") : absolute
+  })
+  const title = createMemo(() => {
+    if (props.input.operation === "start") return `Start ${props.metadata.title ?? "process"}`
+    if (props.input.operation === "stop") return `Stop ${props.metadata.processID ?? "process"}`
+    if (props.input.operation === "list") return "List processes"
+    const name = props.metadata.title ?? props.metadata.processID ?? "process"
+    const cwd = workdirDisplay()
+    if (!cwd) return `# ${tail() ? "Tailing" : "Listening to"} ${name}`
+    return `# ${tail() ? "Tailing" : "Listening to"} ${name} in ${cwd}`
+  })
+  const limits = createMemo(() => {
+    if (!watch()) return ""
+    return input({
+      timeout: props.metadata.timeout ? Locale.duration(props.metadata.timeout) : undefined,
+      max_bytes: props.metadata.bytes ? `${Math.ceil(props.metadata.bytes / 1024)}KB` : undefined,
+      max_lines: props.metadata.lines,
+    })
+  })
+
+  return (
+    <Switch>
+      <Match when={watch() && props.metadata.output !== undefined}>
+        <BlockTool
+          title={title()}
+          part={props.part}
+          spinner={isRunning()}
+          onClick={overflow() ? () => setExpanded((prev) => !prev) : undefined}
+        >
+          <box gap={1}>
+            <text fg={theme.text}>
+              $ {props.metadata.command ?? props.metadata.title ?? props.input.process_id ?? "process"}
+            </text>
+            <Show when={limits()}>
+              <text fg={theme.textMuted}>{limits()}</text>
+            </Show>
+            <Show when={output()}>
+              <text fg={theme.text}>{limited()}</text>
+            </Show>
+            <Show when={overflow()}>
+              <text fg={theme.textMuted}>{expanded() ? "Click to collapse" : "Click to expand"}</text>
+            </Show>
+          </box>
+        </BlockTool>
+      </Match>
+      <Match when={true}>
+        <InlineTool
+          icon="◉"
+          pending={
+            `${tail() ? "Tailing" : "Listening to"} ${props.metadata.title ?? props.input.process_id ?? "process"} ${limits()}`.trim() +
+            "..."
+          }
+          complete={props.metadata.title ?? props.part.state.status === "completed"}
+          part={props.part}
+          onClick={() => {
+            if (live()) openProcessLogs(dialog, live()!)
+          }}
+        >
+          {watch()
+            ? `${tail() ? "Tailing" : "Listening to"} ${props.metadata.title ?? props.input.process_id ?? "process"} ${limits()}`.trim()
+            : title()}
+        </InlineTool>
+      </Match>
+    </Switch>
   )
 }
 

@@ -1,0 +1,26 @@
+Manage workspace-scoped processes started inside OpenCode.
+
+Use this tool when you need to start a long-running process, stop one, inspect active processes, or read live logs while a managed process is still running.
+
+Important:
+- Processes are scoped to the current workspace.
+- Only active processes are available. Once a process exits, it is removed and can no longer be listed or listened to.
+- Prefer this tool over `bash` for dev servers, watchers, and other long-running commands.
+- Use `operation: "start"` to launch a process.
+- Use `operation: "list"` to discover active process IDs.
+- Use `operation: "listen"` to read logs from an active process for a limited time window.
+- Use `operation: "tail"` to read only new logs produced from now onward.
+- Use `operation: "stop"` to terminate an active process.
+- `start` returns a `cursor` in metadata. Use that cursor with `listen` to capture output produced after launch without missing startup logs.
+
+For `listen`:
+- pass `timeout_ms` to define how long to listen
+- optionally pass `max_bytes` or `max_lines` to stop early when enough output has been collected
+- listening stops when the timeout is reached, the output limit is reached, or the process exits
+- logs are always returned as combined output
+- when following a newly started process, prefer the `cursor` returned by `start`
+- use `cursor` from the previous result to continue reading logs without repeating old output
+
+For `tail`:
+- use it for already-running processes when you only care about fresh output
+- it behaves like `listen` but starts from the current end of the log buffer

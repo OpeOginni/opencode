@@ -3,9 +3,18 @@ import { createSimpleContext } from "./helper"
 import { createGlobalEmitter } from "@solid-primitives/event-bus"
 import { batch, onCleanup, onMount } from "solid-js"
 
+export type ProcessEvent =
+  | { type: "connected" }
+  | { type: "output"; text: string; cursor: number }
+  | { type: "exit"; exitCode: number | null; signal: string | null }
+
 export type EventSource = {
   on: (handler: (event: Event) => void) => () => void
   setWorkspace?: (workspaceID?: string) => void
+  connectProcess?: (
+    input: { processID: string; cursor?: number },
+    opts: { signal?: AbortSignal; onEvent: (event: ProcessEvent) => void; onError?: (error: unknown) => void },
+  ) => () => void
 }
 
 export const { use: useSDK, provider: SDKProvider } = createSimpleContext({
@@ -108,6 +117,49 @@ export const { use: useSDK, provider: SDKProvider } = createSimpleContext({
     return {
       get client() {
         return sdk
+      },
+      connectProcess(
+        input: { processID: string; cursor?: number },
+        opts: { signal?: AbortSignal; onEvent: (event: ProcessEvent) => void; onError?: (error: unknown) => void },
+      ) {
+        if (props.events?.connectProcess) {
+          return props.events.connectProcess(input, opts)
+        }
+
+        const ctrl = new AbortController()
+        const stop = () => ctrl.abort()
+        const abort = () => ctrl.abort()
+
+        if (opts.signal) {
+          if (opts.signal.aborted) ctrl.abort()
+          else opts.signal.addEventListener("abort", abort, { once: true })
+        }
+
+        ctrl.signal.addEventListener(
+          "abort",
+          () => {
+            opts.signal?.removeEventListener("abort", abort)
+          },
+          { once: true },
+        )
+        ;(async () => {
+          const events = await sdk.process.connect(
+            {
+              processID: input.processID,
+              cursor: input.cursor,
+            },
+            { signal: ctrl.signal, throwOnError: true },
+          )
+
+          for await (const event of events.stream) {
+            if (ctrl.signal.aborted) break
+            opts.onEvent(event as ProcessEvent)
+          }
+        })().catch((err) => {
+          if (!ctrl.signal.aborted) opts.onError?.(err)
+        })
+
+        return stop
       },
       directory: props.directory,
       event: emitter,

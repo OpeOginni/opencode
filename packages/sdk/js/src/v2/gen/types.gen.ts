@@ -716,6 +716,33 @@ export type EventTodoUpdated = {
   }
 }
 
+export type ProcessInfo = {
+  id: string
+  workspaceID?: string
+  title: string
+  command: string
+  cwd: string
+  status: "running"
+  pid: number
+  startedAt: number
+}
+
+export type EventProcessStarted = {
+  type: "process.started"
+  properties: {
+    info: ProcessInfo
+  }
+}
+
+export type EventProcessExited = {
+  type: "process.exited"
+  properties: {
+    id: string
+    exitCode: number | null
+    signal?: string | null
+  }
+}
+
 export type EventTuiPromptAppend = {
   type: "tui.prompt.append"
   properties: {
@@ -982,6 +1009,8 @@ export type Event =
   | EventSessionCompacted
   | EventFileWatcherUpdated
   | EventTodoUpdated
+  | EventProcessStarted
+  | EventProcessExited
   | EventTuiPromptAppend
   | EventTuiCommandExecute
   | EventTuiToastShow
@@ -1539,6 +1568,23 @@ export type NotFoundError = {
     message: string
   }
 }
+
+export type ProcessLogs = {
+  processID: string
+  title: string
+  command: string
+  cwd: string
+  pid: number
+  cursor: number
+  text: string
+  running: boolean
+  truncated: boolean
+  reason: "timeout" | "max_bytes" | "max_lines" | "exit" | "aborted"
+  exitCode?: number | null
+  signal?: string | null
+}
+
+export type ProcessStream = "combined" | "stdout" | "stderr"
 
 export type Model = {
   id: string
@@ -2156,6 +2202,156 @@ export type ProjectUpdateResponses = {
 }
 
 export type ProjectUpdateResponse = ProjectUpdateResponses[keyof ProjectUpdateResponses]
+
+export type ProcessListData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/process"
+}
+
+export type ProcessListResponses = {
+  /**
+   * Processes
+   */
+  200: Array<ProcessInfo>
+}
+
+export type ProcessListResponse = ProcessListResponses[keyof ProcessListResponses]
+
+export type ProcessCreateData = {
+  body?: {
+    command: string
+    cwd?: string
+    title?: string
+    env?: {
+      [key: string]: string
+    }
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/process"
+}
+
+export type ProcessCreateErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ProcessCreateError = ProcessCreateErrors[keyof ProcessCreateErrors]
+
+export type ProcessCreateResponses = {
+  /**
+   * Process created
+   */
+  200: ProcessInfo
+}
+
+export type ProcessCreateResponse = ProcessCreateResponses[keyof ProcessCreateResponses]
+
+export type ProcessStopData = {
+  body?: {
+    [key: string]: unknown
+  }
+  path: {
+    processID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/process/{processID}/stop"
+}
+
+export type ProcessStopErrors = {
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type ProcessStopError = ProcessStopErrors[keyof ProcessStopErrors]
+
+export type ProcessStopResponses = {
+  /**
+   * Process stopped
+   */
+  200: boolean
+}
+
+export type ProcessStopResponse = ProcessStopResponses[keyof ProcessStopResponses]
+
+export type ProcessConnectData = {
+  body?: never
+  path: {
+    processID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+    cursor?: number
+  }
+  url: "/process/{processID}/connect"
+}
+
+export type ProcessConnectErrors = {
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type ProcessConnectError = ProcessConnectErrors[keyof ProcessConnectErrors]
+
+export type ProcessConnectResponses = {
+  /**
+   * Connected process log stream
+   */
+  200: unknown
+}
+
+export type ProcessLogsData = {
+  body?: never
+  path: {
+    processID: string
+  }
+  query: {
+    directory?: string
+    workspace?: string
+    cursor?: number
+    stream?: ProcessStream
+    timeoutMs: number
+    maxBytes?: number
+    maxLines?: number
+  }
+  url: "/process/{processID}/logs"
+}
+
+export type ProcessLogsErrors = {
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type ProcessLogsError = ProcessLogsErrors[keyof ProcessLogsErrors]
+
+export type ProcessLogsResponses = {
+  /**
+   * Process logs
+   */
+  200: ProcessLogs
+}
+
+export type ProcessLogsResponse = ProcessLogsResponses[keyof ProcessLogsResponses]
 
 export type PtyListData = {
   body?: never

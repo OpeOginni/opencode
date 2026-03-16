@@ -14,6 +14,7 @@ import type {
   McpResource,
   FormatterStatus,
   SessionStatus,
+  ProcessInfo,
   ProviderListResponse,
   ProviderAuthMethod,
   VcsInfo,
@@ -72,6 +73,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
         [key: string]: McpResource
       }
       formatter: FormatterStatus[]
+      process: ProcessInfo[]
       vcs: VcsInfo | undefined
       path: Path
       workspaceList: Workspace[]
@@ -100,6 +102,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
       mcp: {},
       mcp_resource: {},
       formatter: [],
+      process: [],
       vcs: undefined,
       path: { state: "", config: "", worktree: "", directory: "" },
       workspaceList: [],
@@ -345,6 +348,34 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
           break
         }
 
+        case "process.started": {
+          const item = event.properties.info
+          const idx = store.process.findIndex((x) => x.id === item.id)
+          if (idx >= 0) {
+            setStore("process", idx, reconcile(item))
+            break
+          }
+          setStore(
+            "process",
+            produce((draft) => {
+              draft.unshift(item)
+            }),
+          )
+          break
+        }
+
+        case "process.exited": {
+          const idx = store.process.findIndex((x) => x.id === event.properties.id)
+          if (idx < 0) break
+          setStore(
+            "process",
+            produce((draft) => {
+              draft.splice(idx, 1)
+            }),
+          )
+          break
+        }
+
         case "vcs.branch.updated": {
           setStore("vcs", { branch: event.properties.branch })
           break
@@ -416,6 +447,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
             sdk.client.mcp.status().then((x) => setStore("mcp", reconcile(x.data!))),
             sdk.client.experimental.resource.list().then((x) => setStore("mcp_resource", reconcile(x.data ?? {}))),
             sdk.client.formatter.status().then((x) => setStore("formatter", reconcile(x.data!))),
+            sdk.client.process.list().then((x) => setStore("process", reconcile(x.data ?? []))),
             sdk.client.session.status().then((x) => {
               setStore("session_status", reconcile(x.data!))
             }),
@@ -496,6 +528,12 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
           return store.workspaceList.find((workspace) => workspace.id === workspaceID)
         },
         sync: syncWorkspaces,
+      },
+      process: {
+        async sync() {
+          const out = await sdk.client.process.list().catch(() => undefined)
+          setStore("process", reconcile(out?.data ?? []))
+        },
       },
       bootstrap,
     }

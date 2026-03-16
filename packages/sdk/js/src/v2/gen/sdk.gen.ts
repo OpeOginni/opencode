@@ -76,6 +76,16 @@ import type {
   PermissionRespondErrors,
   PermissionRespondResponses,
   PermissionRuleset,
+  ProcessConnectErrors,
+  ProcessConnectResponses,
+  ProcessCreateErrors,
+  ProcessCreateResponses,
+  ProcessListResponses,
+  ProcessLogsErrors,
+  ProcessLogsResponses,
+  ProcessStopErrors,
+  ProcessStopResponses,
+  ProcessStream,
   ProjectCurrentResponses,
   ProjectInitGitResponses,
   ProjectListResponses,
@@ -505,6 +515,200 @@ export class Project extends HeyApiClient {
         ...options?.headers,
         ...params.headers,
       },
+    })
+  }
+}
+
+export class Process extends HeyApiClient {
+  /**
+   * List managed processes
+   *
+   * List all active managed processes for the current workspace.
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<ProcessListResponses, unknown, ThrowOnError>({
+      url: "/process",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Create managed process
+   *
+   * Start a managed process for the current workspace.
+   */
+  public create<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      command?: string
+      cwd?: string
+      title?: string
+      env?: {
+        [key: string]: string
+      }
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "command" },
+            { in: "body", key: "cwd" },
+            { in: "body", key: "title" },
+            { in: "body", key: "env" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<ProcessCreateResponses, ProcessCreateErrors, ThrowOnError>({
+      url: "/process",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Stop managed process
+   *
+   * Stop an active managed process in the current workspace.
+   */
+  public stop<ThrowOnError extends boolean = false>(
+    parameters: {
+      processID: string
+      directory?: string
+      workspace?: string
+      body?: {
+        [key: string]: unknown
+      }
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "processID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "body", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<ProcessStopResponses, ProcessStopErrors, ThrowOnError>({
+      url: "/process/{processID}/stop",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Connect to process logs
+   *
+   * Establish a live stream of buffered and future logs for an active managed process.
+   */
+  public connect<ThrowOnError extends boolean = false>(
+    parameters: {
+      processID: string
+      directory?: string
+      workspace?: string
+      cursor?: number
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "processID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "cursor" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).sse.get<ProcessConnectResponses, ProcessConnectErrors, ThrowOnError>({
+      url: "/process/{processID}/connect",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Read process logs
+   *
+   * Read buffered logs from an active managed process.
+   */
+  public logs<ThrowOnError extends boolean = false>(
+    parameters: {
+      processID: string
+      directory?: string
+      workspace?: string
+      cursor?: number
+      stream?: ProcessStream
+      timeoutMs: number
+      maxBytes?: number
+      maxLines?: number
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "processID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "cursor" },
+            { in: "query", key: "stream" },
+            { in: "query", key: "timeoutMs" },
+            { in: "query", key: "maxBytes" },
+            { in: "query", key: "maxLines" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<ProcessLogsResponses, ProcessLogsErrors, ThrowOnError>({
+      url: "/process/{processID}/logs",
+      ...options,
+      ...params,
     })
   }
 }
@@ -3915,6 +4119,11 @@ export class OpencodeClient extends HeyApiClient {
   private _project?: Project
   get project(): Project {
     return (this._project ??= new Project({ client: this.client }))
+  }
+
+  private _process?: Process
+  get process(): Process {
+    return (this._process ??= new Process({ client: this.client }))
   }
 
   private _pty?: Pty

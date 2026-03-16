@@ -26,6 +26,7 @@ import { WorkspaceID } from "../control-plane/schema"
 import { ProviderID } from "../provider/schema"
 import { WorkspaceRouterMiddleware } from "../control-plane/workspace-router-middleware"
 import { ProjectRoutes } from "./routes/project"
+import { ProcessRoutes } from "./routes/process"
 import { SessionRoutes } from "./routes/session"
 import { PtyRoutes } from "./routes/pty"
 import { McpRoutes } from "./routes/mcp"
@@ -241,6 +242,7 @@ export namespace Server {
         ),
       )
       .route("/project", ProjectRoutes())
+      .route("/process", ProcessRoutes())
       .route("/pty", PtyRoutes())
       .route("/config", ConfigRoutes())
       .route("/experimental", ExperimentalRoutes())

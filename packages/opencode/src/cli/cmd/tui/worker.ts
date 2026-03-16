@@ -44,26 +44,32 @@ const eventStream = {
   abort: undefined as AbortController | undefined,
 }
 
+let workspaceID: string | undefined
+const streams = new Map<string, AbortController>()
+
+const fetcher = (async (input: RequestInfo | URL, init?: RequestInit) => {
+  const request = new Request(input, init)
+  const auth = getAuthorizationHeader()
+  if (auth) request.headers.set("Authorization", auth)
+  return Server.Default().fetch(request)
+}) as typeof globalThis.fetch
+
+const client = (signal: AbortSignal) =>
+  createOpencodeClient({
+    baseUrl: "http://opencode.internal",
+    directory: process.cwd(),
+    experimental_workspaceID: workspaceID,
+    fetch: fetcher,
+    signal,
+  })
+
 const startEventStream = (input: { directory: string; workspaceID?: string }) => {
   if (eventStream.abort) eventStream.abort.abort()
   const abort = new AbortController()
   eventStream.abort = abort
   const signal = abort.signal
-
-  const fetchFn = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    const request = new Request(input, init)
-    const auth = getAuthorizationHeader()
-    if (auth) request.headers.set("Authorization", auth)
-    return Server.Default().fetch(request)
-  }) as typeof globalThis.fetch
-
-  const sdk = createOpencodeClient({
-    baseUrl: "http://opencode.internal",
-    directory: input.directory,
-    experimental_workspaceID: input.workspaceID,
-    fetch: fetchFn,
-    signal,
-  })
+  workspaceID = input.workspaceID
+  const sdk = client(signal)
 
   ;(async () => {
     while (!signal.aborted) {
@@ -136,12 +142,45 @@ export const rpc = {
     Config.global.reset()
     await Instance.disposeAll()
   },
+  async startProcessStream(input: { id: string; processID: string; cursor?: number }) {
+    streams.get(input.id)?.abort()
+    const ctrl = new AbortController()
+    streams.set(input.id, ctrl)
+    ;(async () => {
+      const events = await client(ctrl.signal).process.connect(
+        {
+          processID: input.processID,
+          cursor: input.cursor,
+        },
+        { signal: ctrl.signal, throwOnError: true },
+      )
+
+      for await (const event of events.stream) {
+        if (ctrl.signal.aborted) break
+        Rpc.emit(`process.event.${input.id}`, event)
+      }
+    })()
+      .catch((error) => {
+        if (ctrl.signal.aborted) return
+        Rpc.emit(`process.error.${input.id}`, error instanceof Error ? error.message : String(error))
+      })
+      .finally(() => {
+        streams.delete(input.id)
+      })
+  },
+  async stopProcessStream(input: { id: string }) {
+    streams.get(input.id)?.abort()
+    streams.delete(input.id)
+  },
   async setWorkspace(input: { workspaceID?: string }) {
+    workspaceID = input.workspaceID
     startEventStream({ directory: process.cwd(), workspaceID: input.workspaceID })
   },
   async shutdown() {
     Log.Default.info("worker shutting down")
     if (eventStream.abort) eventStream.abort.abort()
+    for (const ctrl of streams.values()) ctrl.abort()
+    streams.clear()
     await Instance.disposeAll()
     if (server) server.stop(true)
   },

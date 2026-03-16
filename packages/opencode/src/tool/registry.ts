@@ -26,6 +26,7 @@ import { CodeSearchTool } from "./codesearch"
 import { Flag } from "@/flag/flag"
 import { Log } from "@/util/log"
 import { LspTool } from "./lsp"
+import { ProcessTool } from "./process"
 import { Truncate } from "./truncation"
 
 import { ApplyPatchTool } from "./apply_patch"
@@ -105,6 +106,7 @@ export namespace ToolRegistry {
       InvalidTool,
       ...(question ? [QuestionTool] : []),
       BashTool,
+      ProcessTool,
       ReadTool,
       GlobTool,
       GrepTool,

@@ -10,7 +10,7 @@ import { withTimeout } from "@/util/timeout"
 import { withNetworkOptions, resolveNetworkOptions } from "@/cli/network"
 import { Filesystem } from "@/util/filesystem"
 import type { Event } from "@opencode-ai/sdk/v2"
-import type { EventSource } from "./context/sdk"
+import type { EventSource, ProcessEvent } from "./context/sdk"
 import { win32DisableProcessedInput, win32InstallCtrlCGuard } from "./win32"
 import { TuiConfig } from "@/config/tui"
 import { Instance } from "@/project/instance"
@@ -42,6 +42,42 @@ function createWorkerFetch(client: RpcClient): typeof fetch {
 function createEventSource(client: RpcClient): EventSource {
   return {
     on: (handler) => client.on<Event>("event", handler),
+    connectProcess: (input, opts) => {
+      const id = crypto.randomUUID()
+      const event = `process.event.${id}`
+      const error = `process.error.${id}`
+      const off = client.on<ProcessEvent>(event, opts.onEvent)
+      const fail = client.on<string>(error, (value) => {
+        opts.onError?.(value)
+      })
+      const stop = () => {
+        off()
+        fail()
+        void client.call("stopProcessStream", { id })
+      }
+      const abort = () => stop()
+
+      if (opts.signal) {
+        if (opts.signal.aborted) stop()
+        else opts.signal.addEventListener("abort", abort, { once: true })
+      }
+
+      void client
+        .call("startProcessStream", {
+          id,
+          processID: input.processID,
+          cursor: input.cursor,
+        })
+        .catch((err) => {
+          stop()
+          opts.onError?.(err)
+        })
+
+      return () => {
+        opts.signal?.removeEventListener("abort", abort)
+        stop()
+      }
+    },
     setWorkspace: (workspaceID) => {
       void client.call("setWorkspace", { workspaceID })
     },

@@ -11,10 +11,13 @@ import { useKeybind } from "../../context/keybind"
 import { useDirectory } from "../../context/directory"
 import { useKV } from "../../context/kv"
 import { TodoItem } from "../../component/todo-item"
+import { useDialog } from "../../ui/dialog"
+import { openProcessLogs } from "./dialog-process"
 
 export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
   const sync = useSync()
   const { theme } = useTheme()
+  const dialog = useDialog()
   const session = createMemo(() => sync.session.get(props.sessionID)!)
   const diff = createMemo(() => sync.data.session_diff[props.sessionID] ?? [])
   const todo = createMemo(() => sync.data.todo[props.sessionID] ?? [])
@@ -22,10 +25,13 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
 
   const [expanded, setExpanded] = createStore({
     mcp: true,
+    process: true,
     diff: true,
     todo: true,
     lsp: true,
   })
+
+  const proc = createMemo(() => sync.data.process.toSorted((a, b) => b.startedAt - a.startedAt))
 
   // Sort MCP servers alphabetically for consistent display order
   const mcpEntries = createMemo(() => Object.entries(sync.data.mcp).sort(([a], [b]) => a.localeCompare(b)))
@@ -160,6 +166,40 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
                               </Match>
                             </Switch>
                           </span>
+                        </text>
+                      </box>
+                    )}
+                  </For>
+                </Show>
+              </box>
+            </Show>
+            <Show when={proc().length > 0}>
+              <box>
+                <box
+                  flexDirection="row"
+                  gap={1}
+                  onMouseDown={() => proc().length > 2 && setExpanded("process", !expanded.process)}
+                >
+                  <Show when={proc().length > 2}>
+                    <text fg={theme.text}>{expanded.process ? "▼" : "▶"}</text>
+                  </Show>
+                  <text fg={theme.text}>
+                    <b>Processes</b>
+                    <Show when={!expanded.process}>
+                      {" "}
+                      <span style={{ fg: theme.textMuted }}>({proc().length} active)</span>
+                    </Show>
+                  </text>
+                </box>
+                <Show when={proc().length <= 2 || expanded.process}>
+                  <For each={proc()}>
+                    {(item) => (
+                      <box flexDirection="row" gap={1} onMouseUp={() => openProcessLogs(dialog, item)}>
+                        <text flexShrink={0} fg={theme.success}>
+                          •
+                        </text>
+                        <text fg={theme.text} wrapMode="word">
+                          {item.title} <span style={{ fg: theme.textMuted }}>pid {item.pid}</span>
                         </text>
                       </box>
                     )}
