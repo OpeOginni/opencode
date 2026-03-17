@@ -75,6 +75,42 @@ export namespace Config {
     return merged
   }
 
+  function permissionRule(tool: string, rootPermissions: Permission | undefined) {
+    if (rootPermissions?.[tool] !== undefined) return rootPermissions[tool]
+    if (tool === "write" || tool === "edit" || tool === "patch" || tool === "multiedit") return rootPermissions?.edit // Edit tool represents all file modification tools
+    return undefined
+  }
+
+  function inheritPermission(rule: PermissionRule | undefined): PermissionRule {
+    if (!rule) return "allow"
+    if (typeof rule === "string") return rule
+    if ("*" in rule) return rule
+    return {
+      "*": "allow",
+      ...rule,
+    }
+  }
+
+  function resolveAgentToolPermissions(agent: Agent, rootPermissions: Permission | undefined) {
+    if (!agent.tools) return agent
+
+    const permission: Permission = { ...(agent.permission ?? {}) }
+    for (const [tool, enabled] of Object.entries(agent.tools)) {
+      const key = tool === "write" || tool === "edit" || tool === "patch" || tool === "multiedit" ? "edit" : tool
+      if (permission[key] !== undefined) continue
+      if (!enabled) {
+        permission[key] = "deny" // Normally with the legacy tool option when its false its equvalent tot he deny permission
+        continue
+      }
+      permission[key] = inheritPermission(permissionRule(tool, rootPermissions))
+    }
+
+    return {
+      ...agent,
+      permission,
+    }
+  }
+
   export const state = Instance.state(async () => {
     const auth = await Auth.all()
 
@@ -240,6 +276,12 @@ export namespace Config {
       }
       result.permission = mergeDeep(perms, result.permission ?? {})
     }
+
+    const agents = result.agent ?? {}
+    for (const [name, agent] of Object.entries(agents)) {
+      agents[name] = resolveAgentToolPermissions(agent, result.permission)
+    }
+    result.agent = agents
 
     if (!result.username) result.username = os.userInfo().username
 
@@ -771,23 +813,15 @@ export namespace Config {
         if (!knownKeys.has(key)) options[key] = value
       }
 
-      // Convert legacy tools config to permissions
-      const permission: Permission = {}
-      for (const [tool, enabled] of Object.entries(agent.tools ?? {})) {
-        const action = enabled ? "allow" : "deny"
-        // write, edit, patch, multiedit all map to edit permission
-        if (tool === "write" || tool === "edit" || tool === "patch" || tool === "multiedit") {
-          permission.edit = action
-        } else {
-          permission[tool] = action
-        }
-      }
-      Object.assign(permission, agent.permission)
-
       // Convert legacy maxSteps to steps
       const steps = agent.steps ?? agent.maxSteps
 
-      return { ...agent, options, permission, steps } as typeof agent & {
+      return {
+        ...agent,
+        options,
+        permission: agent.permission ?? {},
+        steps,
+      } as typeof agent & {
         options?: Record<string, unknown>
         permission?: Permission
         steps?: number

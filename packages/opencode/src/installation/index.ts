@@ -87,7 +87,7 @@ export namespace Installation {
   }
 
   export function isLocal() {
-    return CHANNEL === "local"
+    return CHANNEL === "local" || (VERSION.startsWith("0.0.0-") && !VERSION.startsWith("0.0.0-beta")) // Prevents all other versions exepct beta from being installed
   }
 
   export async function method() {
@@ -162,7 +162,7 @@ export namespace Installation {
   }
 
   export async function upgrade(method: Method, target: string) {
-    let result: Awaited<ReturnType<typeof upgradeCurl>> | undefined
+    let result: Awaited<ReturnType<typeof upgradeCurl> | Process.Result> | undefined
     switch (method) {
       case "curl":
         result = await upgradeCurl(target)
