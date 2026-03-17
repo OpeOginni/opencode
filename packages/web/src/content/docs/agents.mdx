@@ -368,11 +368,9 @@ The model ID in your OpenCode config uses the format `provider/model-id`. For ex
 
 ### Tools
 
-Control which tools are available in this agent with the `tools` config. You can enable or disable specific tools by setting them to `true` or `false`.
+`tools` is **deprecated**. Prefer the agent's [`permission`](#permissions) field for new configs, updates and more fine-grained control.
 
-This is a legacy shorthand for simple on/off access. In an agent's `tools` config, `true` behaves like `allow` and `false` behaves like `deny` for that tool.
-
-For more fine-grained control, use the agent's [`permission`](#permissions) field instead. That supports `ask` and tool-specific rules such as bash command patterns. If a matching top-level `permission` rule exists, it is inherited by legacy agent `tools` entries.
+Control which tools are available in this agent with the `tools` config. You can enable or disable specific tools by setting them to `true` or `false`. In an agent's `tools` config, `true` is equivalent to `{"*": "allow"}` and `false` is equivalent to `{"*": "deny"}`.
 
 ```json title="opencode.json" {3-6,9-12}
 {
@@ -393,7 +391,7 @@ For more fine-grained control, use the agent's [`permission`](#permissions) fiel
 ```
 
 :::note
-Legacy agent `tools` entries inherit matching top-level `permission` rules. Use agent-level `permission` to override inherited behavior with more specific rules.
+The agent-specific config overrides the global config.
 :::
 
 You can also use wildcards in legacy `tools` entries to control multiple tools at once. For example, to disable all tools from an MCP server:
