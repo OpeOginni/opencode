@@ -83,7 +83,7 @@ export namespace Config {
 
   function inheritPermission(rule: PermissionRule | undefined): PermissionRule {
     if (!rule) return "allow"
-    if (typeof rule === "string") return rule
+    if (typeof rule === "string") return rule // "ask" | "allow" | "deny"
     if ("*" in rule) return rule
     return {
       "*": "allow",
