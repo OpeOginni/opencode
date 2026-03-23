@@ -2,8 +2,7 @@ import z from "zod"
 import { Tool } from "./tool"
 import { EditTool } from "./edit"
 import DESCRIPTION from "./multiedit.txt"
-import path from "path"
-import { Instance } from "../project/instance"
+import { relative } from "./relative"
 
 export const MultiEditTool = Tool.define("multiedit", {
   description: DESCRIPTION,
@@ -36,7 +35,7 @@ export const MultiEditTool = Tool.define("multiedit", {
       results.push(result)
     }
     return {
-      title: path.relative(Instance.worktree, params.filePath),
+      title: relative(params.filePath),
       metadata: {
         results: results.map((r) => r.metadata),
       },

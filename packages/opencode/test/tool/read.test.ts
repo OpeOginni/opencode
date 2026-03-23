@@ -26,6 +26,32 @@ const ctx = {
 }
 
 describe("tool.read external_directory permission", () => {
+  test("uses directory-relative read permission paths in non-git projects", async () => {
+    await using tmp = await tmpdir({
+      init: async (dir) => {
+        await Bun.write(path.join(dir, ".agents", "test.txt"), "hello world")
+      },
+    })
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const read = await ReadTool.init()
+        const requests: Array<Omit<Permission.Request, "id" | "sessionID" | "tool">> = []
+        const testCtx = {
+          ...ctx,
+          ask: async (req: Omit<Permission.Request, "id" | "sessionID" | "tool">) => {
+            requests.push(req)
+          },
+        }
+        const result = await read.execute({ filePath: path.join(tmp.path, ".agents", "test.txt") }, testCtx)
+        expect(result.output).toContain("hello world")
+        const readReq = requests.find((r) => r.permission === "read")
+        expect(readReq).toBeDefined()
+        expect(readReq!.patterns).toEqual([path.join(".agents", "test.txt")])
+      },
+    })
+  })
+
   test("allows reading absolute path inside project directory", async () => {
     await using tmp = await tmpdir({
       init: async (dir) => {

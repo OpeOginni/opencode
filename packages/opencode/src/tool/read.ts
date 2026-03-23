@@ -11,6 +11,7 @@ import { Instance } from "../project/instance"
 import { assertExternalDirectory } from "./external-directory"
 import { InstructionPrompt } from "../session/instruction"
 import { Filesystem } from "../util/filesystem"
+import { relative } from "./relative"
 
 const DEFAULT_READ_LIMIT = 2000
 const MAX_LINE_LENGTH = 2000
@@ -33,7 +34,7 @@ export const ReadTool = Tool.define("read", {
     if (!path.isAbsolute(filepath)) {
       filepath = path.resolve(Instance.directory, filepath)
     }
-    const title = path.relative(Instance.worktree, filepath)
+    const title = relative(filepath)
 
     const stat = Filesystem.stat(filepath)
 
@@ -44,7 +45,7 @@ export const ReadTool = Tool.define("read", {
 
     await ctx.ask({
       permission: "read",
-      patterns: [filepath],
+      patterns: [title],
       always: ["*"],
       metadata: {},
     })

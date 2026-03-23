@@ -12,6 +12,7 @@ import { Filesystem } from "../util/filesystem"
 import { Instance } from "../project/instance"
 import { trimDiff } from "./edit"
 import { assertExternalDirectory } from "./external-directory"
+import { relative } from "./relative"
 
 const MAX_DIAGNOSTICS_PER_FILE = 20
 const MAX_PROJECT_DIAGNOSTICS_FILES = 5
@@ -24,6 +25,7 @@ export const WriteTool = Tool.define("write", {
   }),
   async execute(params, ctx) {
     const filepath = path.isAbsolute(params.filePath) ? params.filePath : path.join(Instance.directory, params.filePath)
+    const rel = relative(filepath)
     await assertExternalDirectory(ctx, filepath)
 
     const exists = await Filesystem.exists(filepath)
@@ -33,7 +35,7 @@ export const WriteTool = Tool.define("write", {
     const diff = trimDiff(createTwoFilesPatch(filepath, filepath, contentOld, params.content))
     await ctx.ask({
       permission: "edit",
-      patterns: [path.relative(Instance.worktree, filepath)],
+      patterns: [rel],
       always: ["*"],
       metadata: {
         filepath,
@@ -72,7 +74,7 @@ export const WriteTool = Tool.define("write", {
     }
 
     return {
-      title: path.relative(Instance.worktree, filepath),
+      title: rel,
       metadata: {
         diagnostics,
         filepath,

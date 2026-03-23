@@ -157,6 +157,24 @@ describe("tool.apply_patch freeform", () => {
     })
   })
 
+  test("uses directory-relative permission paths in non-git projects", async () => {
+    await using fixture = await tmpdir()
+    const { ctx, calls } = makeCtx()
+
+    await Instance.provide({
+      directory: fixture.path,
+      fn: async () => {
+        const patchText = "*** Begin Patch\n*** Add File: .agents/new.txt\n+created\n*** End Patch"
+
+        await execute({ patchText }, ctx)
+
+        expect(calls).toHaveLength(1)
+        expect(calls[0]?.patterns).toEqual([".agents/new.txt"])
+        expect(calls[0]?.metadata.files[0]?.relativePath).toBe(".agents/new.txt")
+      },
+    })
+  })
+
   test("applies multiple hunks to one file", async () => {
     await using fixture = await tmpdir()
     const { ctx } = makeCtx()

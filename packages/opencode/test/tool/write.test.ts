@@ -90,6 +90,34 @@ describe("tool.write", () => {
         },
       })
     })
+
+    test("uses directory-relative permission paths in non-git projects", async () => {
+      await using tmp = await tmpdir()
+      const filepath = path.join(tmp.path, ".agents", "file.txt")
+      const calls: Array<{ patterns: string[] }> = []
+
+      await Instance.provide({
+        directory: tmp.path,
+        fn: async () => {
+          const write = await WriteTool.init()
+          await write.execute(
+            {
+              filePath: filepath,
+              content: "content",
+            },
+            {
+              ...ctx,
+              ask: async (input) => {
+                calls.push({ patterns: input.patterns })
+              },
+            },
+          )
+
+          expect(calls).toHaveLength(1)
+          expect(calls[0]?.patterns).toEqual([path.join(".agents", "file.txt")])
+        },
+      })
+    })
   })
 
   describe("existing file overwrite", () => {

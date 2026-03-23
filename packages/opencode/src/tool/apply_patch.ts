@@ -13,6 +13,7 @@ import { LSP } from "../lsp"
 import { Filesystem } from "../util/filesystem"
 import DESCRIPTION from "./apply_patch.txt"
 import { File } from "../file"
+import { relative } from "./relative"
 
 const PatchParams = z.object({
   patchText: z.string().describe("The full patch text that describes all changes to be made"),
@@ -161,7 +162,7 @@ export const ApplyPatchTool = Tool.define("apply_patch", {
     // Build per-file metadata for UI rendering (used for both permission and result)
     const files = fileChanges.map((change) => ({
       filePath: change.filePath,
-      relativePath: path.relative(Instance.worktree, change.movePath ?? change.filePath).replaceAll("\\", "/"),
+      relativePath: relative(change.movePath ?? change.filePath).replaceAll("\\", "/"),
       type: change.type,
       diff: change.diff,
       before: change.oldContent,
@@ -172,7 +173,7 @@ export const ApplyPatchTool = Tool.define("apply_patch", {
     }))
 
     // Check permissions if needed
-    const relativePaths = fileChanges.map((c) => path.relative(Instance.worktree, c.filePath).replaceAll("\\", "/"))
+    const relativePaths = fileChanges.map((c) => relative(c.filePath).replaceAll("\\", "/"))
     await ctx.ask({
       permission: "edit",
       patterns: relativePaths,
@@ -242,13 +243,13 @@ export const ApplyPatchTool = Tool.define("apply_patch", {
     // Generate output summary
     const summaryLines = fileChanges.map((change) => {
       if (change.type === "add") {
-        return `A ${path.relative(Instance.worktree, change.filePath).replaceAll("\\", "/")}`
+        return `A ${relative(change.filePath).replaceAll("\\", "/")}`
       }
       if (change.type === "delete") {
-        return `D ${path.relative(Instance.worktree, change.filePath).replaceAll("\\", "/")}`
+        return `D ${relative(change.filePath).replaceAll("\\", "/")}`
       }
       const target = change.movePath ?? change.filePath
-      return `M ${path.relative(Instance.worktree, target).replaceAll("\\", "/")}`
+      return `M ${relative(target).replaceAll("\\", "/")}`
     })
     let output = `Success. Updated the following files:\n${summaryLines.join("\n")}`
 
@@ -264,7 +265,7 @@ export const ApplyPatchTool = Tool.define("apply_patch", {
         const limited = errors.slice(0, MAX_DIAGNOSTICS_PER_FILE)
         const suffix =
           errors.length > MAX_DIAGNOSTICS_PER_FILE ? `\n... and ${errors.length - MAX_DIAGNOSTICS_PER_FILE} more` : ""
-        output += `\n\nLSP errors detected in ${path.relative(Instance.worktree, target).replaceAll("\\", "/")}, please fix:\n<diagnostics file="${target}">\n${limited.map(LSP.Diagnostic.pretty).join("\n")}${suffix}\n</diagnostics>`
+        output += `\n\nLSP errors detected in ${relative(target).replaceAll("\\", "/")}, please fix:\n<diagnostics file="${target}">\n${limited.map(LSP.Diagnostic.pretty).join("\n")}${suffix}\n</diagnostics>`
       }
     }
 

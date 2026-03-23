@@ -17,6 +17,7 @@ import { Filesystem } from "../util/filesystem"
 import { Instance } from "../project/instance"
 import { Snapshot } from "@/snapshot"
 import { assertExternalDirectory } from "./external-directory"
+import { relative } from "./relative"
 
 const MAX_DIAGNOSTICS_PER_FILE = 20
 
@@ -52,6 +53,7 @@ export const EditTool = Tool.define("edit", {
 
     const filePath = path.isAbsolute(params.filePath) ? params.filePath : path.join(Instance.directory, params.filePath)
     await assertExternalDirectory(ctx, filePath)
+    const rel = relative(filePath)
 
     let diff = ""
     let contentOld = ""
@@ -63,7 +65,7 @@ export const EditTool = Tool.define("edit", {
         diff = trimDiff(createTwoFilesPatch(filePath, filePath, contentOld, contentNew))
         await ctx.ask({
           permission: "edit",
-          patterns: [path.relative(Instance.worktree, filePath)],
+          patterns: [rel],
           always: ["*"],
           metadata: {
             filepath: filePath,
@@ -99,7 +101,7 @@ export const EditTool = Tool.define("edit", {
       )
       await ctx.ask({
         permission: "edit",
-        patterns: [path.relative(Instance.worktree, filePath)],
+        patterns: [rel],
         always: ["*"],
         metadata: {
           filepath: filePath,
@@ -161,7 +163,7 @@ export const EditTool = Tool.define("edit", {
         diff,
         filediff,
       },
-      title: `${path.relative(Instance.worktree, filePath)}`,
+      title: rel,
       output,
     }
   },
