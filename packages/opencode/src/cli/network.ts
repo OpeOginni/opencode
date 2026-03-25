@@ -37,22 +37,26 @@ export function withNetworkOptions<T>(yargs: Argv<T>) {
 }
 
 export async function resolveNetworkOptions(args: NetworkOptions) {
-  const config = await Config.global()
+  const globalConfig = await Config.global()
+  const customConfig = await Config.custom()
+
   const portExplicitlySet = process.argv.includes("--port")
   const hostnameExplicitlySet = process.argv.includes("--hostname")
   const mdnsExplicitlySet = process.argv.includes("--mdns")
   const mdnsDomainExplicitlySet = process.argv.includes("--mdns-domain")
   const corsExplicitlySet = process.argv.includes("--cors")
 
-  const mdns = mdnsExplicitlySet ? args.mdns : (config?.server?.mdns ?? args.mdns)
-  const mdnsDomain = mdnsDomainExplicitlySet ? args["mdns-domain"] : (config?.server?.mdnsDomain ?? args["mdns-domain"])
-  const port = portExplicitlySet ? args.port : (config?.server?.port ?? args.port)
+  const serverConfig = customConfig?.server ?? globalConfig.server // Based on Precidence Order https://opencode.ai/docs/config#precedence-order
+
+  const mdns = mdnsExplicitlySet ? args.mdns : (serverConfig?.mdns ?? args.mdns)
+  const mdnsDomain = mdnsDomainExplicitlySet ? args["mdns-domain"] : (serverConfig?.mdnsDomain ?? args["mdns-domain"])
+  const port = portExplicitlySet ? args.port : (serverConfig?.port ?? args.port)
   const hostname = hostnameExplicitlySet
     ? args.hostname
-    : mdns && !config?.server?.hostname
+    : mdns && !serverConfig?.hostname
       ? "0.0.0.0"
-      : (config?.server?.hostname ?? args.hostname)
-  const configCors = config?.server?.cors ?? []
+      : (serverConfig?.hostname ?? args.hostname)
+  const configCors = serverConfig?.cors ?? []
   const argsCors = Array.isArray(args.cors) ? args.cors : args.cors ? [args.cors] : []
   const cors = [...configCors, ...argsCors]
 

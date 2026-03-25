@@ -186,6 +186,8 @@ Legacy `theme`, `keybinds`, and `tui` keys in `opencode.json` are deprecated and
 
 You can configure server settings for the `opencode serve` and `opencode web` commands through the `server` option.
 
+Server settings are only read from the [`Global Config`](/docs/config/#global), or from a custom config specified with the [`OPENCODE_CONFIG`](/docs/config/#custom-path) environment variable.
+
 ```json title="opencode.json"
 {
   "$schema": "https://opencode.ai/config.json",

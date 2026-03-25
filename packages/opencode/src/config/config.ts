@@ -1264,6 +1264,19 @@ export namespace Config {
     return result
   })
 
+  export const custom = async () => {
+    let result: Info | undefined = undefined
+
+    if (Flag.OPENCODE_CONFIG) {
+      result = await loadFile(Flag.OPENCODE_CONFIG)
+      log.debug("loaded custom config", { path: Flag.OPENCODE_CONFIG })
+      log.debug("loaded custom config value", { result: result})
+
+    }
+
+    return result
+  }
+
   export const { readFile } = ConfigPaths
 
   async function loadFile(filepath: string): Promise<Info> {
