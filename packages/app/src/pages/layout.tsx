@@ -304,7 +304,7 @@ export default function Layout(props: ParentProps) {
   createEffect(
     on(routed, (next, prev) => {
       if (next) return
-      if (prev === undefined) return
+      if (prev === undefined && !layout.mobileSidebar.opened()) return
       layout.mobileSidebar.hide()
     }),
   )
