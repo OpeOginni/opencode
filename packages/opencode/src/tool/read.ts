@@ -94,6 +94,7 @@ export const ReadTool = Tool.defineEffect(
       if (process.platform === "win32") {
         filepath = AppFileSystem.normalizePath(filepath)
       }
+      const rel = relative(filepath)
       const title = path.relative(Instance.worktree, filepath)
 
       const stat = yield* fs.stat(filepath).pipe(
@@ -111,7 +112,7 @@ export const ReadTool = Tool.defineEffect(
       yield* Effect.promise(() =>
         ctx.ask({
           permission: "read",
-          patterns: [filepath],
+          patterns: [rel],
           always: ["*"],
           metadata: {},
         }),
