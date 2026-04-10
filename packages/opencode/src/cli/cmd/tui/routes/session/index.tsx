@@ -990,11 +990,13 @@ export function Session() {
     try {
       const patches = parsePatch(diffText)
       return patches.map((patch) => {
+        const deleted = patch.newFileName === "/dev/null"
         const newFileName = patch.newFileName !== "/dev/null" ? patch.newFileName : undefined
         const filename = newFileName || patch.oldFileName || "unknown"
         const cleanFilename = filename.replace(/^[ab]\//, "")
         return {
           filename: cleanFilename,
+          deleted,
           additions: patch.hunks.reduce(
             (sum, hunk) => sum + hunk.lines.filter((line) => line.startsWith("+")).length,
             0,
@@ -1122,7 +1124,10 @@ export function Session() {
                                         <Show when={file.additions > 0}>
                                           <span style={{ fg: theme.diffAdded }}> +{file.additions}</span>
                                         </Show>
-                                        <Show when={file.deletions > 0}>
+                                        <Show when={file.deleted}>
+                                          <span style={{ fg: theme.diffRemoved }}> deleted</span>
+                                        </Show>
+                                        <Show when={!file.deleted && file.deletions > 0}>
                                           <span style={{ fg: theme.diffRemoved }}> -{file.deletions}</span>
                                         </Show>
                                       </text>
