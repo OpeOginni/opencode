@@ -146,6 +146,7 @@ export default function Layout(props: ParentProps) {
   }
   const colorSchemeLabel = (scheme: ColorScheme) => language.t(colorSchemeKey[scheme])
   const currentDir = createMemo(() => route().dir)
+  const routed = createMemo(() => !!params.dir)
 
   const [state, setState] = createStore({
     autoselect: !initialDirectory,
@@ -299,6 +300,14 @@ export default function Layout(props: ParentProps) {
     if (!directory) return
     setState("autoselect", false)
   })
+
+  createEffect(
+    on(routed, (next, prev) => {
+      if (next) return
+      if (prev === undefined) return
+      layout.mobileSidebar.hide()
+    }),
+  )
 
   const editorOpen = editor.editorOpen
   const openEditor = editor.openEditor
@@ -1016,6 +1025,7 @@ export default function Layout(props: ParentProps) {
         title: language.t("command.sidebar.toggle"),
         category: language.t("command.category.view"),
         keybind: "mod+b",
+        disabled: !routed(),
         onSelect: () => layout.sidebar.toggle(),
       },
       {
@@ -2329,7 +2339,8 @@ export default function Layout(props: ParentProps) {
   const sidebarContent = (mobile?: boolean) => (
     <SidebarContent
       mobile={mobile}
-      opened={() => layout.sidebar.opened()}
+      pane={!mobile || routed()}
+      opened={() => routed() && layout.sidebar.opened()}
       aimMove={aim.move}
       projects={projects}
       renderProject={(project) => (
@@ -2384,7 +2395,7 @@ export default function Layout(props: ParentProps) {
               <div class="@container w-full h-full contain-strict">{sidebarContent()}</div>
             </nav>
 
-            <Show when={layout.sidebar.opened()}>
+            <Show when={routed() && layout.sidebar.opened()}>
               <div
                 class="hidden xl:block absolute inset-y-0 z-30 w-0 overflow-visible"
                 style={{ left: `${side()}px` }}
@@ -2425,7 +2436,9 @@ export default function Layout(props: ParentProps) {
                 aria-label={language.t("sidebar.nav.projectsAndSessions")}
                 data-component="sidebar-nav-mobile"
                 classList={{
-                  "@container fixed top-10 bottom-0 left-0 z-50 w-full max-w-[400px] overflow-hidden border-r border-border-weaker-base bg-background-base transition-transform duration-200 ease-out": true,
+                  "@container fixed top-10 bottom-0 left-0 z-50 overflow-hidden border-r border-border-weaker-base bg-background-base transition-transform duration-200 ease-out": true,
+                  "w-16": !routed(),
+                  "w-full max-w-[400px]": routed(),
                   "translate-x-0": layout.mobileSidebar.opened(),
                   "-translate-x-full": !layout.mobileSidebar.opened(),
                 }}
@@ -2444,7 +2457,7 @@ export default function Layout(props: ParentProps) {
                   !state.sizing,
               }}
               style={{
-                "--main-left": layout.sidebar.opened() ? `${side()}px` : "4rem",
+                "--main-left": routed() && layout.sidebar.opened() ? `${side()}px` : "4rem",
               }}
             >
               <main
