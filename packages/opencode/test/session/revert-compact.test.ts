@@ -6,6 +6,7 @@ import { ModelID, ProviderID } from "../../src/provider/schema"
 import { SessionRevert } from "../../src/session/revert"
 import { SessionCompaction } from "../../src/session/compaction"
 import { MessageV2 } from "../../src/session/message-v2"
+import { SessionSummary } from "../../src/session/summary"
 import { Snapshot } from "../../src/snapshot"
 import { Log } from "../../src/util/log"
 import { Instance } from "../../src/project/instance"
@@ -497,12 +498,15 @@ describe("revert + compact workflow", () => {
         const first = await turn("a.txt", "a1")
         const second = await turn("b.txt", "b2")
         const third = await turn("c.txt", "c3")
+        const files = async () => (await SessionSummary.diff({ sessionID: sid })).map((item) => item.file).sort()
 
         await SessionRevert.revert({
           sessionID: sid,
           messageID: first,
         })
         expect((await Session.get(sid)).revert?.messageID).toBe(first)
+        expect((await Session.get(sid)).summary?.files).toBe(0)
+        expect(await files()).toEqual([])
         expect(await fs.readFile(path.join(tmp.path, "a.txt"), "utf-8")).toBe("a0")
         expect(await fs.readFile(path.join(tmp.path, "b.txt"), "utf-8")).toBe("b0")
         expect(await fs.readFile(path.join(tmp.path, "c.txt"), "utf-8")).toBe("c0")
@@ -512,6 +516,8 @@ describe("revert + compact workflow", () => {
           messageID: second,
         })
         expect((await Session.get(sid)).revert?.messageID).toBe(second)
+        expect((await Session.get(sid)).summary?.files).toBe(1)
+        expect(await files()).toEqual(["a.txt"])
         expect(await fs.readFile(path.join(tmp.path, "a.txt"), "utf-8")).toBe("a1")
         expect(await fs.readFile(path.join(tmp.path, "b.txt"), "utf-8")).toBe("b0")
         expect(await fs.readFile(path.join(tmp.path, "c.txt"), "utf-8")).toBe("c0")
@@ -521,6 +527,8 @@ describe("revert + compact workflow", () => {
           messageID: third,
         })
         expect((await Session.get(sid)).revert?.messageID).toBe(third)
+        expect((await Session.get(sid)).summary?.files).toBe(2)
+        expect(await files()).toEqual(["a.txt", "b.txt"])
         expect(await fs.readFile(path.join(tmp.path, "a.txt"), "utf-8")).toBe("a1")
         expect(await fs.readFile(path.join(tmp.path, "b.txt"), "utf-8")).toBe("b2")
         expect(await fs.readFile(path.join(tmp.path, "c.txt"), "utf-8")).toBe("c0")
@@ -529,6 +537,8 @@ describe("revert + compact workflow", () => {
           sessionID: sid,
         })
         expect((await Session.get(sid)).revert).toBeUndefined()
+        expect((await Session.get(sid)).summary?.files).toBe(3)
+        expect(await files()).toEqual(["a.txt", "b.txt", "c.txt"])
         expect(await fs.readFile(path.join(tmp.path, "a.txt"), "utf-8")).toBe("a1")
         expect(await fs.readFile(path.join(tmp.path, "b.txt"), "utf-8")).toBe("b2")
         expect(await fs.readFile(path.join(tmp.path, "c.txt"), "utf-8")).toBe("c3")

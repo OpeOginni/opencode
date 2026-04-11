@@ -77,8 +77,10 @@ export namespace SessionRevert {
         if (session.revert?.snapshot) yield* snap.restore(session.revert.snapshot)
         yield* snap.revert(patches)
         if (rev.snapshot) rev.diff = yield* snap.diff(rev.snapshot as string)
-        const range = all.filter((msg) => msg.info.id >= rev!.messageID)
-        const diffs = yield* summary.computeDiff({ messages: range })
+        const remainingMsgs = all.filter((msg) =>
+          rev?.partID ? msg.info.id <= rev.messageID : msg.info.id < rev!.messageID,
+        )
+        const diffs = yield* summary.computeDiff({ messages: remainingMsgs })
         yield* storage.write(["session_diff", input.sessionID], diffs).pipe(Effect.ignore)
         yield* bus.publish(Session.Event.Diff, { sessionID: input.sessionID, diff: diffs })
         yield* sessions.setRevert({
@@ -99,6 +101,18 @@ export namespace SessionRevert {
         const session = yield* sessions.get(input.sessionID)
         if (!session.revert) return session
         if (session.revert.snapshot) yield* snap.restore(session.revert!.snapshot!)
+        const messages = yield* sessions.messages({ sessionID: input.sessionID })
+        const diffs = yield* summary.computeDiff({ messages })
+        yield* storage.write(["session_diff", input.sessionID], diffs).pipe(Effect.ignore)
+        yield* bus.publish(Session.Event.Diff, { sessionID: input.sessionID, diff: diffs })
+        yield* sessions.setSummary({
+          sessionID: input.sessionID,
+          summary: {
+            additions: diffs.reduce((sum, x) => sum + x.additions, 0),
+            deletions: diffs.reduce((sum, x) => sum + x.deletions, 0),
+            files: diffs.length,
+          },
+        })
         yield* sessions.clearRevert(input.sessionID)
         return yield* sessions.get(input.sessionID)
       })
