@@ -153,7 +153,7 @@ export const ReadTool = Tool.define(
       if (isImage || isPdf) {
         const msg = `${isImage ? "Image" : "PDF"} read successfully`
         return {
-          title,
+          title: rel,
           output: msg,
           metadata: {
             preview: msg,
@@ -205,7 +205,7 @@ export const ReadTool = Tool.define(
       }
 
       return {
-        title,
+        title: rel,
         output,
         metadata: {
           preview: file.raw.slice(0, 20).join("\n"),

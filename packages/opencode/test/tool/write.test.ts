@@ -95,37 +95,32 @@ describe("tool.write", () => {
 
           const content = yield* Effect.promise(() => fs.readFile(path.join(dir, "relative.txt"), "utf-8"))
           expect(content).toBe("relative content")
-        },
-      })
-    })
+        }),
+      ),
+    )
 
-    test("uses directory-relative permission paths in non-git projects", async () => {
-      await using tmp = await tmpdir()
-      const filepath = path.join(tmp.path, ".agents", "file.txt")
-      const calls: Array<{ patterns: string[] }> = []
+    it.live("uses directory-relative permission paths in non-git projects", () =>
+      provideTmpdirInstance((dir) =>
+        Effect.gen(function* () {
+          const filepath = path.join(dir, ".agents", "file.txt")
+          const calls: Array<{ patterns: string[] }> = []
 
-      await Instance.provide({
-        directory: tmp.path,
-        fn: async () => {
-          const write = await WriteTool.init()
-          await write.execute(
+          yield* run(
             {
               filePath: filepath,
               content: "content",
             },
             {
               ...ctx,
-              ask: async (input) => {
-                calls.push({ patterns: input.patterns })
-              },
+              ask: (input) =>
+                Effect.sync(() => {
+                  calls.push({ patterns: input.patterns })
+                }),
             },
           )
 
           expect(calls).toHaveLength(1)
           expect(calls[0]?.patterns).toEqual([path.join(".agents", "file.txt")])
-        },
-      })
-    })
         }),
       ),
     )

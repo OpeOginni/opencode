@@ -170,7 +170,7 @@ export const ApplyPatchTool = Tool.define(
       // Build per-file metadata for UI rendering (used for both permission and result)
       const files = fileChanges.map((change) => ({
         filePath: change.filePath,
-        relativePath: path.relative(Instance.worktree, change.movePath ?? change.filePath).replaceAll("\\", "/"),
+        relativePath: relative(change.movePath ?? change.filePath).replaceAll("\\", "/"),
         type: change.type,
         patch: change.diff,
         additions: change.additions,
@@ -179,7 +179,7 @@ export const ApplyPatchTool = Tool.define(
       }))
 
       // Check permissions if needed
-      const relativePaths = fileChanges.map((c) => path.relative(Instance.worktree, c.filePath).replaceAll("\\", "/"))
+      const relativePaths = fileChanges.map((c) => relative(c.filePath).replaceAll("\\", "/"))
       yield* ctx.ask({
         permission: "edit",
         patterns: relativePaths,
@@ -248,10 +248,10 @@ export const ApplyPatchTool = Tool.define(
       // Generate output summary
       const summaryLines = fileChanges.map((change) => {
         if (change.type === "add") {
-          return `A ${relative(target).replaceAll("\\", "/")}`
+          return `A ${relative(change.filePath).replaceAll("\\", "/")}`
         }
         if (change.type === "delete") {
-          return `D ${relative(target).replaceAll("\\", "/")}`
+          return `D ${relative(change.filePath).replaceAll("\\", "/")}`
         }
         const target = change.movePath ?? change.filePath
         return `M ${relative(target).replaceAll("\\", "/")}`

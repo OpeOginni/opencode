@@ -13,7 +13,7 @@ import { FileTime } from "../file/time"
 import { AppFileSystem } from "../filesystem"
 import { Instance } from "../project/instance"
 import { trimDiff } from "./edit"
-import { assertExternalDirectory } from "./external-directory"
+import { assertExternalDirectoryEffect } from "./external-directory"
 import { relative } from "./relative"
 
 const MAX_PROJECT_DIAGNOSTICS_FILES = 5

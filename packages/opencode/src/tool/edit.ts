@@ -181,7 +181,7 @@ export const EditTool = Tool.define(
               diff,
               filediff,
             },
-            title: `$rel}`,
+            title: rel,
             output,
           }
         }),

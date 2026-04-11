@@ -117,19 +117,22 @@ describe("tool.edit", () => {
       await Instance.provide({
         directory: tmp.path,
         fn: async () => {
-          const edit = await EditTool.init()
-          await edit.execute(
-            {
-              filePath: filepath,
-              oldString: "",
-              newString: "new content",
-            },
-            {
-              ...ctx,
-              ask: async (input) => {
-                calls.push({ patterns: input.patterns })
+          const edit = await resolve()
+          await Effect.runPromise(
+            edit.execute(
+              {
+                filePath: filepath,
+                oldString: "",
+                newString: "new content",
               },
-            },
+              {
+                ...ctx,
+                ask: (input) =>
+                  Effect.sync(() => {
+                    calls.push({ patterns: input.patterns })
+                  }),
+              },
+            ),
           )
 
           expect(calls).toHaveLength(1)
