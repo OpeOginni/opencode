@@ -260,6 +260,59 @@ function createFakeAgent() {
 }
 
 describe("acp.agent event subscription", () => {
+  test("does not replay live user message chunks back to the client", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const { agent, controller, sessionUpdates, stop, sdk } = createFakeAgent()
+        const cwd = "/tmp/opencode-acp-test"
+        const sessionId = await agent.newSession({ cwd, mcpServers: [] } as any).then((x) => x.sessionId)
+
+        sdk.session.message = async () => ({
+          data: {
+            info: {
+              id: "msg_user",
+              role: "user",
+              sessionID: sessionId,
+            },
+            parts: [
+              {
+                id: "part_user",
+                type: "text",
+                text: "hey",
+              },
+            ],
+          },
+        })
+
+        controller.push({
+          directory: cwd,
+          payload: {
+            type: "message.part.updated",
+            properties: {
+              sessionID: sessionId,
+              time: Date.now(),
+              part: {
+                id: "part_user",
+                sessionID: sessionId,
+                messageID: "msg_user",
+                type: "text",
+                text: "hey",
+              },
+            },
+          },
+        } as any)
+
+        await new Promise((r) => setTimeout(r, 20))
+
+        expect(sessionUpdates.some((u) => u.update.sessionUpdate === "user_message_chunk")).toBe(false)
+
+        stop()
+      },
+    })
+  })
+
   test("routes message.part.delta by the event sessionID (no cross-session pollution)", async () => {
     await using tmp = await tmpdir()
     await Instance.provide({

@@ -464,7 +464,10 @@ export namespace ACP {
               return undefined
             })
           if (!msg || msg.info.role !== "user") return
-          await this.processMessage({ info: msg.info, parts: [part] })
+
+          // The client already owns the active user prompt, so replaying live
+          // user chunks back through ACP duplicates composer content in clients
+          // like Zed. We still replay user history during loadSession/forkSession.
           return
         }
 
