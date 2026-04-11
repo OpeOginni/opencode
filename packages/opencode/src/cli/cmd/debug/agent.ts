@@ -1,13 +1,14 @@
 import { EOL } from "os"
 import { basename } from "path"
+import { Effect } from "effect"
 import { Agent } from "../../../agent/agent"
 import { Provider } from "../../../provider/provider"
 import { Session } from "../../../session"
 import type { MessageV2 } from "../../../session/message-v2"
-import { Identifier } from "../../../id/id"
+import { MessageID, PartID } from "../../../session/schema"
 import { ToolRegistry } from "../../../tool/registry"
 import { Instance } from "../../../project/instance"
-import { PermissionNext } from "../../../permission/next"
+import { Permission } from "../../../permission"
 import { iife } from "../../../util/iife"
 import { bootstrap } from "../../bootstrap"
 import { cmd } from "../cmd"
@@ -71,11 +72,14 @@ export const AgentCommand = cmd({
 
 async function getAvailableTools(agent: Agent.Info) {
   const model = agent.model ?? (await Provider.defaultModel())
-  return ToolRegistry.tools(model, agent)
+  return ToolRegistry.tools({
+    ...model,
+    agent,
+  })
 }
 
 async function resolveTools(agent: Agent.Info, availableTools: Awaited<ReturnType<typeof getAvailableTools>>) {
-  const disabled = PermissionNext.disabled(
+  const disabled = Permission.disabled(
     availableTools.map((tool) => tool.id),
     agent.permission,
   )
@@ -113,7 +117,7 @@ function parseToolParams(input?: string) {
 
 async function createToolContext(agent: Agent.Info) {
   const session = await Session.create({ title: `Debug tool run (${agent.name})` })
-  const messageID = Identifier.ascending("message")
+  const messageID = MessageID.ascending()
   const model = agent.model ?? (await Provider.defaultModel())
   const now = Date.now()
   const message: MessageV2.Assistant = {
@@ -145,23 +149,25 @@ async function createToolContext(agent: Agent.Info) {
   }
   await Session.updateMessage(message)
 
-  const ruleset = PermissionNext.merge(agent.permission, session.permission ?? [])
+  const ruleset = Permission.merge(agent.permission, session.permission ?? [])
 
   return {
     sessionID: session.id,
     messageID,
-    callID: Identifier.ascending("part"),
+    callID: PartID.ascending(),
     agent: agent.name,
     abort: new AbortController().signal,
     messages: [],
-    metadata: () => {},
-    async ask(req: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">) {
-      for (const pattern of req.patterns) {
-        const rule = PermissionNext.evaluate(req.permission, pattern, ruleset)
-        if (rule.action === "deny") {
-          throw new PermissionNext.DeniedError(ruleset)
+    metadata: () => Effect.void,
+    ask(req: Omit<Permission.Request, "id" | "sessionID" | "tool">) {
+      return Effect.sync(() => {
+        for (const pattern of req.patterns) {
+          const rule = Permission.evaluate(req.permission, pattern, ruleset)
+          if (rule.action === "deny") {
+            throw new Permission.DeniedError({ ruleset })
+          }
         }
-      }
+      })
     },
   }
 }

@@ -83,6 +83,95 @@ describe("filesystem", () => {
     })
   })
 
+  describe("findUp()", () => {
+    test("keeps previous nearest-first behavior for single target", async () => {
+      await using tmp = await tmpdir()
+      const parent = path.join(tmp.path, "parent")
+      const child = path.join(parent, "child")
+      await fs.mkdir(child, { recursive: true })
+      await fs.writeFile(path.join(tmp.path, "marker"), "root", "utf-8")
+      await fs.writeFile(path.join(parent, "marker"), "parent", "utf-8")
+
+      const result = await Filesystem.findUp("marker", child, tmp.path)
+
+      expect(result).toEqual([path.join(parent, "marker"), path.join(tmp.path, "marker")])
+    })
+
+    test("respects stop boundary", async () => {
+      await using tmp = await tmpdir()
+      const parent = path.join(tmp.path, "parent")
+      const child = path.join(parent, "child")
+      await fs.mkdir(child, { recursive: true })
+      await fs.writeFile(path.join(tmp.path, "marker"), "root", "utf-8")
+      await fs.writeFile(path.join(parent, "marker"), "parent", "utf-8")
+
+      const result = await Filesystem.findUp("marker", child, parent)
+
+      expect(result).toEqual([path.join(parent, "marker")])
+    })
+
+    test("supports multiple targets with nearest-first default ordering", async () => {
+      await using tmp = await tmpdir()
+      const parent = path.join(tmp.path, "parent")
+      const child = path.join(parent, "child")
+      await fs.mkdir(child, { recursive: true })
+
+      await fs.writeFile(path.join(parent, "cfg.jsonc"), "{}", "utf-8")
+      await fs.writeFile(path.join(tmp.path, "cfg.json"), "{}", "utf-8")
+      await fs.writeFile(path.join(tmp.path, "cfg.jsonc"), "{}", "utf-8")
+
+      const result = await Filesystem.findUp(["cfg.json", "cfg.jsonc"], child, tmp.path)
+
+      expect(result).toEqual([
+        path.join(parent, "cfg.jsonc"),
+        path.join(tmp.path, "cfg.json"),
+        path.join(tmp.path, "cfg.jsonc"),
+      ])
+    })
+
+    test("supports rootFirst ordering for multiple targets", async () => {
+      await using tmp = await tmpdir()
+      const parent = path.join(tmp.path, "parent")
+      const child = path.join(parent, "child")
+      await fs.mkdir(child, { recursive: true })
+
+      await fs.writeFile(path.join(parent, "cfg.jsonc"), "{}", "utf-8")
+      await fs.writeFile(path.join(tmp.path, "cfg.json"), "{}", "utf-8")
+      await fs.writeFile(path.join(tmp.path, "cfg.jsonc"), "{}", "utf-8")
+
+      const result = await Filesystem.findUp(["cfg.json", "cfg.jsonc"], child, tmp.path, { rootFirst: true })
+
+      expect(result).toEqual([
+        path.join(tmp.path, "cfg.json"),
+        path.join(tmp.path, "cfg.jsonc"),
+        path.join(parent, "cfg.jsonc"),
+      ])
+    })
+
+    test("rootFirst preserves json then jsonc order per directory", async () => {
+      await using tmp = await tmpdir()
+      const project = path.join(tmp.path, "project")
+      const nested = path.join(project, "nested")
+      await fs.mkdir(nested, { recursive: true })
+
+      await fs.writeFile(path.join(tmp.path, "opencode.json"), "{}", "utf-8")
+      await fs.writeFile(path.join(tmp.path, "opencode.jsonc"), "{}", "utf-8")
+      await fs.writeFile(path.join(project, "opencode.json"), "{}", "utf-8")
+      await fs.writeFile(path.join(project, "opencode.jsonc"), "{}", "utf-8")
+
+      const result = await Filesystem.findUp(["opencode.json", "opencode.jsonc"], nested, tmp.path, {
+        rootFirst: true,
+      })
+
+      expect(result).toEqual([
+        path.join(tmp.path, "opencode.json"),
+        path.join(tmp.path, "opencode.jsonc"),
+        path.join(project, "opencode.json"),
+        path.join(project, "opencode.jsonc"),
+      ])
+    })
+  })
+
   describe("readText()", () => {
     test("reads file content", async () => {
       await using tmp = await tmpdir()
@@ -283,6 +372,285 @@ describe("filesystem", () => {
 
     test("handles files without extension", () => {
       expect(Filesystem.mimeType("Makefile")).toBe("application/octet-stream")
+    })
+  })
+
+  describe("windowsPath()", () => {
+    test("converts Git Bash paths", () => {
+      if (process.platform === "win32") {
+        expect(Filesystem.windowsPath("/c/Users/test")).toBe("C:/Users/test")
+        expect(Filesystem.windowsPath("/d/dev/project")).toBe("D:/dev/project")
+      } else {
+        expect(Filesystem.windowsPath("/c/Users/test")).toBe("/c/Users/test")
+      }
+    })
+
+    test("converts Cygwin paths", () => {
+      if (process.platform === "win32") {
+        expect(Filesystem.windowsPath("/cygdrive/c/Users/test")).toBe("C:/Users/test")
+        expect(Filesystem.windowsPath("/cygdrive/x/dev/project")).toBe("X:/dev/project")
+      } else {
+        expect(Filesystem.windowsPath("/cygdrive/c/Users/test")).toBe("/cygdrive/c/Users/test")
+      }
+    })
+
+    test("converts WSL paths", () => {
+      if (process.platform === "win32") {
+        expect(Filesystem.windowsPath("/mnt/c/Users/test")).toBe("C:/Users/test")
+        expect(Filesystem.windowsPath("/mnt/z/dev/project")).toBe("Z:/dev/project")
+      } else {
+        expect(Filesystem.windowsPath("/mnt/c/Users/test")).toBe("/mnt/c/Users/test")
+      }
+    })
+
+    test("ignores normal Windows paths", () => {
+      expect(Filesystem.windowsPath("C:/Users/test")).toBe("C:/Users/test")
+      expect(Filesystem.windowsPath("D:\\dev\\project")).toBe("D:\\dev\\project")
+    })
+  })
+
+  describe("writeStream()", () => {
+    test("writes from Web ReadableStream", async () => {
+      await using tmp = await tmpdir()
+      const filepath = path.join(tmp.path, "streamed.txt")
+      const content = "Hello from stream!"
+      const encoder = new TextEncoder()
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode(content))
+          controller.close()
+        },
+      })
+
+      await Filesystem.writeStream(filepath, stream)
+
+      expect(await fs.readFile(filepath, "utf-8")).toBe(content)
+    })
+
+    test("writes from Node.js Readable stream", async () => {
+      await using tmp = await tmpdir()
+      const filepath = path.join(tmp.path, "node-streamed.txt")
+      const content = "Hello from Node stream!"
+      const { Readable } = await import("stream")
+      const stream = Readable.from([content])
+
+      await Filesystem.writeStream(filepath, stream)
+
+      expect(await fs.readFile(filepath, "utf-8")).toBe(content)
+    })
+
+    test("writes binary data from Web ReadableStream", async () => {
+      await using tmp = await tmpdir()
+      const filepath = path.join(tmp.path, "binary.dat")
+      const binaryData = new Uint8Array([0x00, 0x01, 0x02, 0x03, 0xff])
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(binaryData)
+          controller.close()
+        },
+      })
+
+      await Filesystem.writeStream(filepath, stream)
+
+      const read = await fs.readFile(filepath)
+      expect(Buffer.from(read)).toEqual(Buffer.from(binaryData))
+    })
+
+    test("writes large content in chunks", async () => {
+      await using tmp = await tmpdir()
+      const filepath = path.join(tmp.path, "large.txt")
+      const chunks = ["chunk1", "chunk2", "chunk3", "chunk4", "chunk5"]
+      const stream = new ReadableStream({
+        start(controller) {
+          for (const chunk of chunks) {
+            controller.enqueue(new TextEncoder().encode(chunk))
+          }
+          controller.close()
+        },
+      })
+
+      await Filesystem.writeStream(filepath, stream)
+
+      expect(await fs.readFile(filepath, "utf-8")).toBe(chunks.join(""))
+    })
+
+    test("creates parent directories", async () => {
+      await using tmp = await tmpdir()
+      const filepath = path.join(tmp.path, "nested", "deep", "streamed.txt")
+      const content = "nested stream content"
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(content))
+          controller.close()
+        },
+      })
+
+      await Filesystem.writeStream(filepath, stream)
+
+      expect(await fs.readFile(filepath, "utf-8")).toBe(content)
+    })
+
+    test("writes with permissions", async () => {
+      await using tmp = await tmpdir()
+      const filepath = path.join(tmp.path, "protected-stream.txt")
+      const content = "secret stream content"
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(content))
+          controller.close()
+        },
+      })
+
+      await Filesystem.writeStream(filepath, stream, 0o600)
+
+      const stats = await fs.stat(filepath)
+      if (process.platform !== "win32") {
+        expect(stats.mode & 0o777).toBe(0o600)
+      }
+    })
+
+    test("writes executable with permissions", async () => {
+      await using tmp = await tmpdir()
+      const filepath = path.join(tmp.path, "script.sh")
+      const content = "#!/bin/bash\necho hello"
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(content))
+          controller.close()
+        },
+      })
+
+      await Filesystem.writeStream(filepath, stream, 0o755)
+
+      const stats = await fs.stat(filepath)
+      if (process.platform !== "win32") {
+        expect(stats.mode & 0o777).toBe(0o755)
+      }
+      expect(await fs.readFile(filepath, "utf-8")).toBe(content)
+    })
+  })
+
+  describe("resolve()", () => {
+    test("resolves slash-prefixed drive paths on Windows", async () => {
+      if (process.platform !== "win32") return
+      await using tmp = await tmpdir()
+      const forward = tmp.path.replaceAll("\\", "/")
+      expect(Filesystem.resolve(`/${forward}`)).toBe(Filesystem.normalizePath(tmp.path))
+    })
+
+    test("resolves slash-prefixed drive roots on Windows", async () => {
+      if (process.platform !== "win32") return
+      await using tmp = await tmpdir()
+      const drive = tmp.path[0].toUpperCase()
+      expect(Filesystem.resolve(`/${drive}:`)).toBe(Filesystem.resolve(`${drive}:/`))
+    })
+
+    test("resolves Git Bash and MSYS2 paths on Windows", async () => {
+      // Git Bash and MSYS2 both use /<drive>/... paths on Windows.
+      if (process.platform !== "win32") return
+      await using tmp = await tmpdir()
+      const drive = tmp.path[0].toLowerCase()
+      const rest = tmp.path.slice(2).replaceAll("\\", "/")
+      expect(Filesystem.resolve(`/${drive}${rest}`)).toBe(Filesystem.normalizePath(tmp.path))
+    })
+
+    test("resolves Git Bash and MSYS2 drive roots on Windows", async () => {
+      // Git Bash and MSYS2 both use /<drive> paths on Windows.
+      if (process.platform !== "win32") return
+      await using tmp = await tmpdir()
+      const drive = tmp.path[0].toLowerCase()
+      expect(Filesystem.resolve(`/${drive}`)).toBe(Filesystem.resolve(`${drive.toUpperCase()}:/`))
+    })
+
+    test("resolves Cygwin paths on Windows", async () => {
+      if (process.platform !== "win32") return
+      await using tmp = await tmpdir()
+      const drive = tmp.path[0].toLowerCase()
+      const rest = tmp.path.slice(2).replaceAll("\\", "/")
+      expect(Filesystem.resolve(`/cygdrive/${drive}${rest}`)).toBe(Filesystem.normalizePath(tmp.path))
+    })
+
+    test("resolves Cygwin drive roots on Windows", async () => {
+      if (process.platform !== "win32") return
+      await using tmp = await tmpdir()
+      const drive = tmp.path[0].toLowerCase()
+      expect(Filesystem.resolve(`/cygdrive/${drive}`)).toBe(Filesystem.resolve(`${drive.toUpperCase()}:/`))
+    })
+
+    test("resolves WSL mount paths on Windows", async () => {
+      if (process.platform !== "win32") return
+      await using tmp = await tmpdir()
+      const drive = tmp.path[0].toLowerCase()
+      const rest = tmp.path.slice(2).replaceAll("\\", "/")
+      expect(Filesystem.resolve(`/mnt/${drive}${rest}`)).toBe(Filesystem.normalizePath(tmp.path))
+    })
+
+    test("resolves WSL mount roots on Windows", async () => {
+      if (process.platform !== "win32") return
+      await using tmp = await tmpdir()
+      const drive = tmp.path[0].toLowerCase()
+      expect(Filesystem.resolve(`/mnt/${drive}`)).toBe(Filesystem.resolve(`${drive.toUpperCase()}:/`))
+    })
+
+    test("resolves symlinked directory to canonical path", async () => {
+      await using tmp = await tmpdir()
+      const target = path.join(tmp.path, "real")
+      await fs.mkdir(target)
+      const link = path.join(tmp.path, "link")
+      await fs.symlink(target, link)
+      expect(Filesystem.resolve(link)).toBe(Filesystem.resolve(target))
+    })
+
+    test("returns unresolved path when target does not exist", async () => {
+      await using tmp = await tmpdir()
+      const missing = path.join(tmp.path, "does-not-exist-" + Date.now())
+      const result = Filesystem.resolve(missing)
+      expect(result).toBe(Filesystem.normalizePath(path.resolve(missing)))
+    })
+
+    test("throws ELOOP on symlink cycle", async () => {
+      await using tmp = await tmpdir()
+      const a = path.join(tmp.path, "a")
+      const b = path.join(tmp.path, "b")
+      await fs.symlink(b, a)
+      await fs.symlink(a, b)
+      expect(() => Filesystem.resolve(a)).toThrow()
+    })
+
+    // Windows: chmod(0o000) is a no-op, so EACCES cannot be triggered
+    test("throws EACCES on permission-denied symlink target", async () => {
+      if (process.platform === "win32") return
+      if (process.getuid?.() === 0) return // skip when running as root
+      await using tmp = await tmpdir()
+      const dir = path.join(tmp.path, "restricted")
+      await fs.mkdir(dir)
+      const link = path.join(tmp.path, "link")
+      await fs.symlink(dir, link)
+      await fs.chmod(dir, 0o000)
+      try {
+        expect(() => Filesystem.resolve(path.join(link, "child"))).toThrow()
+      } finally {
+        await fs.chmod(dir, 0o755)
+      }
+    })
+
+    // Windows: traversing through a file throws ENOENT (not ENOTDIR),
+    // which resolve() catches as a fallback instead of rethrowing
+    test("rethrows non-ENOENT errors", async () => {
+      if (process.platform === "win32") return
+      await using tmp = await tmpdir()
+      const file = path.join(tmp.path, "not-a-directory")
+      await fs.writeFile(file, "x")
+      expect(() => Filesystem.resolve(path.join(file, "child"))).toThrow()
+    })
+  })
+
+  describe("normalizePathPattern()", () => {
+    test("preserves drive root globs on Windows", async () => {
+      if (process.platform !== "win32") return
+      await using tmp = await tmpdir()
+      const root = path.parse(tmp.path).root
+      expect(Filesystem.normalizePathPattern(path.join(root, "*"))).toBe(path.join(root, "*"))
     })
   })
 })

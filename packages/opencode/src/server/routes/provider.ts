@@ -5,9 +5,14 @@ import { Config } from "../../config/config"
 import { Provider } from "../../provider/provider"
 import { ModelsDev } from "../../provider/models"
 import { ProviderAuth } from "../../provider/auth"
+import { ProviderID } from "../../provider/schema"
+import { AppRuntime } from "../../effect/app-runtime"
 import { mapValues } from "remeda"
 import { errors } from "../error"
 import { lazy } from "../../util/lazy"
+import { Log } from "../../util/log"
+
+const log = Log.create({ service: "server" })
 
 export const ProviderRoutes = lazy(() =>
   new Hono()
@@ -24,7 +29,7 @@ export const ProviderRoutes = lazy(() =>
               "application/json": {
                 schema: resolver(
                   z.object({
-                    all: ModelsDev.Provider.array(),
+                    all: Provider.Info.array(),
                     default: z.record(z.string(), z.string()),
                     connected: z.array(z.string()),
                   }),
@@ -77,7 +82,7 @@ export const ProviderRoutes = lazy(() =>
         },
       }),
       async (c) => {
-        return c.json(await ProviderAuth.methods())
+        return c.json(await AppRuntime.runPromise(ProviderAuth.Service.use((svc) => svc.methods())))
       },
     )
     .post(
@@ -101,22 +106,28 @@ export const ProviderRoutes = lazy(() =>
       validator(
         "param",
         z.object({
-          providerID: z.string().meta({ description: "Provider ID" }),
+          providerID: ProviderID.zod.meta({ description: "Provider ID" }),
         }),
       ),
       validator(
         "json",
         z.object({
           method: z.number().meta({ description: "Auth method index" }),
+          inputs: z.record(z.string(), z.string()).optional().meta({ description: "Prompt inputs" }),
         }),
       ),
       async (c) => {
         const providerID = c.req.valid("param").providerID
-        const { method } = c.req.valid("json")
-        const result = await ProviderAuth.authorize({
-          providerID,
-          method,
-        })
+        const { method, inputs } = c.req.valid("json")
+        const result = await AppRuntime.runPromise(
+          ProviderAuth.Service.use((svc) =>
+            svc.authorize({
+              providerID,
+              method,
+              inputs,
+            }),
+          ),
+        )
         return c.json(result)
       },
     )
@@ -141,7 +152,7 @@ export const ProviderRoutes = lazy(() =>
       validator(
         "param",
         z.object({
-          providerID: z.string().meta({ description: "Provider ID" }),
+          providerID: ProviderID.zod.meta({ description: "Provider ID" }),
         }),
       ),
       validator(
@@ -154,11 +165,15 @@ export const ProviderRoutes = lazy(() =>
       async (c) => {
         const providerID = c.req.valid("param").providerID
         const { method, code } = c.req.valid("json")
-        await ProviderAuth.callback({
-          providerID,
-          method,
-          code,
-        })
+        await AppRuntime.runPromise(
+          ProviderAuth.Service.use((svc) =>
+            svc.callback({
+              providerID,
+              method,
+              code,
+            }),
+          ),
+        )
         return c.json(true)
       },
     ),
