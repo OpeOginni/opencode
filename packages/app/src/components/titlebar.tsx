@@ -257,7 +257,6 @@ export function Titlebar() {
               <div
                 class="flex items-center gap-0 transition-transform"
                 classList={{
-                  "ml-14": web() && !project(),
                   "translate-x-0": !project() || !layout.sidebar.opened(),
                   "-translate-x-[36px]": project() && layout.sidebar.opened(),
                 }}
