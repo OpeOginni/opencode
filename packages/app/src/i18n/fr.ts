@@ -554,6 +554,7 @@ export const dict = {
   "sidebar.gettingStarted.line2":
     "Connectez n'importe quel fournisseur pour utiliser des modèles, y compris Claude, GPT, Gemini etc.",
   "sidebar.project.recentSessions": "Sessions récentes",
+  "sidebar.project.noneSelected": "Aucun projet sélectionné",
   "sidebar.project.viewAllSessions": "Voir toutes les sessions",
   "sidebar.project.clearNotifications": "Effacer les notifications",
   "app.name.desktop": "OpenCode Desktop",

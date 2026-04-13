@@ -601,6 +601,7 @@ export const dict = {
   "sidebar.gettingStarted.line1": "OpenCode 提供免费模型，你可以立即开始使用。",
   "sidebar.gettingStarted.line2": "连接任意提供商即可使用更多模型，如 Claude、GPT、Gemini 等。",
   "sidebar.project.recentSessions": "最近会话",
+  "sidebar.project.noneSelected": "未选择项目",
   "sidebar.project.viewAllSessions": "查看全部会话",
   "sidebar.project.clearNotifications": "清除通知",
 

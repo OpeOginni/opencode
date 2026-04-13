@@ -608,6 +608,7 @@ export const dict = {
   "sidebar.gettingStarted.line1": "OpenCode uključuje besplatne modele, tako da možeš odmah početi.",
   "sidebar.gettingStarted.line2": "Poveži bilo kojeg provajdera da koristiš modele, npr. Claude, GPT, Gemini itd.",
   "sidebar.project.recentSessions": "Nedavne sesije",
+  "sidebar.project.noneSelected": "Nije odabran nijedan projekat",
   "sidebar.project.viewAllSessions": "Prikaži sve sesije",
   "sidebar.project.clearNotifications": "Očisti obavijesti",
 

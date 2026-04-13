@@ -547,6 +547,7 @@ export const dict = {
   "sidebar.gettingStarted.line1": "OpenCode inclui modelos gratuitos para você começar imediatamente.",
   "sidebar.gettingStarted.line2": "Conecte qualquer provedor para usar modelos, incluindo Claude, GPT, Gemini etc.",
   "sidebar.project.recentSessions": "Sessões recentes",
+  "sidebar.project.noneSelected": "Nenhum projeto selecionado",
   "sidebar.project.viewAllSessions": "Ver todas as sessões",
   "sidebar.project.clearNotifications": "Limpar notificações",
   "app.name.desktop": "OpenCode Desktop",

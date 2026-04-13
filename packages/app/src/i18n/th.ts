@@ -602,6 +602,7 @@ export const dict = {
   "sidebar.gettingStarted.line1": "OpenCode รวมถึงโมเดลฟรีเพื่อให้คุณเริ่มต้นได้ทันที",
   "sidebar.gettingStarted.line2": "เชื่อมต่อผู้ให้บริการใด ๆ เพื่อใช้โมเดล รวมถึง Claude, GPT, Gemini ฯลฯ",
   "sidebar.project.recentSessions": "เซสชันล่าสุด",
+  "sidebar.project.noneSelected": "ไม่ได้เลือกโปรเจกต์",
   "sidebar.project.viewAllSessions": "ดูเซสชันทั้งหมด",
   "sidebar.project.clearNotifications": "ล้างการแจ้งเตือน",
 

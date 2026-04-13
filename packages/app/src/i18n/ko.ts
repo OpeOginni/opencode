@@ -545,6 +545,7 @@ export const dict = {
   "sidebar.gettingStarted.line1": "OpenCode에는 무료 모델이 포함되어 있어 즉시 시작할 수 있습니다.",
   "sidebar.gettingStarted.line2": "Claude, GPT, Gemini 등을 포함한 모델을 사용하려면 공급자를 연결하세요.",
   "sidebar.project.recentSessions": "최근 세션",
+  "sidebar.project.noneSelected": "선택된 프로젝트가 없습니다",
   "sidebar.project.viewAllSessions": "모든 세션 보기",
   "sidebar.project.clearNotifications": "알림 지우기",
   "app.name.desktop": "OpenCode Desktop",
