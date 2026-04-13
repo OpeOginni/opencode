@@ -146,7 +146,6 @@ export default function Layout(props: ParentProps) {
   }
   const colorSchemeLabel = (scheme: ColorScheme) => language.t(colorSchemeKey[scheme])
   const currentDir = createMemo(() => route().dir)
-  const routed = createMemo(() => !!params.dir)
 
   const [state, setState] = createStore({
     autoselect: !initialDirectory,
@@ -300,14 +299,6 @@ export default function Layout(props: ParentProps) {
     if (!directory) return
     setState("autoselect", false)
   })
-
-  createEffect(
-    on(routed, (next, prev) => {
-      if (next) return
-      if (prev === undefined && !layout.mobileSidebar.opened()) return
-      layout.mobileSidebar.hide()
-    }),
-  )
 
   const editorOpen = editor.editorOpen
   const openEditor = editor.openEditor
@@ -1025,7 +1016,6 @@ export default function Layout(props: ParentProps) {
         title: language.t("command.sidebar.toggle"),
         category: language.t("command.category.view"),
         keybind: "mod+b",
-        disabled: !routed(),
         onSelect: () => layout.sidebar.toggle(),
       },
       {
@@ -2037,7 +2027,7 @@ export default function Layout(props: ParentProps) {
     const project = panelProps.project
     const merged = createMemo(() => panelProps.mobile || (panelProps.merged ?? layout.sidebar.opened()))
     const hover = createMemo(() => !panelProps.mobile && panelProps.merged === false && !layout.sidebar.opened())
-    const empty = createMemo(() => !params.dir && layout.projects.list().length === 0)
+    const empty = createMemo(() => layout.projects.list().length === 0)
     const projectName = createMemo(() => {
       const item = project()
       if (!item) return ""
@@ -2093,7 +2083,16 @@ export default function Layout(props: ParentProps) {
         <Show
           when={project()}
           fallback={
-            <Show when={empty()}>
+            <Show
+              when={empty()}
+              fallback={
+                <div class="flex-1 min-h-0 -mt-4 flex items-center justify-center px-6 pb-64 text-center">
+                  <div class="mt-8 flex max-w-60 flex-col items-center gap-3 text-center">
+                    <div class="text-14-medium text-text-base">No Project Selected</div>
+                  </div>
+                </div>
+              }
+            >
               <div class="flex-1 min-h-0 -mt-4 flex items-center justify-center px-6 pb-64 text-center">
                 <div class="mt-8 flex max-w-60 flex-col items-center gap-6 text-center">
                   <div class="flex flex-col gap-3">
@@ -2339,8 +2338,7 @@ export default function Layout(props: ParentProps) {
   const sidebarContent = (mobile?: boolean) => (
     <SidebarContent
       mobile={mobile}
-      pane={!mobile || routed()}
-      opened={() => routed() && layout.sidebar.opened()}
+      opened={() => layout.sidebar.opened()}
       aimMove={aim.move}
       projects={projects}
       renderProject={(project) => (
@@ -2395,7 +2393,7 @@ export default function Layout(props: ParentProps) {
               <div class="@container w-full h-full contain-strict">{sidebarContent()}</div>
             </nav>
 
-            <Show when={routed() && layout.sidebar.opened()}>
+            <Show when={layout.sidebar.opened()}>
               <div
                 class="hidden xl:block absolute inset-y-0 z-30 w-0 overflow-visible"
                 style={{ left: `${side()}px` }}
@@ -2436,9 +2434,7 @@ export default function Layout(props: ParentProps) {
                 aria-label={language.t("sidebar.nav.projectsAndSessions")}
                 data-component="sidebar-nav-mobile"
                 classList={{
-                  "@container fixed top-10 bottom-0 left-0 z-50 overflow-hidden border-r border-border-weaker-base bg-background-base transition-transform duration-200 ease-out": true,
-                  "w-16": !routed(),
-                  "w-full max-w-[400px]": routed(),
+                  "@container fixed top-10 bottom-0 left-0 z-50 w-full max-w-[400px] overflow-hidden border-r border-border-weaker-base bg-background-base transition-transform duration-200 ease-out": true,
                   "translate-x-0": layout.mobileSidebar.opened(),
                   "-translate-x-full": !layout.mobileSidebar.opened(),
                 }}
@@ -2457,7 +2453,7 @@ export default function Layout(props: ParentProps) {
                   !state.sizing,
               }}
               style={{
-                "--main-left": routed() && layout.sidebar.opened() ? `${side()}px` : "4rem",
+                "--main-left": layout.sidebar.opened() ? `${side()}px` : "4rem",
               }}
             >
               <main
