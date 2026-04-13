@@ -14,7 +14,6 @@ import { type LocalProject } from "@/context/layout"
 
 export const SidebarContent = (props: {
   mobile?: boolean
-  pane?: boolean
   opened: Accessor<boolean>
   aimMove: (event: MouseEvent) => void
   projects: Accessor<LocalProject[]>
@@ -33,8 +32,7 @@ export const SidebarContent = (props: {
   onOpenHelp: () => void
   renderPanel: () => JSX.Element
 }): JSX.Element => {
-  const pane = createMemo(() => props.pane ?? true)
-  const expanded = createMemo(() => pane() && (!!props.mobile || props.opened()))
+  const expanded = createMemo(() => !!props.mobile || props.opened())
   const placement = () => (props.mobile ? "bottom" : "right")
   let panel: HTMLDivElement | undefined
 
@@ -113,17 +111,15 @@ export const SidebarContent = (props: {
         </div>
       </div>
 
-      <Show when={pane()}>
-        <div
-          ref={(el) => {
-            panel = el
-          }}
-          classList={{ "flex-1 flex h-full min-h-0 min-w-0 overflow-hidden": true, "pointer-events-none": !expanded() }}
-          aria-hidden={!expanded()}
-        >
-          {props.renderPanel()}
-        </div>
-      </Show>
+      <div
+        ref={(el) => {
+          panel = el
+        }}
+        classList={{ "flex-1 flex h-full min-h-0 min-w-0 overflow-hidden": true, "pointer-events-none": !expanded() }}
+        aria-hidden={!expanded()}
+      >
+        {props.renderPanel()}
+      </div>
     </div>
   )
 }
