@@ -11,7 +11,6 @@ import DESCRIPTION from "./read.txt"
 import { Instance } from "../project/instance"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import { Instruction } from "../session/instruction"
-import { Filesystem } from "../util/filesystem"
 import { relative } from "./relative"
 
 const DEFAULT_READ_LIMIT = 2000

@@ -129,7 +129,7 @@ describe("tool.edit", () => {
     test("uses directory-relative permission paths in non-git projects", async () => {
       await using tmp = await tmpdir()
       const filepath = path.join(tmp.path, ".agents", "file.txt")
-      const calls: Array<{ patterns: string[] }> = []
+      const calls: Array<{ patterns: readonly string[] }> = []
 
       await Instance.provide({
         directory: tmp.path,

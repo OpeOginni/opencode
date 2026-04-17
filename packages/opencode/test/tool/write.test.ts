@@ -100,7 +100,7 @@ describe("tool.write", () => {
       provideTmpdirInstance((dir) =>
         Effect.gen(function* () {
           const filepath = path.join(dir, ".agents", "file.txt")
-          const calls: Array<{ patterns: string[] }> = []
+          const calls: Array<{ patterns: readonly string[] }> = []
 
           yield* run(
             {
