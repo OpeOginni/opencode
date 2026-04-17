@@ -41,8 +41,6 @@ export const WriteTool = Tool.define(
           const exists = yield* fs.existsSafe(filepath)
           const contentOld = exists ? yield* fs.readFileString(filepath) : ""
           const rel = relative(filepath)
-          if (exists) yield* filetime.assert(ctx.sessionID, filepath)
-
           const diff = trimDiff(createTwoFilesPatch(filepath, filepath, contentOld, params.content))
           yield* ctx.ask({
             permission: "edit",
