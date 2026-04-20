@@ -13,6 +13,7 @@
           "dialog_close": "escape,q"
         }
       }
-    ]
+    ],
+    "./plugin/message-tps.tsx"
   ]
 }

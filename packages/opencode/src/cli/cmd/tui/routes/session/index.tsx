@@ -1387,8 +1387,8 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
       </Show>
       <Switch>
         <Match when={props.last || final() || props.message.error?.name === "MessageAbortedError"}>
-          <box paddingLeft={3}>
-            <text marginTop={1}>
+          <box paddingLeft={3} marginTop={1} flexDirection="row" gap={1} flexWrap="wrap" alignItems="center">
+            <text>
               <span
                 style={{
                   fg:
@@ -1408,6 +1408,11 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
                 <span style={{ fg: theme.textMuted }}> · interrupted</span>
               </Show>
             </text>
+            <TuiPluginRuntime.Slot
+              name="session_assistant_footer"
+              session_id={props.message.sessionID}
+              message_id={props.message.id}
+            />
           </box>
         </Match>
       </Switch>
