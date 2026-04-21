@@ -18,7 +18,7 @@ import { InstallationLocal, InstallationVersion } from "@/installation/version"
 import { makeRuntime } from "@/effect/runtime"
 import { Filesystem, Log } from "@/util"
 import { ConfigVariable } from "@/config/variable"
-import { Npm } from "@/npm/effect"
+import { Npm } from "@/npm"
 
 const log = Log.create({ service: "tui.config" })
 
@@ -158,7 +158,12 @@ export const layer = Layer.effect(
       (dir) =>
         npm
           .install(dir, {
-            add: ["@opencode-ai/plugin" + (InstallationLocal ? "" : "@" + InstallationVersion)],
+            add: [
+              {
+                name: "@opencode-ai/plugin",
+                version: InstallationLocal ? undefined : InstallationVersion,
+              },
+            ],
           })
           .pipe(Effect.forkScoped),
       {
