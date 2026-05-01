@@ -1,7 +1,8 @@
 import path from "path"
-import { Instance } from "../project/instance"
+import { type InstanceContext } from "../project/instance"
 
-export function relative(file: string) {
-  const root = Instance.worktree === "/" ? Instance.directory : Instance.worktree
+export function relative(instance: InstanceContext, file: string) {
+
+  const root = instance.worktree === "/" ? instance.directory : instance.worktree
   return path.relative(root, file)
 }
