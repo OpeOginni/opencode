@@ -7,7 +7,7 @@ import * as Tool from "./tool"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { LSP } from "@/lsp/lsp"
 import DESCRIPTION from "./read.txt"
-import { Instance } from "../project/instance"
+import { InstanceState } from "@/effect/instance-state"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import { Instruction } from "../session/instruction"
 import { relative } from "./relative"
@@ -158,14 +158,15 @@ export const ReadTool = Tool.define(
         return yield* Effect.fail(new Error("offset must be greater than or equal to 1"))
       }
 
+      const instance = yield* InstanceState.context
       let filepath = params.filePath
       if (!path.isAbsolute(filepath)) {
-        filepath = path.resolve(Instance.directory, filepath)
+        filepath = path.resolve(instance.directory, filepath)
       }
       if (process.platform === "win32") {
         filepath = AppFileSystem.normalizePath(filepath)
       }
-      const rel = relative(filepath)
+      const rel = relative(instance,  filepath)
 
       const stat = yield* fs.stat(filepath).pipe(
         Effect.catchIf(

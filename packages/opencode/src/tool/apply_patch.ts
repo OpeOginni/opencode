@@ -3,7 +3,7 @@ import { Effect, Schema } from "effect"
 import * as Tool from "./tool"
 import { Bus } from "../bus"
 import { FileWatcher } from "../file/watcher"
-import { Instance } from "../project/instance"
+import { InstanceState } from "@/effect/instance-state"
 import { Patch } from "../patch"
 import { createTwoFilesPatch, diffLines } from "diff"
 import { assertExternalDirectoryEffect } from "./external-directory"
@@ -53,6 +53,8 @@ export const ApplyPatchTool = Tool.define(
         return yield* Effect.fail(new Error("apply_patch verification failed: no hunks found"))
       }
 
+      const instance = yield* InstanceState.context
+
       // Validate file paths and check permissions
       const fileChanges: Array<{
         filePath: string
@@ -69,7 +71,7 @@ export const ApplyPatchTool = Tool.define(
       let totalDiff = ""
 
       for (const hunk of hunks) {
-        const filePath = path.resolve(Instance.directory, hunk.path)
+        const filePath = path.resolve(instance.directory, hunk.path)
         yield* assertExternalDirectoryEffect(ctx, filePath)
 
         switch (hunk.type) {
@@ -134,7 +136,7 @@ export const ApplyPatchTool = Tool.define(
               if (change.removed) deletions += change.count || 0
             }
 
-            const movePath = hunk.move_path ? path.resolve(Instance.directory, hunk.move_path) : undefined
+            const movePath = hunk.move_path ? path.resolve(instance.directory, hunk.move_path) : undefined
             yield* assertExternalDirectoryEffect(ctx, movePath)
 
             fileChanges.push({
@@ -188,7 +190,7 @@ export const ApplyPatchTool = Tool.define(
       // Build per-file metadata for UI rendering (used for both permission and result)
       const files = fileChanges.map((change) => ({
         filePath: change.filePath,
-        relativePath: relative(change.movePath ?? change.filePath).replaceAll("\\", "/"),
+        relativePath: relative(instance, change.movePath ?? change.filePath).replaceAll("\\", "/"),
         type: change.type,
         patch: change.diff,
         additions: change.additions,
@@ -197,7 +199,7 @@ export const ApplyPatchTool = Tool.define(
       }))
 
       // Check permissions if needed
-      const relativePaths = fileChanges.map((c) => relative(c.filePath).replaceAll("\\", "/"))
+      const relativePaths = fileChanges.map((c) => relative(instance, c.filePath).replaceAll("\\", "/"))
       yield* ctx.ask({
         permission: "edit",
         patterns: relativePaths,
@@ -268,13 +270,13 @@ export const ApplyPatchTool = Tool.define(
       // Generate output summary
       const summaryLines = fileChanges.map((change) => {
         if (change.type === "add") {
-          return `A ${relative(change.filePath).replaceAll("\\", "/")}`
+          return `A ${relative(instance, change.filePath).replaceAll("\\", "/")}`
         }
         if (change.type === "delete") {
-          return `D ${relative(change.filePath).replaceAll("\\", "/")}`
+          return `D ${relative(instance, change.filePath).replaceAll("\\", "/")}`
         }
         const target = change.movePath ?? change.filePath
-        return `M ${relative(target).replaceAll("\\", "/")}`
+        return `M ${relative(instance, target).replaceAll("\\", "/")}`
       })
       let output = `Success. Updated the following files:\n${summaryLines.join("\n")}`
 
@@ -283,7 +285,7 @@ export const ApplyPatchTool = Tool.define(
         const target = change.movePath ?? change.filePath
         const block = LSP.Diagnostic.report(target, diagnostics[AppFileSystem.normalizePath(target)] ?? [])
         if (!block) continue
-        const rel = relative(target).replaceAll("\\", "/")
+        const rel = relative(instance, target).replaceAll("\\", "/")
         output += `\n\nLSP errors detected in ${rel}, please fix:\n${block}`
       }
 
