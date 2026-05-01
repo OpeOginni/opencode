@@ -1,11 +1,10 @@
 import * as InstanceState from "@/effect/instance-state"
-import { EffectBridge } from "@/effect/bridge"
+import { InstanceRef, WorkspaceRef } from "@/effect/instance-ref"
 import { Agent } from "@/agent/agent"
 import { Bus } from "@/bus"
 import { Command } from "@/command"
 import { Permission } from "@/permission"
 import { PermissionID } from "@/permission/schema"
-import { Instance } from "@/project/instance"
 import { SessionShare } from "@/share/session"
 import { Session } from "@/session/session"
 import { SessionCompaction } from "@/session/compaction"
@@ -19,7 +18,7 @@ import { Todo } from "@/session/todo"
 import { MessageID, PartID, SessionID } from "@/session/schema"
 import { NotFoundError } from "@/storage/storage"
 import { NamedError } from "@opencode-ai/core/util/error"
-import { Cause, Effect, Schema } from "effect"
+import { Cause, Effect, Schema, Scope } from "effect"
 import * as Stream from "effect/Stream"
 import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { HttpApiBuilder, HttpApiError, HttpApiSchema } from "effect/unstable/httpapi"
@@ -61,22 +60,18 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     const todoSvc = yield* Todo.Service
     const summary = yield* SessionSummary.Service
     const bus = yield* Bus.Service
+    const scope = yield* Scope.Scope
 
     const list = Effect.fn("SessionHttpApi.list")(function* (ctx: { query: typeof ListQuery.Type }) {
-      const instance = yield* InstanceState.context
-      return Instance.restore(instance, () =>
-        Array.from(
-          Session.list({
-            directory: ctx.query.scope === "project" ? undefined : ctx.query.directory,
-            scope: ctx.query.scope,
-            path: ctx.query.path,
-            roots: ctx.query.roots,
-            start: ctx.query.start,
-            search: ctx.query.search,
-            limit: ctx.query.limit,
-          }),
-        ),
-      )
+      return yield* session.list({
+        directory: ctx.query.scope === "project" ? undefined : ctx.query.directory,
+        scope: ctx.query.scope,
+        path: ctx.query.path,
+        roots: ctx.query.roots,
+        start: ctx.query.start,
+        search: ctx.query.search,
+        limit: ctx.query.limit,
+      })
     })
 
     const status = Effect.fn("SessionHttpApi.status")(function* () {
@@ -259,15 +254,16 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       params: { sessionID: SessionID }
       payload: typeof PromptPayload.Type
     }) {
-      const bridge = yield* EffectBridge.make()
+      const instance = yield* InstanceState.context
+      const workspace = yield* InstanceState.workspaceID
       return HttpServerResponse.stream(
         Stream.fromEffect(
-          bridge.run(
-            promptSvc.prompt({
+          promptSvc
+            .prompt({
               ...ctx.payload,
               sessionID: ctx.params.sessionID,
-            }),
-          ),
+            })
+            .pipe(Effect.provideService(InstanceRef, instance), Effect.provideService(WorkspaceRef, workspace)),
         ).pipe(
           Stream.map((message) => JSON.stringify(message)),
           Stream.encodeText,
@@ -280,22 +276,18 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       params: { sessionID: SessionID }
       payload: typeof PromptPayload.Type
     }) {
-      const bridge = yield* EffectBridge.make()
-      yield* Effect.sync(() => {
-        bridge.fork(
-          promptSvc.prompt({ ...ctx.payload, sessionID: ctx.params.sessionID }).pipe(
-            Effect.catchCause((cause) =>
-              Effect.gen(function* () {
-                yield* Effect.logError("prompt_async failed", { sessionID: ctx.params.sessionID, cause })
-                yield* bus.publish(Session.Event.Error, {
-                  sessionID: ctx.params.sessionID,
-                  error: new NamedError.Unknown({ message: Cause.pretty(cause) }).toObject(),
-                })
-              }),
-            ),
-          ),
-        )
-      })
+      yield* promptSvc.prompt({ ...ctx.payload, sessionID: ctx.params.sessionID }).pipe(
+        Effect.catchCause((cause) =>
+          Effect.gen(function* () {
+            yield* Effect.logError("prompt_async failed", { sessionID: ctx.params.sessionID, cause })
+            yield* bus.publish(Session.Event.Error, {
+              sessionID: ctx.params.sessionID,
+              error: new NamedError.Unknown({ message: Cause.pretty(cause) }).toObject(),
+            })
+          }),
+        ),
+        Effect.forkIn(scope, { startImmediately: true }),
+      )
       return HttpApiSchema.NoContent.make()
     })
 
