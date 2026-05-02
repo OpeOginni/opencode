@@ -339,20 +339,26 @@ opencode run --attach http://localhost:4096 "Explain async/await in JavaScript"
 
 #### 플래그
 
-| 플래그                                   | 축약 | 설명                                                                   |
-| ---------------------------------------- | ---- | ---------------------------------------------------------------------- |
-| `--command`                              |      | 실행할 명령(인수는 message로 전달)                                     |
-| <nobr><code>{"--continue"}</code></nobr> | `-c` | 마지막 세션 이어서 실행                                                |
-| <nobr><code>{"--session"}</code></nobr>  | `-s` | 이어서 실행할 세션 ID                                                  |
-| <nobr><code>{"--fork"}</code></nobr>     |      | 세션을 이어갈 때 포크 생성 (`--continue` 또는 `--session`과 함께 사용) |
-| `--share`                                |      | 세션 공유                                                              |
-| `--model`                                | `-m` | 사용할 모델 (`provider/model` 형식)                                    |
-| `--agent`                                |      | 사용할 에이전트                                                        |
-| `--file`                                 | `-f` | 메시지에 첨부할 파일                                                   |
-| `--format`                               |      | 출력 형식: default(포맷됨) 또는 json(원시 JSON 이벤트)                 |
-| `--title`                                |      | 세션 제목(값이 없으면 프롬프트를 잘라 자동 생성)                       |
-| `--attach`                               |      | 실행 중인 opencode 서버에 연결(예: http://localhost:4096)              |
-| `--port`                                 |      | 로컬 서버 포트(기본값: 랜덤 포트)                                      |
+| 플래그                                                       | 축약 | 설명                                                                       |
+| ------------------------------------------------------------ | ---- | -------------------------------------------------------------------------- |
+| <nobr><code>{"--command"}</code></nobr>                      |      | 실행할 명령(인수는 message로 전달)                                         |
+| <nobr><code>{"--continue"}</code></nobr>                     | `-c` | 마지막 세션 이어서 실행                                                    |
+| <nobr><code>{"--session"}</code></nobr>                      | `-s` | 이어서 실행할 세션 ID                                                      |
+| <nobr><code>{"--fork"}</code></nobr>                         |      | 세션을 이어갈 때 포크 생성 (`--continue` 또는 `--session`과 함께 사용)     |
+| <nobr><code>{"--share"}</code></nobr>                        |      | 세션 공유                                                                  |
+| <nobr><code>{"--model"}</code></nobr>                        | `-m` | 사용할 모델 (`provider/model` 형식)                                        |
+| <nobr><code>{"--agent"}</code></nobr>                        |      | 사용할 에이전트                                                            |
+| <nobr><code>{"--file"}</code></nobr>                         | `-f` | 메시지에 첨부할 파일                                                       |
+| <nobr><code>{"--format"}</code></nobr>                       |      | 출력 형식: default(포맷됨) 또는 json(원시 JSON 이벤트)                     |
+| <nobr><code>{"--title"}</code></nobr>                        |      | 세션 제목(값이 없으면 프롬프트를 잘라 자동 생성)                           |
+| <nobr><code>{"--attach"}</code></nobr>                       |      | 실행 중인 opencode 서버에 연결(예: http://localhost:4096)                  |
+| <nobr><code>{"--password"}</code></nobr>                     | `-p` | Basic auth password (defaults to `OPENCODE_SERVER_PASSWORD`)               |
+| <nobr><code>{"--username"}</code></nobr>                     | `-u` | Basic auth username (defaults to `OPENCODE_SERVER_USERNAME` or `opencode`) |
+| <nobr><code>{"--dir"}</code></nobr>                          |      | Directory to run in, or path on the remote server when attaching           |
+| <nobr><code>{"--port"}</code></nobr>                         |      | 로컬 서버 포트(기본값: 랜덤 포트)                                          |
+| <nobr><code>{"--variant"}</code></nobr>                      |      | Model variant (provider-specific reasoning effort)                         |
+| <nobr><code>{"--thinking"}</code></nobr>                     |      | Show thinking blocks                                                       |
+| <nobr><code>{"--dangerously-skip-permissions"}</code></nobr> |      | Auto-approve permissions that are not explicitly denied (dangerous!)       |
 
 ---
 

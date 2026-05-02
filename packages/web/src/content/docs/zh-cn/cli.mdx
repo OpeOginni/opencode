@@ -339,20 +339,26 @@ opencode run --attach http://localhost:4096 "Explain async/await in JavaScript"
 
 #### 标志
 
-| 标志                                     | 简写 | 描述                                                           |
-| ---------------------------------------- | ---- | -------------------------------------------------------------- |
-| `--command`                              |      | 要运行的命令，使用 message 作为参数                            |
-| <nobr><code>{"--continue"}</code></nobr> | `-c` | 继续上一个会话                                                 |
-| <nobr><code>{"--session"}</code></nobr>  | `-s` | 要继续的会话 ID                                                |
-| <nobr><code>{"--fork"}</code></nobr>     |      | 继续时分叉会话（与 `--continue` 或 `--session` 配合使用）      |
-| `--share`                                |      | 分享会话                                                       |
-| `--model`                                | `-m` | 要使用的模型，格式为 provider/model                            |
-| `--agent`                                |      | 要使用的代理                                                   |
-| `--file`                                 | `-f` | 附加到消息的文件                                               |
-| `--format`                               |      | 格式：default（格式化输出）或 json（原始 JSON 事件）           |
-| `--title`                                |      | 会话标题（未提供值时使用截断的提示词）                         |
-| `--attach`                               |      | 连接到正在运行的 opencode 服务器（例如 http://localhost:4096） |
-| `--port`                                 |      | 本地服务器端口（默认为随机端口）                               |
+| 标志                                                         | 简写 | 描述                                                                       |
+| ------------------------------------------------------------ | ---- | -------------------------------------------------------------------------- |
+| <nobr><code>{"--command"}</code></nobr>                      |      | 要运行的命令，使用 message 作为参数                                        |
+| <nobr><code>{"--continue"}</code></nobr>                     | `-c` | 继续上一个会话                                                             |
+| <nobr><code>{"--session"}</code></nobr>                      | `-s` | 要继续的会话 ID                                                            |
+| <nobr><code>{"--fork"}</code></nobr>                         |      | 继续时分叉会话（与 `--continue` 或 `--session` 配合使用）                  |
+| <nobr><code>{"--share"}</code></nobr>                        |      | 分享会话                                                                   |
+| <nobr><code>{"--model"}</code></nobr>                        | `-m` | 要使用的模型，格式为 provider/model                                        |
+| <nobr><code>{"--agent"}</code></nobr>                        |      | 要使用的代理                                                               |
+| <nobr><code>{"--file"}</code></nobr>                         | `-f` | 附加到消息的文件                                                           |
+| <nobr><code>{"--format"}</code></nobr>                       |      | 格式：default（格式化输出）或 json（原始 JSON 事件）                       |
+| <nobr><code>{"--title"}</code></nobr>                        |      | 会话标题（未提供值时使用截断的提示词）                                     |
+| <nobr><code>{"--attach"}</code></nobr>                       |      | 连接到正在运行的 opencode 服务器（例如 http://localhost:4096）             |
+| <nobr><code>{"--password"}</code></nobr>                     | `-p` | Basic auth password (defaults to `OPENCODE_SERVER_PASSWORD`)               |
+| <nobr><code>{"--username"}</code></nobr>                     | `-u` | Basic auth username (defaults to `OPENCODE_SERVER_USERNAME` or `opencode`) |
+| <nobr><code>{"--dir"}</code></nobr>                          |      | Directory to run in, or path on the remote server when attaching           |
+| <nobr><code>{"--port"}</code></nobr>                         |      | 本地服务器端口（默认为随机端口）                                           |
+| <nobr><code>{"--variant"}</code></nobr>                      |      | Model variant (provider-specific reasoning effort)                         |
+| <nobr><code>{"--thinking"}</code></nobr>                     |      | Show thinking blocks                                                       |
+| <nobr><code>{"--dangerously-skip-permissions"}</code></nobr> |      | Auto-approve permissions that are not explicitly denied (dangerous!)       |
 
 ---
 

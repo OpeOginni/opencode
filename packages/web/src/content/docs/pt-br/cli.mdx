@@ -339,20 +339,26 @@ opencode run --attach http://localhost:4096 "Explique async/await em JavaScript"
 
 #### Opções
 
-| Flag                                     | Curto | Descrição                                                                     |
-| ---------------------------------------- | ----- | ----------------------------------------------------------------------------- |
-| `--command`                              |       | O comando a ser executado, use mensagem para argumentos                       |
-| <nobr><code>{"--continue"}</code></nobr> | `-c`  | Continue a última sessão                                                      |
-| <nobr><code>{"--session"}</code></nobr>  | `-s`  | ID da sessão para continuar                                                   |
-| <nobr><code>{"--fork"}</code></nobr>     |       | Criar um fork da sessão ao continuar (use com `--continue` ou `--session`)    |
-| `--share`                                |       | Compartilhe a sessão                                                          |
-| `--model`                                | `-m`  | Modelo a ser usado na forma de provider/model                                 |
-| `--agent`                                |       | Agente a ser usado                                                            |
-| `--file`                                 | `-f`  | Arquivo(s) a serem anexados à mensagem                                        |
-| `--format`                               |       | Formato: padrão (formatado) ou json (eventos JSON brutos)                     |
-| `--title`                                |       | Título para a sessão (usa o prompt truncado se nenhum valor for fornecido)    |
-| `--attach`                               |       | Anexe a um servidor opencode em execução (por exemplo, http://localhost:4096) |
-| `--port`                                 |       | Porta para o servidor local (padrão para porta aleatória)                     |
+| Flag                                                         | Curto | Descrição                                                                     |
+| ------------------------------------------------------------ | ----- | ----------------------------------------------------------------------------- |
+| <nobr><code>{"--command"}</code></nobr>                      |       | O comando a ser executado, use mensagem para argumentos                       |
+| <nobr><code>{"--continue"}</code></nobr>                     | `-c`  | Continue a última sessão                                                      |
+| <nobr><code>{"--session"}</code></nobr>                      | `-s`  | ID da sessão para continuar                                                   |
+| <nobr><code>{"--fork"}</code></nobr>                         |       | Criar um fork da sessão ao continuar (use com `--continue` ou `--session`)    |
+| <nobr><code>{"--share"}</code></nobr>                        |       | Compartilhe a sessão                                                          |
+| <nobr><code>{"--model"}</code></nobr>                        | `-m`  | Modelo a ser usado na forma de provider/model                                 |
+| <nobr><code>{"--agent"}</code></nobr>                        |       | Agente a ser usado                                                            |
+| <nobr><code>{"--file"}</code></nobr>                         | `-f`  | Arquivo(s) a serem anexados à mensagem                                        |
+| <nobr><code>{"--format"}</code></nobr>                       |       | Formato: padrão (formatado) ou json (eventos JSON brutos)                     |
+| <nobr><code>{"--title"}</code></nobr>                        |       | Título para a sessão (usa o prompt truncado se nenhum valor for fornecido)    |
+| <nobr><code>{"--attach"}</code></nobr>                       |       | Anexe a um servidor opencode em execução (por exemplo, http://localhost:4096) |
+| <nobr><code>{"--password"}</code></nobr>                     | `-p`  | Basic auth password (defaults to `OPENCODE_SERVER_PASSWORD`)                  |
+| <nobr><code>{"--username"}</code></nobr>                     | `-u`  | Basic auth username (defaults to `OPENCODE_SERVER_USERNAME` or `opencode`)    |
+| <nobr><code>{"--dir"}</code></nobr>                          |       | Directory to run in, or path on the remote server when attaching              |
+| <nobr><code>{"--port"}</code></nobr>                         |       | Porta para o servidor local (padrão para porta aleatória)                     |
+| <nobr><code>{"--variant"}</code></nobr>                      |       | Model variant (provider-specific reasoning effort)                            |
+| <nobr><code>{"--thinking"}</code></nobr>                     |       | Show thinking blocks                                                          |
+| <nobr><code>{"--dangerously-skip-permissions"}</code></nobr> |       | Auto-approve permissions that are not explicitly denied (dangerous!)          |
 
 ---
 

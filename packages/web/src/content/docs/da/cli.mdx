@@ -339,20 +339,26 @@ opencode run --attach http://localhost:4096 "Explain async/await in JavaScript"
 
 #### Flag
 
-| Flag                                     | Kort | Beskrivelse                                                                         |
-| ---------------------------------------- | ---- | ----------------------------------------------------------------------------------- |
-| `--command`                              |      | Kommandoen til at køre, brug besked til args                                        |
-| <nobr><code>{"--continue"}</code></nobr> | `-c` | Fortsæt sidste session                                                              |
-| <nobr><code>{"--session"}</code></nobr>  | `-s` | Sessions-id for at fortsætte                                                        |
-| <nobr><code>{"--fork"}</code></nobr>     |      | Forgren sessionen ved fortsættelse (brug med `--continue` eller `--session`)        |
-| `--share`                                |      | Del sessionen                                                                       |
-| `--model`                                | `-m` | Model til brug i form af provider/model                                             |
-| `--agent`                                |      | Agent til brug                                                                      |
-| `--file`                                 | `-f` | Fil(er), der skal vedhæftes til meddelelsen                                         |
-| `--format`                               |      | Format: standard (formateret) eller json (rå JSON hændelser)                        |
-| `--title`                                |      | Titel for sessionen (bruger trunkeret prompt, hvis der ikke er angivet nogen værdi) |
-| `--attach`                               |      | Tilslut til en kørende opencode-server (f.eks. http://localhost:4096)               |
-| `--port`                                 |      | Port til den lokale server (standard til vilkårlig port)                            |
+| Flag                                                         | Kort | Beskrivelse                                                                         |
+| ------------------------------------------------------------ | ---- | ----------------------------------------------------------------------------------- |
+| <nobr><code>{"--command"}</code></nobr>                      |      | Kommandoen til at køre, brug besked til args                                        |
+| <nobr><code>{"--continue"}</code></nobr>                     | `-c` | Fortsæt sidste session                                                              |
+| <nobr><code>{"--session"}</code></nobr>                      | `-s` | Sessions-id for at fortsætte                                                        |
+| <nobr><code>{"--fork"}</code></nobr>                         |      | Forgren sessionen ved fortsættelse (brug med `--continue` eller `--session`)        |
+| <nobr><code>{"--share"}</code></nobr>                        |      | Del sessionen                                                                       |
+| <nobr><code>{"--model"}</code></nobr>                        | `-m` | Model til brug i form af provider/model                                             |
+| <nobr><code>{"--agent"}</code></nobr>                        |      | Agent til brug                                                                      |
+| <nobr><code>{"--file"}</code></nobr>                         | `-f` | Fil(er), der skal vedhæftes til meddelelsen                                         |
+| <nobr><code>{"--format"}</code></nobr>                       |      | Format: standard (formateret) eller json (rå JSON hændelser)                        |
+| <nobr><code>{"--title"}</code></nobr>                        |      | Titel for sessionen (bruger trunkeret prompt, hvis der ikke er angivet nogen værdi) |
+| <nobr><code>{"--attach"}</code></nobr>                       |      | Tilslut til en kørende opencode-server (f.eks. http://localhost:4096)               |
+| <nobr><code>{"--password"}</code></nobr>                     | `-p` | Basic auth password (defaults to `OPENCODE_SERVER_PASSWORD`)                        |
+| <nobr><code>{"--username"}</code></nobr>                     | `-u` | Basic auth username (defaults to `OPENCODE_SERVER_USERNAME` or `opencode`)          |
+| <nobr><code>{"--dir"}</code></nobr>                          |      | Directory to run in, or path on the remote server when attaching                    |
+| <nobr><code>{"--port"}</code></nobr>                         |      | Port til den lokale server (standard til vilkårlig port)                            |
+| <nobr><code>{"--variant"}</code></nobr>                      |      | Model variant (provider-specific reasoning effort)                                  |
+| <nobr><code>{"--thinking"}</code></nobr>                     |      | Show thinking blocks                                                                |
+| <nobr><code>{"--dangerously-skip-permissions"}</code></nobr> |      | Auto-approve permissions that are not explicitly denied (dangerous!)                |
 
 ---
 

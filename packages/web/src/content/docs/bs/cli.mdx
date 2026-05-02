@@ -336,20 +336,26 @@ opencode run --attach http://localhost:4096 "Explain async/await in JavaScript"
 
 #### Opcije
 
-| Opcija                                   | Kratko | Opis                                                                     |
-| ---------------------------------------- | ------ | ------------------------------------------------------------------------ |
-| `--command`                              |        | Naredba za pokretanje, koristite poruku za argumente                     |
-| <nobr><code>{"--continue"}</code></nobr> | `-c`   | Nastavite posljednju sesiju                                              |
-| <nobr><code>{"--session"}</code></nobr>  | `-s`   | ID sesije za nastavak                                                    |
-| <nobr><code>{"--fork"}</code></nobr>     |        | Forkujte sesiju pri nastavku (koristiti sa `--continue` ili `--session`) |
-| `--share`                                |        | Podijelite sesiju                                                        |
-| `--model`                                | `-m`   | Model za korištenje u obliku provider/model                              |
-| `--agent`                                |        | Agent za korištenje                                                      |
-| `--file`                                 | `-f`   | Fajlovi koje treba priložiti poruci                                      |
-| `--format`                               |        | Format: default (formatiran) ili json (sirovi JSON događaji)             |
-| `--title`                                |        | Naslov sesije (koristi skraćeni prompt ako nije navedena vrijednost)     |
-| `--attach`                               |        | Priključite na pokrenuti OpenCode server (npr. http://localhost:4096)    |
-| `--port`                                 |        | Port za lokalni server (zadano na nasumični port)                        |
+| Opcija                                                       | Kratko | Opis                                                                       |
+| ------------------------------------------------------------ | ------ | -------------------------------------------------------------------------- |
+| <nobr><code>{"--command"}</code></nobr>                      |        | Naredba za pokretanje, koristite poruku za argumente                       |
+| <nobr><code>{"--continue"}</code></nobr>                     | `-c`   | Nastavite posljednju sesiju                                                |
+| <nobr><code>{"--session"}</code></nobr>                      | `-s`   | ID sesije za nastavak                                                      |
+| <nobr><code>{"--fork"}</code></nobr>                         |        | Forkujte sesiju pri nastavku (koristiti sa `--continue` ili `--session`)   |
+| <nobr><code>{"--share"}</code></nobr>                        |        | Podijelite sesiju                                                          |
+| <nobr><code>{"--model"}</code></nobr>                        | `-m`   | Model za korištenje u obliku provider/model                                |
+| <nobr><code>{"--agent"}</code></nobr>                        |        | Agent za korištenje                                                        |
+| <nobr><code>{"--file"}</code></nobr>                         | `-f`   | Fajlovi koje treba priložiti poruci                                        |
+| <nobr><code>{"--format"}</code></nobr>                       |        | Format: default (formatiran) ili json (sirovi JSON događaji)               |
+| <nobr><code>{"--title"}</code></nobr>                        |        | Naslov sesije (koristi skraćeni prompt ako nije navedena vrijednost)       |
+| <nobr><code>{"--attach"}</code></nobr>                       |        | Priključite na pokrenuti OpenCode server (npr. http://localhost:4096)      |
+| <nobr><code>{"--password"}</code></nobr>                     | `-p`   | Basic auth password (defaults to `OPENCODE_SERVER_PASSWORD`)               |
+| <nobr><code>{"--username"}</code></nobr>                     | `-u`   | Basic auth username (defaults to `OPENCODE_SERVER_USERNAME` or `opencode`) |
+| <nobr><code>{"--dir"}</code></nobr>                          |        | Directory to run in, or path on the remote server when attaching           |
+| <nobr><code>{"--port"}</code></nobr>                         |        | Port za lokalni server (zadano na nasumični port)                          |
+| <nobr><code>{"--variant"}</code></nobr>                      |        | Model variant (provider-specific reasoning effort)                         |
+| <nobr><code>{"--thinking"}</code></nobr>                     |        | Show thinking blocks                                                       |
+| <nobr><code>{"--dangerously-skip-permissions"}</code></nobr> |        | Auto-approve permissions that are not explicitly denied (dangerous!)       |
 
 ---
 
