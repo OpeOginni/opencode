@@ -78,10 +78,14 @@ opencode attach http://10.20.30.40:4096
 
 #### Flagi
 
-| Flaga       | Skrót | Opis                                    |
-| ----------- | ----- | --------------------------------------- |
-| `--dir`     |       | Katalog roboczy, w którym uruchomić TUI |
-| `--session` | `-s`  | Identyfikator sesji do kontynuowania    |
+| Flaga                                    | Skrót | Opis                                                                                                  |
+| ---------------------------------------- | ----- | ----------------------------------------------------------------------------------------------------- |
+| <nobr><code>{"--dir"}</code></nobr>      |       | Katalog roboczy, w którym uruchomić TUI                                                               |
+| <nobr><code>{"--continue"}</code></nobr> | `-c`  | Kontynuuj ostatnią sesję                                                                              |
+| <nobr><code>{"--session"}</code></nobr>  | `-s`  | Identyfikator sesji do kontynuowania                                                                  |
+| <nobr><code>{"--fork"}</code></nobr>     |       | Rozgałęź sesję podczas kontynuowania (użyj z `--continue` lub `--session`)                            |
+| <nobr><code>{"--password"}</code></nobr> | `-p`  | Hasło uwierzytelniania podstawowego (domyślnie `OPENCODE_SERVER_PASSWORD`)                            |
+| <nobr><code>{"--username"}</code></nobr> | `-u`  | Nazwa użytkownika uwierzytelniania podstawowego (domyślnie `OPENCODE_SERVER_USERNAME` lub `opencode`) |
 
 ---
 
@@ -335,20 +339,25 @@ opencode run --attach http://localhost:4096 "Explain async/await in JavaScript"
 
 #### Flagi
 
-| Flaga        | Skrót | Opis                                                                    |
-| ------------ | ----- | ----------------------------------------------------------------------- |
-| `--command`  |       | Polecenie do uruchomienia, reszta to argumenty                          |
-| `--continue` | `-c`  | Kontynuuj ostatnią sesję                                                |
-| `--session`  | `-s`  | Identyfikator sesji do kontynuowania                                    |
-| `--fork`     |       | Sklonuj sesję podczas kontynuacji (użyj z `--continue` lub `--session`) |
-| `--share`    |       | Udostępnij sesję po zakończeniu                                         |
-| `--model`    | `-m`  | Model do użycia w formacie dostawca/model                               |
-| `--agent`    |       | Agent do użycia                                                         |
-| `--file`     | `-f`  | Pliki do załączenia do wiadomości                                       |
-| `--format`   |       | Format wyjściowy: `default` (sformatowany) lub `json` (surowy JSON)     |
-| `--title`    |       | Tytuł sesji (jeśli nie podano, zostanie wygenerowany z promptu)         |
-| `--attach`   |       | Dołącz do działającego serwera OpenCode (np. http://localhost:4096)     |
-| `--port`     |       | Port dla serwera lokalnego (domyślnie losowy)                           |
+| Flaga                                    | Skrót | Opis                                                                                                  |
+| ---------------------------------------- | ----- | ----------------------------------------------------------------------------------------------------- |
+| <nobr><code>{"--command"}</code></nobr>  |       | Polecenie do uruchomienia, reszta to argumenty                                                        |
+| <nobr><code>{"--continue"}</code></nobr> | `-c`  | Kontynuuj ostatnią sesję                                                                              |
+| <nobr><code>{"--session"}</code></nobr>  | `-s`  | Identyfikator sesji do kontynuowania                                                                  |
+| <nobr><code>{"--fork"}</code></nobr>     |       | Sklonuj sesję podczas kontynuacji (użyj z `--continue` lub `--session`)                               |
+| <nobr><code>{"--share"}</code></nobr>    |       | Udostępnij sesję po zakończeniu                                                                       |
+| <nobr><code>{"--model"}</code></nobr>    | `-m`  | Model do użycia w formacie dostawca/model                                                             |
+| <nobr><code>{"--agent"}</code></nobr>    |       | Agent do użycia                                                                                       |
+| <nobr><code>{"--file"}</code></nobr>     | `-f`  | Pliki do załączenia do wiadomości                                                                     |
+| <nobr><code>{"--format"}</code></nobr>   |       | Format wyjściowy: `default` (sformatowany) lub `json` (surowy JSON)                                   |
+| <nobr><code>{"--title"}</code></nobr>    |       | Tytuł sesji (jeśli nie podano, zostanie wygenerowany z promptu)                                       |
+| <nobr><code>{"--attach"}</code></nobr>   |       | Dołącz do działającego serwera OpenCode (np. http://localhost:4096)                                   |
+| <nobr><code>{"--password"}</code></nobr> | `-p`  | Hasło uwierzytelniania podstawowego (domyślnie `OPENCODE_SERVER_PASSWORD`)                            |
+| <nobr><code>{"--username"}</code></nobr> | `-u`  | Nazwa użytkownika uwierzytelniania podstawowego (domyślnie `OPENCODE_SERVER_USERNAME` lub `opencode`) |
+| <nobr><code>{"--dir"}</code></nobr>      |       | Katalog do uruchomienia lub ścieżka na zdalnym serwerze podczas dołączania                            |
+| <nobr><code>{"--variant"}</code></nobr>  |       | Wariant modelu (poziom wnioskowania specyficzny dla dostawcy)                                         |
+| <nobr><code>{"--thinking"}</code></nobr> |       | Pokaż bloki myślenia                                                                                  |
+| <nobr><code>{"--port"}</code></nobr>     |       | Port dla serwera lokalnego (domyślnie losowy)                                                         |
 
 ---
 
