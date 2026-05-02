@@ -29,7 +29,7 @@ import type {
   ExperimentalConsoleSwitchOrgResponses,
   ExperimentalResourceListResponses,
   ExperimentalSessionListResponses,
-  ExperimentalWorkspaceAdaptorListResponses,
+  ExperimentalWorkspaceAdapterListResponses,
   ExperimentalWorkspaceCreateErrors,
   ExperimentalWorkspaceCreateResponses,
   ExperimentalWorkspaceListResponses,
@@ -105,6 +105,7 @@ import type {
   PtyListResponses,
   PtyRemoveErrors,
   PtyRemoveResponses,
+  PtyShellsResponses,
   PtyUpdateErrors,
   PtyUpdateResponses,
   QuestionAnswer,
@@ -163,6 +164,7 @@ import type {
   SyncHistoryListResponses,
   SyncReplayErrors,
   SyncReplayResponses,
+  SyncStartResponses,
   TextPartInput,
   ToolIdsErrors,
   ToolIdsResponses,
@@ -510,11 +512,11 @@ export class App extends HeyApiClient {
   }
 }
 
-export class Adaptor extends HeyApiClient {
+export class Adapter extends HeyApiClient {
   /**
-   * List workspace adaptors
+   * List workspace adapters
    *
-   * List all available workspace adaptors for the current project.
+   * List all available workspace adapters for the current project.
    */
   public list<ThrowOnError extends boolean = false>(
     parameters?: {
@@ -534,8 +536,8 @@ export class Adaptor extends HeyApiClient {
         },
       ],
     )
-    return (options?.client ?? this.client).get<ExperimentalWorkspaceAdaptorListResponses, unknown, ThrowOnError>({
-      url: "/experimental/workspace/adaptor",
+    return (options?.client ?? this.client).get<ExperimentalWorkspaceAdapterListResponses, unknown, ThrowOnError>({
+      url: "/experimental/workspace/adapter",
       ...options,
       ...params,
     })
@@ -729,9 +731,9 @@ export class Workspace extends HeyApiClient {
     })
   }
 
-  private _adaptor?: Adaptor
-  get adaptor(): Adaptor {
-    return (this._adaptor ??= new Adaptor({ client: this.client }))
+  private _adapter?: Adapter
+  get adapter(): Adapter {
+    return (this._adapter ??= new Adapter({ client: this.client }))
   }
 }
 
@@ -846,12 +848,12 @@ export class Session extends HeyApiClient {
     parameters?: {
       directory?: string
       workspace?: string
-      roots?: boolean
+      roots?: boolean | "true" | "false"
       start?: number
       cursor?: number
       search?: string
       limit?: number
-      archived?: boolean
+      archived?: boolean | "true" | "false"
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -1079,6 +1081,36 @@ export class Project extends HeyApiClient {
 }
 
 export class Pty extends HeyApiClient {
+  /**
+   * List available shells
+   *
+   * Get a list of available shells on the system.
+   */
+  public shells<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<PtyShellsResponses, unknown, ThrowOnError>({
+      url: "/pty/shells",
+      ...options,
+      ...params,
+    })
+  }
+
   /**
    * List PTY sessions
    *
@@ -1615,7 +1647,9 @@ export class Session2 extends HeyApiClient {
     parameters?: {
       directory?: string
       workspace?: string
-      roots?: boolean
+      scope?: "project"
+      path?: string
+      roots?: boolean | "true" | "false"
       start?: number
       search?: string
       limit?: number
@@ -1629,6 +1663,8 @@ export class Session2 extends HeyApiClient {
           args: [
             { in: "query", key: "directory" },
             { in: "query", key: "workspace" },
+            { in: "query", key: "scope" },
+            { in: "query", key: "path" },
             { in: "query", key: "roots" },
             { in: "query", key: "start" },
             { in: "query", key: "search" },
@@ -3038,7 +3074,7 @@ export class History extends HeyApiClient {
         },
       ],
     )
-    return (options?.client ?? this.client).get<SyncHistoryListResponses, SyncHistoryListErrors, ThrowOnError>({
+    return (options?.client ?? this.client).post<SyncHistoryListResponses, SyncHistoryListErrors, ThrowOnError>({
       url: "/sync/history",
       ...options,
       ...params,
@@ -3052,6 +3088,36 @@ export class History extends HeyApiClient {
 }
 
 export class Sync extends HeyApiClient {
+  /**
+   * Start workspace sync
+   *
+   * Start sync loops for workspaces in the current project that have active sessions.
+   */
+  public start<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<SyncStartResponses, unknown, ThrowOnError>({
+      url: "/sync/start",
+      ...options,
+      ...params,
+    })
+  }
+
   /**
    * Replay sync events
    *
