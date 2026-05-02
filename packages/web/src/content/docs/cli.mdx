@@ -29,16 +29,19 @@ opencode [project]
 
 #### Flags
 
-| Flag         | Short | Description                                                             |
-| ------------ | ----- | ----------------------------------------------------------------------- |
-| `--continue` | `-c`  | Continue the last session                                               |
-| `--session`  | `-s`  | Session ID to continue                                                  |
-| `--fork`     |       | Fork the session when continuing (use with `--continue` or `--session`) |
-| `--prompt`   |       | Prompt to use                                                           |
-| `--model`    | `-m`  | Model to use in the form of provider/model                              |
-| `--agent`    |       | Agent to use                                                            |
-| `--port`     |       | Port to listen on                                                       |
-| `--hostname` |       | Hostname to listen on                                                   |
+| Flag                                        | Short | Description                                                             |
+| ------------------------------------------- | ----- | ----------------------------------------------------------------------- |
+| <nobr><code>{"--continue"}</code></nobr>    | `-c`  | Continue the last session                                               |
+| <nobr><code>{"--session"}</code></nobr>     | `-s`  | Session ID to continue                                                  |
+| <nobr><code>{"--fork"}</code></nobr>        |       | Fork the session when continuing (use with `--continue` or `--session`) |
+| <nobr><code>{"--prompt"}</code></nobr>      |       | Prompt to use                                                           |
+| <nobr><code>{"--model"}</code></nobr>       | `-m`  | Model to use in the form of provider/model                              |
+| <nobr><code>{"--agent"}</code></nobr>       |       | Agent to use                                                            |
+| <nobr><code>{"--port"}</code></nobr>        |       | Port to listen on                                                       |
+| <nobr><code>{"--hostname"}</code></nobr>    |       | Hostname to listen on                                                   |
+| <nobr><code>{"--mdns"}</code></nobr>        |       | Enable mDNS discovery                                                   |
+| <nobr><code>{"--mdns-domain"}</code></nobr> |       | Custom mDNS domain name                                                 |
+| <nobr><code>{"--cors"}</code></nobr>        |       | Additional browser origin(s) to allow CORS                              |
 
 ---
 
@@ -97,13 +100,13 @@ This command will guide you through creating a new agent with a custom system pr
 
 #### Flags
 
-| Flag            | Description                                                                                                                                                                                                                |
-| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--path`        | Directory to write the agent file to (defaults to global or `.opencode/agent` based on the prompt)                                                                                                                         |
-| `--description` | What the agent should do                                                                                                                                                                                                   |
-| `--mode`        | Agent mode: `all`, `primary`, or `subagent`                                                                                                                                                                                |
-| `--permissions` | Comma-separated list of permissions to allow (default: all). Available: `bash`, `read`, `edit`, `glob`, `grep`, `webfetch`, `task`, `todowrite`, `websearch`, `lsp`, `skill`. Anything omitted is denied. Alias: `--tools` |
-| `--model`, `-m` | Model to use, in `provider/model` format                                                                                                                                                                                   |
+| Flag                                        | Short | Description                                                                                                                                                                                                                |
+| ------------------------------------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <nobr><code>{"--path"}</code></nobr>        |       | Directory to write the agent file to (defaults to global or `.opencode/agent` based on the prompt)                                                                                                                         |
+| <nobr><code>{"--description"}</code></nobr> |       | What the agent should do                                                                                                                                                                                                   |
+| <nobr><code>{"--mode"}</code></nobr>        |       | Agent mode: `all`, `primary`, or `subagent`                                                                                                                                                                                |
+| <nobr><code>{"--permissions"}</code></nobr> |       | Comma-separated list of permissions to allow (default: all). Available: `bash`, `read`, `edit`, `glob`, `grep`, `webfetch`, `task`, `todowrite`, `websearch`, `lsp`, `skill`. Anything omitted is denied. Alias: `--tools` |
+| <nobr><code>{"--model"}</code></nobr>       | `-m`  | Model to use, in `provider/model` format                                                                                                                                                                                   |
 
 Passing all of `--path`, `--description`, `--mode`, and `--permissions` runs the command non-interactively.
 
@@ -127,6 +130,12 @@ Command to manage credentials and login for providers.
 opencode auth [command]
 ```
 
+You can also use the canonical command name.
+
+```bash
+opencode providers [command]
+```
+
 ---
 
 #### login
@@ -138,6 +147,13 @@ opencode auth login
 ```
 
 When OpenCode starts up it loads the providers from the credentials file. And if there are any keys defined in your environments or a `.env` file in your project.
+
+##### Flags
+
+| Flag                                     | Short | Description                                          |
+| ---------------------------------------- | ----- | ---------------------------------------------------- |
+| <nobr><code>{"--provider"}</code></nobr> | `-p`  | Provider ID or name to log in to                     |
+| <nobr><code>{"--method"}</code></nobr>   | `-m`  | Login method label to use, skipping method selection |
 
 ---
 
@@ -199,10 +215,10 @@ opencode github run
 
 ##### Flags
 
-| Flag      | Description                            |
-| --------- | -------------------------------------- |
-| `--event` | GitHub mock event to run the agent for |
-| `--token` | GitHub personal access token           |
+| Flag                                  | Description                            |
+| ------------------------------------- | -------------------------------------- |
+| <nobr><code>{"--event"}</code></nobr> | GitHub mock event to run the agent for |
+| <nobr><code>{"--token"}</code></nobr> | GitHub personal access token           |
 
 ---
 
@@ -308,10 +324,10 @@ opencode models anthropic
 
 #### Flags
 
-| Flag        | Description                                                  |
-| ----------- | ------------------------------------------------------------ |
-| `--refresh` | Refresh the models cache from models.dev                     |
-| `--verbose` | Use more verbose model output (includes metadata like costs) |
+| Flag                                    | Description                                                  |
+| --------------------------------------- | ------------------------------------------------------------ |
+| <nobr><code>{"--refresh"}</code></nobr> | Refresh the models cache from models.dev                     |
+| <nobr><code>{"--verbose"}</code></nobr> | Use more verbose model output (includes metadata like costs) |
 
 Use the `--refresh` flag to update the cached model list. This is useful when new models have been added to a provider and you want to see them in OpenCode.
 
@@ -377,12 +393,13 @@ This starts an HTTP server that provides API access to opencode functionality wi
 
 #### Flags
 
-| Flag         | Description                                |
-| ------------ | ------------------------------------------ |
-| `--port`     | Port to listen on                          |
-| `--hostname` | Hostname to listen on                      |
-| `--mdns`     | Enable mDNS discovery                      |
-| `--cors`     | Additional browser origin(s) to allow CORS |
+| Flag                                        | Description                                |
+| ------------------------------------------- | ------------------------------------------ |
+| <nobr><code>{"--port"}</code></nobr>        | Port to listen on                          |
+| <nobr><code>{"--hostname"}</code></nobr>    | Hostname to listen on                      |
+| <nobr><code>{"--mdns"}</code></nobr>        | Enable mDNS discovery                      |
+| <nobr><code>{"--mdns-domain"}</code></nobr> | Custom mDNS domain name                    |
+| <nobr><code>{"--cors"}</code></nobr>        | Additional browser origin(s) to allow CORS |
 
 ---
 
@@ -406,10 +423,20 @@ opencode session list
 
 ##### Flags
 
-| Flag          | Short | Description                          |
-| ------------- | ----- | ------------------------------------ |
-| `--max-count` | `-n`  | Limit to N most recent sessions      |
-| `--format`    |       | Output format: table or json (table) |
+| Flag                                      | Short | Description                          |
+| ----------------------------------------- | ----- | ------------------------------------ |
+| <nobr><code>{"--max-count"}</code></nobr> | `-n`  | Limit to N most recent sessions      |
+| <nobr><code>{"--format"}</code></nobr>    |       | Output format: table or json (table) |
+
+---
+
+#### delete
+
+Delete an OpenCode session.
+
+```bash
+opencode session delete <sessionID>
+```
 
 ---
 
@@ -423,12 +450,12 @@ opencode stats
 
 #### Flags
 
-| Flag        | Description                                                                 |
-| ----------- | --------------------------------------------------------------------------- |
-| `--days`    | Show stats for the last N days (all time)                                   |
-| `--tools`   | Number of tools to show (all)                                               |
-| `--models`  | Show model usage breakdown (hidden by default). Pass a number to show top N |
-| `--project` | Filter by project (all projects, empty string: current project)             |
+| Flag                                    | Description                                                                 |
+| --------------------------------------- | --------------------------------------------------------------------------- |
+| <nobr><code>{"--days"}</code></nobr>    | Show stats for the last N days (all time)                                   |
+| <nobr><code>{"--tools"}</code></nobr>   | Number of tools to show (all)                                               |
+| <nobr><code>{"--models"}</code></nobr>  | Show model usage breakdown (hidden by default). Pass a number to show top N |
+| <nobr><code>{"--project"}</code></nobr> | Filter by project (all projects, empty string: current project)             |
 
 ---
 
@@ -441,6 +468,12 @@ opencode export [sessionID]
 ```
 
 If you don't provide a session ID, you'll be prompted to select from available sessions.
+
+#### Flags
+
+| Flag                                     | Description                           |
+| ---------------------------------------- | ------------------------------------- |
+| <nobr><code>{"--sanitize"}</code></nobr> | Redact sensitive transcript/file data |
 
 ---
 
@@ -473,12 +506,13 @@ This starts an HTTP server and opens a web browser to access OpenCode through a 
 
 #### Flags
 
-| Flag         | Description                                |
-| ------------ | ------------------------------------------ |
-| `--port`     | Port to listen on                          |
-| `--hostname` | Hostname to listen on                      |
-| `--mdns`     | Enable mDNS discovery                      |
-| `--cors`     | Additional browser origin(s) to allow CORS |
+| Flag                                        | Description                                |
+| ------------------------------------------- | ------------------------------------------ |
+| <nobr><code>{"--port"}</code></nobr>        | Port to listen on                          |
+| <nobr><code>{"--hostname"}</code></nobr>    | Hostname to listen on                      |
+| <nobr><code>{"--mdns"}</code></nobr>        | Enable mDNS discovery                      |
+| <nobr><code>{"--mdns-domain"}</code></nobr> | Custom mDNS domain name                    |
+| <nobr><code>{"--cors"}</code></nobr>        | Additional browser origin(s) to allow CORS |
 
 ---
 
@@ -494,11 +528,109 @@ This command starts an ACP server that communicates via stdin/stdout using nd-JS
 
 #### Flags
 
-| Flag         | Description           |
-| ------------ | --------------------- |
-| `--cwd`      | Working directory     |
-| `--port`     | Port to listen on     |
-| `--hostname` | Hostname to listen on |
+| Flag                                        | Description                                |
+| ------------------------------------------- | ------------------------------------------ |
+| <nobr><code>{"--cwd"}</code></nobr>         | Working directory                          |
+| <nobr><code>{"--port"}</code></nobr>        | Port to listen on                          |
+| <nobr><code>{"--hostname"}</code></nobr>    | Hostname to listen on                      |
+| <nobr><code>{"--mdns"}</code></nobr>        | Enable mDNS discovery                      |
+| <nobr><code>{"--mdns-domain"}</code></nobr> | Custom mDNS domain name                    |
+| <nobr><code>{"--cors"}</code></nobr>        | Additional browser origin(s) to allow CORS |
+
+---
+
+### plugin
+
+Install a plugin and update your config.
+
+```bash
+opencode plugin <module>
+```
+
+Or use the alias.
+
+```bash
+opencode plug <module>
+```
+
+#### Flags
+
+| Flag                                   | Short | Description                     |
+| -------------------------------------- | ----- | ------------------------------- |
+| <nobr><code>{"--global"}</code></nobr> | `-g`  | Install in global config        |
+| <nobr><code>{"--force"}</code></nobr>  | `-f`  | Replace existing plugin version |
+
+---
+
+### pr
+
+Fetch and checkout a GitHub PR branch, then run OpenCode.
+
+```bash
+opencode pr <number>
+```
+
+---
+
+### db
+
+Database tools.
+
+```bash
+opencode db [query]
+```
+
+#### Flags
+
+| Flag                                   | Description                    |
+| -------------------------------------- | ------------------------------ |
+| <nobr><code>{"--format"}</code></nobr> | Output format: `json` or `tsv` |
+
+---
+
+#### path
+
+Print the database path.
+
+```bash
+opencode db path
+```
+
+---
+
+#### migrate
+
+Migrate JSON data to SQLite.
+
+```bash
+opencode db migrate
+```
+
+---
+
+### generate
+
+Generate the OpenAPI specification.
+
+```bash
+opencode generate
+```
+
+#### Flags
+
+| Flag                                    | Description                                                    |
+| --------------------------------------- | -------------------------------------------------------------- |
+| <nobr><code>{"--httpapi"}</code></nobr> | Generate OpenAPI from the experimental Effect HttpApi contract |
+
+---
+
+### debug
+
+Debugging and troubleshooting tools.
+
+```bash
+opencode debug [command]
+```
 
 ---
 
@@ -512,12 +644,12 @@ opencode uninstall
 
 #### Flags
 
-| Flag            | Short | Description                                 |
-| --------------- | ----- | ------------------------------------------- |
-| `--keep-config` | `-c`  | Keep configuration files                    |
-| `--keep-data`   | `-d`  | Keep session data and snapshots             |
-| `--dry-run`     |       | Show what would be removed without removing |
-| `--force`       | `-f`  | Skip confirmation prompts                   |
+| Flag                                        | Short | Description                                 |
+| ------------------------------------------- | ----- | ------------------------------------------- |
+| <nobr><code>{"--keep-config"}</code></nobr> | `-c`  | Keep configuration files                    |
+| <nobr><code>{"--keep-data"}</code></nobr>   | `-d`  | Keep session data and snapshots             |
+| <nobr><code>{"--dry-run"}</code></nobr>     |       | Show what would be removed without removing |
+| <nobr><code>{"--force"}</code></nobr>       | `-f`  | Skip confirmation prompts                   |
 
 ---
 
@@ -543,9 +675,9 @@ opencode upgrade v0.1.48
 
 #### Flags
 
-| Flag       | Short | Description                                                       |
-| ---------- | ----- | ----------------------------------------------------------------- |
-| `--method` | `-m`  | The installation method that was used; curl, npm, pnpm, bun, brew |
+| Flag                                   | Short | Description                                                       |
+| -------------------------------------- | ----- | ----------------------------------------------------------------- |
+| <nobr><code>{"--method"}</code></nobr> | `-m`  | The installation method that was used; curl, npm, pnpm, bun, brew |
 
 ---
 
@@ -553,12 +685,13 @@ opencode upgrade v0.1.48
 
 The opencode CLI takes the following global flags.
 
-| Flag           | Short | Description                          |
-| -------------- | ----- | ------------------------------------ |
-| `--help`       | `-h`  | Display help                         |
-| `--version`    | `-v`  | Print version number                 |
-| `--print-logs` |       | Print logs to stderr                 |
-| `--log-level`  |       | Log level (DEBUG, INFO, WARN, ERROR) |
+| Flag                                       | Short | Description                          |
+| ------------------------------------------ | ----- | ------------------------------------ |
+| <nobr><code>{"--help"}</code></nobr>       | `-h`  | Display help                         |
+| <nobr><code>{"--version"}</code></nobr>    | `-v`  | Print version number                 |
+| <nobr><code>{"--print-logs"}</code></nobr> |       | Print logs to stderr                 |
+| <nobr><code>{"--log-level"}</code></nobr>  |       | Log level (DEBUG, INFO, WARN, ERROR) |
+| <nobr><code>{"--pure"}</code></nobr>       |       | Run without external plugins         |
 
 ---
 
