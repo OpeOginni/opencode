@@ -1,8 +1,7 @@
-import { getAdaptor } from "@/control-plane/adaptors"
+import { getAdapter } from "@/control-plane/adapters"
 import { WorkspaceID } from "@/control-plane/schema"
 import type { Target } from "@/control-plane/types"
 import { Workspace } from "@/control-plane/workspace"
-import { Instance } from "@/project/instance"
 import { Session } from "@/session/session"
 import { HttpApiProxy } from "./proxy"
 import * as Fence from "@/server/fence"
@@ -43,14 +42,6 @@ export class WorkspaceRoutingMiddleware extends HttpApiMiddleware.Service<
   }
 >()("@opencode/ExperimentalHttpApiWorkspaceRouting") {}
 
-function currentDirectory(): string {
-  try {
-    return Instance.directory
-  } catch {
-    return process.cwd()
-  }
-}
-
 function requestURL(request: HttpServerRequest.HttpServerRequest): URL {
   return new URL(request.url, "http://localhost")
 }
@@ -65,7 +56,7 @@ function selectedWorkspaceID(url: URL, sessionWorkspaceID?: WorkspaceID): Worksp
 }
 
 function defaultDirectory(request: HttpServerRequest.HttpServerRequest, url: URL): string {
-  return url.searchParams.get("directory") || request.headers["x-opencode-directory"] || currentDirectory()
+  return url.searchParams.get("directory") || request.headers["x-opencode-directory"] || process.cwd()
 }
 
 function shouldStayOnControlPlane(request: HttpServerRequest.HttpServerRequest, url: URL): boolean {
@@ -89,8 +80,8 @@ function missingWorkspaceResponse(id: WorkspaceID): HttpServerResponse.HttpServe
 
 function resolveTarget(workspace: Workspace.Info): Effect.Effect<Target> {
   return Effect.gen(function* () {
-    const adaptor = yield* Effect.sync(() => getAdaptor(workspace.projectID, workspace.type))
-    return yield* Effect.promise(() => Promise.resolve(adaptor.target(workspace)))
+    const adapter = yield* Effect.sync(() => getAdapter(workspace.projectID, workspace.type))
+    return yield* Effect.promise(() => Promise.resolve(adapter.target(workspace)))
   })
 }
 

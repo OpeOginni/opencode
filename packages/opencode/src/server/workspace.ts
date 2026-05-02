@@ -1,11 +1,10 @@
 import type { MiddlewareHandler } from "hono"
 import type { UpgradeWebSocket } from "hono/ws"
-import { getAdaptor } from "@/control-plane/adaptors"
+import { getAdapter } from "@/control-plane/adapters"
 import { WorkspaceID } from "@/control-plane/schema"
 import { WorkspaceContext } from "@/control-plane/workspace-context"
 import { Workspace } from "@/control-plane/workspace"
 import { Flag } from "@opencode-ai/core/flag/flag"
-import { InstanceBootstrap } from "@/project/bootstrap"
 import { Instance } from "@/project/instance"
 import { Session } from "@/session/session"
 import { SessionID } from "@/session/schema"
@@ -91,8 +90,8 @@ export function WorkspaceRouterMiddleware(upgrade: UpgradeWebSocket): Middleware
       return next()
     }
 
-    const adaptor = getAdaptor(workspace.projectID, workspace.type)
-    const target = await adaptor.target(workspace)
+    const adapter = getAdapter(workspace.projectID, workspace.type)
+    const target = await adapter.target(workspace)
 
     if (target.type === "local") {
       return WorkspaceContext.provide({
@@ -100,7 +99,6 @@ export function WorkspaceRouterMiddleware(upgrade: UpgradeWebSocket): Middleware
         fn: () =>
           Instance.provide({
             directory: target.directory,
-            init: () => AppRuntime.runPromise(InstanceBootstrap),
             async fn() {
               return next()
             },
