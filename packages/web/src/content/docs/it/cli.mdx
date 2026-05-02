@@ -78,10 +78,14 @@ opencode attach http://10.20.30.40:4096
 
 #### Flag
 
-| Flag        | Breve | Descrizione                             |
-| ----------- | ----- | --------------------------------------- |
-| `--dir`     |       | Working directory in cui avviare la TUI |
-| `--session` | `-s`  | ID sessione da continuare               |
+| Flag         | Breve | Descrizione                                                                                     |
+| ------------ | ----- | ----------------------------------------------------------------------------------------------- |
+| `--dir`      |       | Directory di lavoro in cui avviare la TUI                                                       |
+| `--continue` | `-c`  | Continua l'ultima sessione                                                                      |
+| `--session`  | `-s`  | ID sessione da continuare                                                                       |
+| `--fork`     |       | Crea un fork della sessione durante la continuazione (usa con `--continue` o `--session`)       |
+| `--password` | `-p`  | Password per l'autenticazione di base (predefinita: `OPENCODE_SERVER_PASSWORD`)                 |
+| `--username` | `-u`  | Nome utente per l'autenticazione di base (predefinito: `OPENCODE_SERVER_USERNAME` o `opencode`) |
 
 ---
 

@@ -78,10 +78,14 @@ opencode attach http://10.20.30.40:4096
 
 #### Bayraklar
 
-| Bayrak      | Kısa | Tanım                                |
-| ----------- | ---- | ------------------------------------ |
-| `--dir`     |      | TUI'yi başlatmak için çalışma dizini |
-| `--session` | `-s` | Devam edecek oturum açma bilgileri   |
+| Bayrak       | Kısa | Tanım                                                                                         |
+| ------------ | ---- | --------------------------------------------------------------------------------------------- |
+| `--dir`      |      | TUI'yi başlatmak için çalışma dizini                                                          |
+| `--continue` | `-c` | Son oturuma devam et                                                                          |
+| `--session`  | `-s` | Devam edilecek oturum ID'si                                                                   |
+| `--fork`     |      | Devam ederken oturumu çatalla (`--continue` veya `--session` ile kullanın)                    |
+| `--password` | `-p` | Temel kimlik doğrulama parolası (varsayılan: `OPENCODE_SERVER_PASSWORD`)                      |
+| `--username` | `-u` | Temel kimlik doğrulama kullanıcı adı (varsayılan: `OPENCODE_SERVER_USERNAME` veya `opencode`) |
 
 ---
 

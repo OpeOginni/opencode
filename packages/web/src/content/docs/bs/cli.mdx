@@ -78,10 +78,14 @@ opencode attach http://10.20.30.40:4096
 
 #### Opcije
 
-| Opcija      | Kratko | Opis                                 |
-| ----------- | ------ | ------------------------------------ |
-| `--dir`     |        | Radni direktorij za pokretanje TUI-a |
-| `--session` | `-s`   | ID sesije za nastavak                |
+| Opcija       | Kratko | Opis                                                                                          |
+| ------------ | ------ | --------------------------------------------------------------------------------------------- |
+| `--dir`      |        | Radni direktorij za pokretanje TUI-a                                                          |
+| `--continue` | `-c`   | Nastavi posljednju sesiju                                                                     |
+| `--session`  | `-s`   | ID sesije za nastavak                                                                         |
+| `--fork`     |        | Forkuj sesiju prilikom nastavka (koristite sa `--continue` ili `--session`)                   |
+| `--password` | `-p`   | Lozinka za osnovnu autentifikaciju (zadano: `OPENCODE_SERVER_PASSWORD`)                       |
+| `--username` | `-u`   | Korisničko ime za osnovnu autentifikaciju (zadano: `OPENCODE_SERVER_USERNAME` ili `opencode`) |
 
 ---
 

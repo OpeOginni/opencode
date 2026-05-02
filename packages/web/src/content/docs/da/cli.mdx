@@ -78,10 +78,14 @@ opencode attach http://10.20.30.40:4096
 
 #### Flag
 
-| Flag        | Kort | Beskrivelse                      |
-| ----------- | ---- | -------------------------------- |
-| `--dir`     |      | Arbejdsmappe til at starte TUI i |
-| `--session` | `-s` | Sessions-id for at fortsætte     |
+| Flag         | Kort | Beskrivelse                                                                       |
+| ------------ | ---- | --------------------------------------------------------------------------------- |
+| `--dir`      |      | Arbejdsmappe til at starte TUI i                                                  |
+| `--continue` | `-c` | Fortsæt den seneste session                                                       |
+| `--session`  | `-s` | Sessions-id for at fortsætte                                                      |
+| `--fork`     |      | Forgren sessionen ved fortsættelse (brug med `--continue` eller `--session`)      |
+| `--password` | `-p` | Adgangskode til basic auth (standard: `OPENCODE_SERVER_PASSWORD`)                 |
+| `--username` | `-u` | Brugernavn til basic auth (standard: `OPENCODE_SERVER_USERNAME` eller `opencode`) |
 
 ---
 

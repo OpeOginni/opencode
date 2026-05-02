@@ -78,10 +78,14 @@ opencode attach http://10.20.30.40:4096
 
 #### Flagi
 
-| Flaga       | Skrót | Opis                                    |
-| ----------- | ----- | --------------------------------------- |
-| `--dir`     |       | Katalog roboczy, w którym uruchomić TUI |
-| `--session` | `-s`  | Identyfikator sesji do kontynuowania    |
+| Flaga        | Skrót | Opis                                                                                                  |
+| ------------ | ----- | ----------------------------------------------------------------------------------------------------- |
+| `--dir`      |       | Katalog roboczy, w którym uruchomić TUI                                                               |
+| `--continue` | `-c`  | Kontynuuj ostatnią sesję                                                                              |
+| `--session`  | `-s`  | Identyfikator sesji do kontynuowania                                                                  |
+| `--fork`     |       | Rozgałęź sesję podczas kontynuowania (użyj z `--continue` lub `--session`)                            |
+| `--password` | `-p`  | Hasło uwierzytelniania podstawowego (domyślnie `OPENCODE_SERVER_PASSWORD`)                            |
+| `--username` | `-u`  | Nazwa użytkownika uwierzytelniania podstawowego (domyślnie `OPENCODE_SERVER_USERNAME` lub `opencode`) |
 
 ---
 

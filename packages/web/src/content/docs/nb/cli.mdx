@@ -78,10 +78,14 @@ opencode attach http://10.20.30.40:4096
 
 #### Flagg
 
-| Flagg       | Kort | Beskrivelse                       |
-| ----------- | ---- | --------------------------------- |
-| `--dir`     |      | Arbeidskatalog for å starte TUI i |
-| `--session` | `-s` | Økt ID for å fortsette            |
+| Flagg        | Kort | Beskrivelse                                                                                        |
+| ------------ | ---- | -------------------------------------------------------------------------------------------------- |
+| `--dir`      |      | Arbeidskatalog for å starte TUI i                                                                  |
+| `--continue` | `-c` | Fortsett siste økt                                                                                 |
+| `--session`  | `-s` | Økt-ID for å fortsette                                                                             |
+| `--fork`     |      | Forgren økten ved fortsettelse (bruk med `--continue` eller `--session`)                           |
+| `--password` | `-p` | Passord for grunnleggende autentisering (standard: `OPENCODE_SERVER_PASSWORD`)                     |
+| `--username` | `-u` | Brukernavn for grunnleggende autentisering (standard: `OPENCODE_SERVER_USERNAME` eller `opencode`) |
 
 ---
 
