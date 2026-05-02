@@ -29,16 +29,16 @@ opencode [project]
 
 #### Flagg
 
-| Flagg                                    | Kort | Beskrivelse                                                              |
-| ---------------------------------------- | ---- | ------------------------------------------------------------------------ |
-| <nobr><code>{"--continue"}</code></nobr> | `-c` | Fortsett siste økt                                                       |
-| <nobr><code>{"--session"}</code></nobr>  | `-s` | Økt ID for å fortsette                                                   |
-| <nobr><code>{"--fork"}</code></nobr>     |      | Forgren økten ved fortsettelse (bruk med `--continue` eller `--session`) |
-| `--prompt`                               |      | Ledetekst som skal brukes                                                |
-| `--model`                                | `-m` | Modell å bruke i form av leverandør/modell                               |
-| `--agent`                                |      | Agent som skal brukes                                                    |
-| `--port`                                 |      | Port å lytte på                                                          |
-| `--hostname`                             |      | Vertsnavn å lytte på                                                     |
+| Flagg        | Kort | Beskrivelse                                                              |
+| ------------ | ---- | ------------------------------------------------------------------------ |
+| `--continue` | `-c` | Fortsett siste økt                                                       |
+| `--session`  | `-s` | Økt ID for å fortsette                                                   |
+| `--fork`     |      | Forgren økten ved fortsettelse (bruk med `--continue` eller `--session`) |
+| `--prompt`   |      | Ledetekst som skal brukes                                                |
+| `--model`    | `-m` | Modell å bruke i form av leverandør/modell                               |
+| `--agent`    |      | Agent som skal brukes                                                    |
+| `--port`     |      | Port å lytte på                                                          |
+| `--hostname` |      | Vertsnavn å lytte på                                                     |
 
 ---
 
@@ -78,14 +78,10 @@ opencode attach http://10.20.30.40:4096
 
 #### Flagg
 
-| Flagg                                    | Kort | Beskrivelse                                                                                        |
-| ---------------------------------------- | ---- | -------------------------------------------------------------------------------------------------- |
-| <nobr><code>{"--dir"}</code></nobr>      |      | Arbeidskatalog for å starte TUI i                                                                  |
-| <nobr><code>{"--continue"}</code></nobr> | `-c` | Fortsett siste økt                                                                                 |
-| <nobr><code>{"--session"}</code></nobr>  | `-s` | Økt-ID for å fortsette                                                                             |
-| <nobr><code>{"--fork"}</code></nobr>     |      | Forgren økten ved fortsettelse (bruk med `--continue` eller `--session`)                           |
-| <nobr><code>{"--password"}</code></nobr> | `-p` | Passord for grunnleggende autentisering (standard: `OPENCODE_SERVER_PASSWORD`)                     |
-| <nobr><code>{"--username"}</code></nobr> | `-u` | Brukernavn for grunnleggende autentisering (standard: `OPENCODE_SERVER_USERNAME` eller `opencode`) |
+| Flagg       | Kort | Beskrivelse                       |
+| ----------- | ---- | --------------------------------- |
+| `--dir`     |      | Arbeidskatalog for å starte TUI i |
+| `--session` | `-s` | Økt ID for å fortsette            |
 
 ---
 
@@ -339,26 +335,20 @@ opencode run --attach http://localhost:4096 "Explain async/await in JavaScript"
 
 #### Flagg
 
-| Flagg                                                        | Kort | Beskrivelse                                                                |
-| ------------------------------------------------------------ | ---- | -------------------------------------------------------------------------- |
-| <nobr><code>{"--command"}</code></nobr>                      |      | Kommandoen for å kjøre, bruk melding for args                              |
-| <nobr><code>{"--continue"}</code></nobr>                     | `-c` | Fortsett siste økt                                                         |
-| <nobr><code>{"--session"}</code></nobr>                      | `-s` | Økt ID for å fortsette                                                     |
-| <nobr><code>{"--fork"}</code></nobr>                         |      | Forgren økten ved fortsettelse (bruk med `--continue` eller `--session`)   |
-| <nobr><code>{"--share"}</code></nobr>                        |      | Del økten                                                                  |
-| <nobr><code>{"--model"}</code></nobr>                        | `-m` | Modell å bruke i form av leverandør/modell                                 |
-| <nobr><code>{"--agent"}</code></nobr>                        |      | Agent å bruke                                                              |
-| <nobr><code>{"--file"}</code></nobr>                         | `-f` | Fil(er) som skal legges ved meldingen                                      |
-| <nobr><code>{"--format"}</code></nobr>                       |      | Format: standard (formatert) eller json (rå JSON hendelser)                |
-| <nobr><code>{"--title"}</code></nobr>                        |      | Tittel for økten (bruker avkortet ledetekst hvis ingen verdi er oppgitt)   |
-| <nobr><code>{"--attach"}</code></nobr>                       |      | Koble til en kjørende OpenCode-server (f.eks. http://localhost:4096)       |
-| <nobr><code>{"--password"}</code></nobr>                     | `-p` | Basic auth password (defaults to `OPENCODE_SERVER_PASSWORD`)               |
-| <nobr><code>{"--username"}</code></nobr>                     | `-u` | Basic auth username (defaults to `OPENCODE_SERVER_USERNAME` or `opencode`) |
-| <nobr><code>{"--dir"}</code></nobr>                          |      | Directory to run in, or path on the remote server when attaching           |
-| <nobr><code>{"--port"}</code></nobr>                         |      | Port for den lokale serveren (standard til tilfeldig port)                 |
-| <nobr><code>{"--variant"}</code></nobr>                      |      | Model variant (provider-specific reasoning effort)                         |
-| <nobr><code>{"--thinking"}</code></nobr>                     |      | Show thinking blocks                                                       |
-| <nobr><code>{"--dangerously-skip-permissions"}</code></nobr> |      | Auto-approve permissions that are not explicitly denied (dangerous!)       |
+| Flagg        | Kort | Beskrivelse                                                              |
+| ------------ | ---- | ------------------------------------------------------------------------ |
+| `--command`  |      | Kommandoen for å kjøre, bruk melding for args                            |
+| `--continue` | `-c` | Fortsett siste økt                                                       |
+| `--session`  | `-s` | Økt ID for å fortsette                                                   |
+| `--fork`     |      | Forgren økten ved fortsettelse (bruk med `--continue` eller `--session`) |
+| `--share`    |      | Del økten                                                                |
+| `--model`    | `-m` | Modell å bruke i form av leverandør/modell                               |
+| `--agent`    |      | Agent å bruke                                                            |
+| `--file`     | `-f` | Fil(er) som skal legges ved meldingen                                    |
+| `--format`   |      | Format: standard (formatert) eller json (rå JSON hendelser)              |
+| `--title`    |      | Tittel for økten (bruker avkortet ledetekst hvis ingen verdi er oppgitt) |
+| `--attach`   |      | Koble til en kjørende OpenCode-server (f.eks. http://localhost:4096)     |
+| `--port`     |      | Port for den lokale serveren (standard til tilfeldig port)               |
 
 ---
 

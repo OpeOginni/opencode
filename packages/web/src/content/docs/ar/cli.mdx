@@ -29,16 +29,16 @@ opencode [project]
 
 #### الخيارات
 
-| الخيار                                   | المختصر | الوصف                                                             |
-| ---------------------------------------- | ------- | ----------------------------------------------------------------- |
-| <nobr><code>{"--continue"}</code></nobr> | `-c`    | متابعة الجلسة الأخيرة                                             |
-| <nobr><code>{"--session"}</code></nobr>  | `-s`    | معرّف الجلسة للمتابعة                                             |
-| <nobr><code>{"--fork"}</code></nobr>     |         | تفريع الجلسة عند المتابعة (يستخدم مع `--continue` أو `--session`) |
-| `--prompt`                               |         | الموجّه المراد استخدامه                                           |
-| `--model`                                | `-m`    | النموذج المراد استخدامه بصيغة provider/model                      |
-| `--agent`                                |         | الوكيل المراد استخدامه                                            |
-| `--port`                                 |         | المنفذ الذي يتم الاستماع عليه                                     |
-| `--hostname`                             |         | اسم المضيف الذي يتم الاستماع عليه                                 |
+| الخيار       | المختصر | الوصف                                                             |
+| ------------ | ------- | ----------------------------------------------------------------- |
+| `--continue` | `-c`    | متابعة الجلسة الأخيرة                                             |
+| `--session`  | `-s`    | معرّف الجلسة للمتابعة                                             |
+| `--fork`     |         | تفريع الجلسة عند المتابعة (يستخدم مع `--continue` أو `--session`) |
+| `--prompt`   |         | الموجّه المراد استخدامه                                           |
+| `--model`    | `-m`    | النموذج المراد استخدامه بصيغة provider/model                      |
+| `--agent`    |         | الوكيل المراد استخدامه                                            |
+| `--port`     |         | المنفذ الذي يتم الاستماع عليه                                     |
+| `--hostname` |         | اسم المضيف الذي يتم الاستماع عليه                                 |
 
 ---
 
@@ -78,14 +78,10 @@ opencode attach http://10.20.30.40:4096
 
 #### الرايات
 
-| الراية                                   | المختصر | الوصف                                                                             |
-| ---------------------------------------- | ------- | --------------------------------------------------------------------------------- |
-| <nobr><code>{"--dir"}</code></nobr>      |         | دليل العمل الذي ستبدأ منه واجهة TUI                                               |
-| <nobr><code>{"--continue"}</code></nobr> | `-c`    | متابعة آخر جلسة                                                                   |
-| <nobr><code>{"--session"}</code></nobr>  | `-s`    | معرّف الجلسة للمتابعة                                                             |
-| <nobr><code>{"--fork"}</code></nobr>     |         | تفريع الجلسة عند المتابعة (استخدمه مع `--continue` أو `--session`)                |
-| <nobr><code>{"--password"}</code></nobr> | `-p`    | كلمة مرور المصادقة الأساسية (الافتراضي `OPENCODE_SERVER_PASSWORD`)                |
-| <nobr><code>{"--username"}</code></nobr> | `-u`    | اسم مستخدم المصادقة الأساسية (الافتراضي `OPENCODE_SERVER_USERNAME` أو `opencode`) |
+| الراية      | المختصر | الوصف                               |
+| ----------- | ------- | ----------------------------------- |
+| `--dir`     |         | دليل العمل الذي ستبدأ منه واجهة TUI |
+| `--session` | `-s`    | معرّف الجلسة للمتابعة               |
 
 ---
 
@@ -339,26 +335,20 @@ opencode run --attach http://localhost:4096 "Explain async/await in JavaScript"
 
 #### الرايات
 
-| الراية                                                       | المختصر | الوصف                                                                      |
-| ------------------------------------------------------------ | ------- | -------------------------------------------------------------------------- |
-| <nobr><code>{"--command"}</code></nobr>                      |         | الأمر المراد تشغيله؛ استخدم الرسالة كوسائط                                 |
-| <nobr><code>{"--continue"}</code></nobr>                     | `-c`    | متابعة الجلسة الأخيرة                                                      |
-| <nobr><code>{"--session"}</code></nobr>                      | `-s`    | معرّف الجلسة للمتابعة                                                      |
-| <nobr><code>{"--fork"}</code></nobr>                         |         | تفريع الجلسة عند المتابعة (يستخدم مع `--continue` أو `--session`)          |
-| <nobr><code>{"--share"}</code></nobr>                        |         | مشاركة الجلسة                                                              |
-| <nobr><code>{"--model"}</code></nobr>                        | `-m`    | النموذج المراد استخدامه بصيغة provider/model                               |
-| <nobr><code>{"--agent"}</code></nobr>                        |         | الوكيل المراد استخدامه                                                     |
-| <nobr><code>{"--file"}</code></nobr>                         | `-f`    | ملف/ملفات لإرفاقها بالرسالة                                                |
-| <nobr><code>{"--format"}</code></nobr>                       |         | التنسيق: default (منسق) أو json (أحداث JSON خام)                           |
-| <nobr><code>{"--title"}</code></nobr>                        |         | عنوان للجلسة (يستخدم موجهًا مقتطعًا إن لم تُحدَّد قيمة)                    |
-| <nobr><code>{"--attach"}</code></nobr>                       |         | الإرفاق بخادم opencode قيد التشغيل (مثل http://localhost:4096)             |
-| <nobr><code>{"--password"}</code></nobr>                     | `-p`    | Basic auth password (defaults to `OPENCODE_SERVER_PASSWORD`)               |
-| <nobr><code>{"--username"}</code></nobr>                     | `-u`    | Basic auth username (defaults to `OPENCODE_SERVER_USERNAME` or `opencode`) |
-| <nobr><code>{"--dir"}</code></nobr>                          |         | Directory to run in, or path on the remote server when attaching           |
-| <nobr><code>{"--port"}</code></nobr>                         |         | منفذ الخادم المحلي (الافتراضي منفذ عشوائي)                                 |
-| <nobr><code>{"--variant"}</code></nobr>                      |         | Model variant (provider-specific reasoning effort)                         |
-| <nobr><code>{"--thinking"}</code></nobr>                     |         | Show thinking blocks                                                       |
-| <nobr><code>{"--dangerously-skip-permissions"}</code></nobr> |         | Auto-approve permissions that are not explicitly denied (dangerous!)       |
+| الراية       | المختصر | الوصف                                                             |
+| ------------ | ------- | ----------------------------------------------------------------- |
+| `--command`  |         | الأمر المراد تشغيله؛ استخدم الرسالة كوسائط                        |
+| `--continue` | `-c`    | متابعة الجلسة الأخيرة                                             |
+| `--session`  | `-s`    | معرّف الجلسة للمتابعة                                             |
+| `--fork`     |         | تفريع الجلسة عند المتابعة (يستخدم مع `--continue` أو `--session`) |
+| `--share`    |         | مشاركة الجلسة                                                     |
+| `--model`    | `-m`    | النموذج المراد استخدامه بصيغة provider/model                      |
+| `--agent`    |         | الوكيل المراد استخدامه                                            |
+| `--file`     | `-f`    | ملف/ملفات لإرفاقها بالرسالة                                       |
+| `--format`   |         | التنسيق: default (منسق) أو json (أحداث JSON خام)                  |
+| `--title`    |         | عنوان للجلسة (يستخدم موجهًا مقتطعًا إن لم تُحدَّد قيمة)           |
+| `--attach`   |         | الإرفاق بخادم opencode قيد التشغيل (مثل http://localhost:4096)    |
+| `--port`     |         | منفذ الخادم المحلي (الافتراضي منفذ عشوائي)                        |
 
 ---
 
