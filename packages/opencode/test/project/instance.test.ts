@@ -5,13 +5,13 @@ import { InstanceRef } from "../../src/effect/instance-ref"
 import { registerDisposer } from "../../src/effect/instance-registry"
 import { Instance } from "../../src/project/instance"
 import { InstanceStore } from "../../src/project/instance-store"
-import { tmpdirScoped } from "../fixture/fixture"
+import { disposeAllInstances, tmpdirScoped } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
 
 const it = testEffect(Layer.mergeAll(InstanceStore.defaultLayer, CrossSpawnSpawner.defaultLayer))
 
 afterEach(async () => {
-  await Instance.disposeAll()
+  await disposeAllInstances()
 })
 
 describe("InstanceStore", () => {
@@ -250,6 +250,24 @@ describe("InstanceStore", () => {
 
       expect(directory).toBe(dir)
       expect(() => Instance.current).toThrow()
+    }),
+  )
+
+  it.live("does not install legacy ALS around Effect init", () =>
+    Effect.gen(function* () {
+      const dir = yield* tmpdirScoped()
+
+      const directory = yield* Effect.promise(() =>
+        Instance.provide({
+          directory: dir,
+          init: Effect.sync(() => {
+            expect(() => Instance.current).toThrow()
+          }),
+          fn: () => Instance.directory,
+        }),
+      )
+
+      expect(directory).toBe(dir)
     }),
   )
 })
