@@ -29,16 +29,16 @@ opencode [project]
 
 #### Flag
 
-| Flag         | Kort | Beskrivelse                                                                  |
-| ------------ | ---- | ---------------------------------------------------------------------------- |
-| `--continue` | `-c` | Fortsæt sidste session                                                       |
-| `--session`  | `-s` | Sessions-id for at fortsætte                                                 |
-| `--fork`     |      | Forgren sessionen ved fortsættelse (brug med `--continue` eller `--session`) |
-| `--prompt`   |      | Spørg om at bruge                                                            |
-| `--model`    | `-m` | Model til brug i form af provider/model                                      |
-| `--agent`    |      | Agent hos bruge                                                              |
-| `--port`     |      | Port at lytte på                                                             |
-| `--hostname` |      | Værtsnavn at lytte på                                                        |
+| Flag                                     | Kort | Beskrivelse                                                                  |
+| ---------------------------------------- | ---- | ---------------------------------------------------------------------------- |
+| <nobr><code>{"--continue"}</code></nobr> | `-c` | Fortsæt sidste session                                                       |
+| <nobr><code>{"--session"}</code></nobr>  | `-s` | Sessions-id for at fortsætte                                                 |
+| <nobr><code>{"--fork"}</code></nobr>     |      | Forgren sessionen ved fortsættelse (brug med `--continue` eller `--session`) |
+| `--prompt`                               |      | Spørg om at bruge                                                            |
+| `--model`                                | `-m` | Model til brug i form af provider/model                                      |
+| `--agent`                                |      | Agent hos bruge                                                              |
+| `--port`                                 |      | Port at lytte på                                                             |
+| `--hostname`                             |      | Værtsnavn at lytte på                                                        |
 
 ---
 
@@ -78,14 +78,14 @@ opencode attach http://10.20.30.40:4096
 
 #### Flag
 
-| Flag         | Kort | Beskrivelse                                                                       |
-| ------------ | ---- | --------------------------------------------------------------------------------- |
-| `--dir`      |      | Arbejdsmappe til at starte TUI i                                                  |
-| `--continue` | `-c` | Fortsæt den seneste session                                                       |
-| `--session`  | `-s` | Sessions-id for at fortsætte                                                      |
-| `--fork`     |      | Forgren sessionen ved fortsættelse (brug med `--continue` eller `--session`)      |
-| `--password` | `-p` | Adgangskode til basic auth (standard: `OPENCODE_SERVER_PASSWORD`)                 |
-| `--username` | `-u` | Brugernavn til basic auth (standard: `OPENCODE_SERVER_USERNAME` eller `opencode`) |
+| Flag                                     | Kort | Beskrivelse                                                                       |
+| ---------------------------------------- | ---- | --------------------------------------------------------------------------------- |
+| <nobr><code>{"--dir"}</code></nobr>      |      | Arbejdsmappe til at starte TUI i                                                  |
+| <nobr><code>{"--continue"}</code></nobr> | `-c` | Fortsæt den seneste session                                                       |
+| <nobr><code>{"--session"}</code></nobr>  | `-s` | Sessions-id for at fortsætte                                                      |
+| <nobr><code>{"--fork"}</code></nobr>     |      | Forgren sessionen ved fortsættelse (brug med `--continue` eller `--session`)      |
+| <nobr><code>{"--password"}</code></nobr> | `-p` | Adgangskode til basic auth (standard: `OPENCODE_SERVER_PASSWORD`)                 |
+| <nobr><code>{"--username"}</code></nobr> | `-u` | Brugernavn til basic auth (standard: `OPENCODE_SERVER_USERNAME` eller `opencode`) |
 
 ---
 
@@ -339,20 +339,20 @@ opencode run --attach http://localhost:4096 "Explain async/await in JavaScript"
 
 #### Flag
 
-| Flag         | Kort | Beskrivelse                                                                         |
-| ------------ | ---- | ----------------------------------------------------------------------------------- |
-| `--command`  |      | Kommandoen til at køre, brug besked til args                                        |
-| `--continue` | `-c` | Fortsæt sidste session                                                              |
-| `--session`  | `-s` | Sessions-id for at fortsætte                                                        |
-| `--fork`     |      | Forgren sessionen ved fortsættelse (brug med `--continue` eller `--session`)        |
-| `--share`    |      | Del sessionen                                                                       |
-| `--model`    | `-m` | Model til brug i form af provider/model                                             |
-| `--agent`    |      | Agent til brug                                                                      |
-| `--file`     | `-f` | Fil(er), der skal vedhæftes til meddelelsen                                         |
-| `--format`   |      | Format: standard (formateret) eller json (rå JSON hændelser)                        |
-| `--title`    |      | Titel for sessionen (bruger trunkeret prompt, hvis der ikke er angivet nogen værdi) |
-| `--attach`   |      | Tilslut til en kørende opencode-server (f.eks. http://localhost:4096)               |
-| `--port`     |      | Port til den lokale server (standard til vilkårlig port)                            |
+| Flag                                     | Kort | Beskrivelse                                                                         |
+| ---------------------------------------- | ---- | ----------------------------------------------------------------------------------- |
+| `--command`                              |      | Kommandoen til at køre, brug besked til args                                        |
+| <nobr><code>{"--continue"}</code></nobr> | `-c` | Fortsæt sidste session                                                              |
+| <nobr><code>{"--session"}</code></nobr>  | `-s` | Sessions-id for at fortsætte                                                        |
+| <nobr><code>{"--fork"}</code></nobr>     |      | Forgren sessionen ved fortsættelse (brug med `--continue` eller `--session`)        |
+| `--share`                                |      | Del sessionen                                                                       |
+| `--model`                                | `-m` | Model til brug i form af provider/model                                             |
+| `--agent`                                |      | Agent til brug                                                                      |
+| `--file`                                 | `-f` | Fil(er), der skal vedhæftes til meddelelsen                                         |
+| `--format`                               |      | Format: standard (formateret) eller json (rå JSON hændelser)                        |
+| `--title`                                |      | Titel for sessionen (bruger trunkeret prompt, hvis der ikke er angivet nogen værdi) |
+| `--attach`                               |      | Tilslut til en kørende opencode-server (f.eks. http://localhost:4096)               |
+| `--port`                                 |      | Port til den lokale server (standard til vilkårlig port)                            |
 
 ---
 

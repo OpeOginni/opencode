@@ -29,16 +29,16 @@ opencode [project]
 
 #### 标志
 
-| 标志         | 简写 | 描述                                                      |
-| ------------ | ---- | --------------------------------------------------------- |
-| `--continue` | `-c` | 继续上一个会话                                            |
-| `--session`  | `-s` | 要继续的会话 ID                                           |
-| `--fork`     |      | 继续时分叉会话（与 `--continue` 或 `--session` 配合使用） |
-| `--prompt`   |      | 要使用的提示词                                            |
-| `--model`    | `-m` | 要使用的模型，格式为 provider/model                       |
-| `--agent`    |      | 要使用的代理                                              |
-| `--port`     |      | 监听端口                                                  |
-| `--hostname` |      | 监听主机名                                                |
+| 标志                                     | 简写 | 描述                                                      |
+| ---------------------------------------- | ---- | --------------------------------------------------------- |
+| <nobr><code>{"--continue"}</code></nobr> | `-c` | 继续上一个会话                                            |
+| <nobr><code>{"--session"}</code></nobr>  | `-s` | 要继续的会话 ID                                           |
+| <nobr><code>{"--fork"}</code></nobr>     |      | 继续时分叉会话（与 `--continue` 或 `--session` 配合使用） |
+| `--prompt`                               |      | 要使用的提示词                                            |
+| `--model`                                | `-m` | 要使用的模型，格式为 provider/model                       |
+| `--agent`                                |      | 要使用的代理                                              |
+| `--port`                                 |      | 监听端口                                                  |
+| `--hostname`                             |      | 监听主机名                                                |
 
 ---
 
@@ -78,14 +78,14 @@ opencode attach http://10.20.30.40:4096
 
 #### 标志
 
-| 标志         | 简写 | 描述                                                                |
-| ------------ | ---- | ------------------------------------------------------------------- |
-| `--dir`      |      | 启动 TUI 的工作目录                                                 |
-| `--continue` | `-c` | 继续上一个会话                                                      |
-| `--session`  | `-s` | 要继续的会话 ID                                                     |
-| `--fork`     |      | 继续时派生会话（与 `--continue` 或 `--session` 一起使用）           |
-| `--password` | `-p` | 基本认证密码（默认使用 `OPENCODE_SERVER_PASSWORD`）                 |
-| `--username` | `-u` | 基本认证用户名（默认使用 `OPENCODE_SERVER_USERNAME` 或 `opencode`） |
+| 标志                                     | 简写 | 描述                                                                |
+| ---------------------------------------- | ---- | ------------------------------------------------------------------- |
+| <nobr><code>{"--dir"}</code></nobr>      |      | 启动 TUI 的工作目录                                                 |
+| <nobr><code>{"--continue"}</code></nobr> | `-c` | 继续上一个会话                                                      |
+| <nobr><code>{"--session"}</code></nobr>  | `-s` | 要继续的会话 ID                                                     |
+| <nobr><code>{"--fork"}</code></nobr>     |      | 继续时派生会话（与 `--continue` 或 `--session` 一起使用）           |
+| <nobr><code>{"--password"}</code></nobr> | `-p` | 基本认证密码（默认使用 `OPENCODE_SERVER_PASSWORD`）                 |
+| <nobr><code>{"--username"}</code></nobr> | `-u` | 基本认证用户名（默认使用 `OPENCODE_SERVER_USERNAME` 或 `opencode`） |
 
 ---
 
@@ -339,20 +339,20 @@ opencode run --attach http://localhost:4096 "Explain async/await in JavaScript"
 
 #### 标志
 
-| 标志         | 简写 | 描述                                                           |
-| ------------ | ---- | -------------------------------------------------------------- |
-| `--command`  |      | 要运行的命令，使用 message 作为参数                            |
-| `--continue` | `-c` | 继续上一个会话                                                 |
-| `--session`  | `-s` | 要继续的会话 ID                                                |
-| `--fork`     |      | 继续时分叉会话（与 `--continue` 或 `--session` 配合使用）      |
-| `--share`    |      | 分享会话                                                       |
-| `--model`    | `-m` | 要使用的模型，格式为 provider/model                            |
-| `--agent`    |      | 要使用的代理                                                   |
-| `--file`     | `-f` | 附加到消息的文件                                               |
-| `--format`   |      | 格式：default（格式化输出）或 json（原始 JSON 事件）           |
-| `--title`    |      | 会话标题（未提供值时使用截断的提示词）                         |
-| `--attach`   |      | 连接到正在运行的 opencode 服务器（例如 http://localhost:4096） |
-| `--port`     |      | 本地服务器端口（默认为随机端口）                               |
+| 标志                                     | 简写 | 描述                                                           |
+| ---------------------------------------- | ---- | -------------------------------------------------------------- |
+| `--command`                              |      | 要运行的命令，使用 message 作为参数                            |
+| <nobr><code>{"--continue"}</code></nobr> | `-c` | 继续上一个会话                                                 |
+| <nobr><code>{"--session"}</code></nobr>  | `-s` | 要继续的会话 ID                                                |
+| <nobr><code>{"--fork"}</code></nobr>     |      | 继续时分叉会话（与 `--continue` 或 `--session` 配合使用）      |
+| `--share`                                |      | 分享会话                                                       |
+| `--model`                                | `-m` | 要使用的模型，格式为 provider/model                            |
+| `--agent`                                |      | 要使用的代理                                                   |
+| `--file`                                 | `-f` | 附加到消息的文件                                               |
+| `--format`                               |      | 格式：default（格式化输出）或 json（原始 JSON 事件）           |
+| `--title`                                |      | 会话标题（未提供值时使用截断的提示词）                         |
+| `--attach`                               |      | 连接到正在运行的 opencode 服务器（例如 http://localhost:4096） |
+| `--port`                                 |      | 本地服务器端口（默认为随机端口）                               |
 
 ---
 

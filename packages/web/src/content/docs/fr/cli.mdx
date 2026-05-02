@@ -29,16 +29,16 @@ opencode [project]
 
 #### Options
 
-| Option       | Court | Description                                                                   |
-| ------------ | ----- | ----------------------------------------------------------------------------- |
-| `--continue` | `-c`  | Continuer la dernière session                                                 |
-| `--session`  | `-s`  | ID de session pour continuer                                                  |
-| `--fork`     |       | Forker la session en continuant (à utiliser avec `--continue` ou `--session`) |
-| `--prompt`   |       | Prompt à utiliser                                                             |
-| `--model`    | `-m`  | Modèle à utiliser sous forme de fournisseur/modèle                            |
-| `--agent`    |       | Agent à utiliser                                                              |
-| `--port`     |       | Port d'écoute                                                                 |
-| `--hostname` |       | Nom d'hôte d'écoute                                                           |
+| Option                                   | Court | Description                                                                   |
+| ---------------------------------------- | ----- | ----------------------------------------------------------------------------- |
+| <nobr><code>{"--continue"}</code></nobr> | `-c`  | Continuer la dernière session                                                 |
+| <nobr><code>{"--session"}</code></nobr>  | `-s`  | ID de session pour continuer                                                  |
+| <nobr><code>{"--fork"}</code></nobr>     |       | Forker la session en continuant (à utiliser avec `--continue` ou `--session`) |
+| `--prompt`                               |       | Prompt à utiliser                                                             |
+| `--model`                                | `-m`  | Modèle à utiliser sous forme de fournisseur/modèle                            |
+| `--agent`                                |       | Agent à utiliser                                                              |
+| `--port`                                 |       | Port d'écoute                                                                 |
+| `--hostname`                             |       | Nom d'hôte d'écoute                                                           |
 
 ---
 
@@ -78,14 +78,14 @@ opencode attach http://10.20.30.40:4096
 
 #### Options
 
-| Option       | Court | Description                                                                                        |
-| ------------ | ----- | -------------------------------------------------------------------------------------------------- |
-| `--dir`      |       | Répertoire de travail dans lequel démarrer TUI                                                     |
-| `--continue` | `-c`  | Continuer la dernière session                                                                      |
-| `--session`  | `-s`  | ID de session pour continuer                                                                       |
-| `--fork`     |       | Dupliquer la session lors de la reprise (à utiliser avec `--continue` ou `--session`)              |
-| `--password` | `-p`  | Mot de passe d'authentification de base (par défaut `OPENCODE_SERVER_PASSWORD`)                    |
-| `--username` | `-u`  | Nom d'utilisateur d'authentification de base (par défaut `OPENCODE_SERVER_USERNAME` ou `opencode`) |
+| Option                                   | Court | Description                                                                                        |
+| ---------------------------------------- | ----- | -------------------------------------------------------------------------------------------------- |
+| <nobr><code>{"--dir"}</code></nobr>      |       | Répertoire de travail dans lequel démarrer TUI                                                     |
+| <nobr><code>{"--continue"}</code></nobr> | `-c`  | Continuer la dernière session                                                                      |
+| <nobr><code>{"--session"}</code></nobr>  | `-s`  | ID de session pour continuer                                                                       |
+| <nobr><code>{"--fork"}</code></nobr>     |       | Dupliquer la session lors de la reprise (à utiliser avec `--continue` ou `--session`)              |
+| <nobr><code>{"--password"}</code></nobr> | `-p`  | Mot de passe d'authentification de base (par défaut `OPENCODE_SERVER_PASSWORD`)                    |
+| <nobr><code>{"--username"}</code></nobr> | `-u`  | Nom d'utilisateur d'authentification de base (par défaut `OPENCODE_SERVER_USERNAME` ou `opencode`) |
 
 ---
 
@@ -339,20 +339,20 @@ opencode run --attach http://localhost:4096 "Explain async/await in JavaScript"
 
 #### Options
 
-| Option       | Court | Description                                                                                    |
-| ------------ | ----- | ---------------------------------------------------------------------------------------------- |
-| `--command`  |       | La commande à exécuter, utilisez le message pour les arguments                                 |
-| `--continue` | `-c`  | Continuer la dernière session                                                                  |
-| `--session`  | `-s`  | ID de session pour continuer                                                                   |
-| `--fork`     |       | Forker la session en continuant (à utiliser avec `--continue` ou `--session`)                  |
-| `--share`    |       | Partager la session                                                                            |
-| `--model`    | `-m`  | Modèle à utiliser sous forme de fournisseur/modèle                                             |
-| `--agent`    |       | Agent à utiliser                                                                               |
-| `--file`     | `-f`  | Fichier(s) à joindre au message                                                                |
-| `--format`   |       | Format : par défaut (formaté) ou json (événements JSON bruts)                                  |
-| `--title`    |       | Titre de la session (utilise un prompt tronqué si aucune valeur n'est fournie)                 |
-| `--attach`   |       | Connectez-vous à un serveur opencode en cours d'exécution (par exemple, http://localhost:4096) |
-| `--port`     |       | Port du serveur local (port aléatoire par défaut)                                              |
+| Option                                   | Court | Description                                                                                    |
+| ---------------------------------------- | ----- | ---------------------------------------------------------------------------------------------- |
+| `--command`                              |       | La commande à exécuter, utilisez le message pour les arguments                                 |
+| <nobr><code>{"--continue"}</code></nobr> | `-c`  | Continuer la dernière session                                                                  |
+| <nobr><code>{"--session"}</code></nobr>  | `-s`  | ID de session pour continuer                                                                   |
+| <nobr><code>{"--fork"}</code></nobr>     |       | Forker la session en continuant (à utiliser avec `--continue` ou `--session`)                  |
+| `--share`                                |       | Partager la session                                                                            |
+| `--model`                                | `-m`  | Modèle à utiliser sous forme de fournisseur/modèle                                             |
+| `--agent`                                |       | Agent à utiliser                                                                               |
+| `--file`                                 | `-f`  | Fichier(s) à joindre au message                                                                |
+| `--format`                               |       | Format : par défaut (formaté) ou json (événements JSON bruts)                                  |
+| `--title`                                |       | Titre de la session (utilise un prompt tronqué si aucune valeur n'est fournie)                 |
+| `--attach`                               |       | Connectez-vous à un serveur opencode en cours d'exécution (par exemple, http://localhost:4096) |
+| `--port`                                 |       | Port du serveur local (port aléatoire par défaut)                                              |
 
 ---
 

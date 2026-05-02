@@ -29,16 +29,16 @@ opencode [project]
 
 #### 플래그
 
-| 플래그       | 축약 | 설명                                                                   |
-| ------------ | ---- | ---------------------------------------------------------------------- |
-| `--continue` | `-c` | 마지막 세션 이어서 실행                                                |
-| `--session`  | `-s` | 이어서 실행할 세션 ID                                                  |
-| `--fork`     |      | 세션을 이어갈 때 포크 생성 (`--continue` 또는 `--session`과 함께 사용) |
-| `--prompt`   |      | 사용할 프롬프트                                                        |
-| `--model`    | `-m` | 사용할 모델 (`provider/model` 형식)                                    |
-| `--agent`    |      | 사용할 에이전트                                                        |
-| `--port`     |      | 수신 포트                                                              |
-| `--hostname` |      | 수신 호스트명                                                          |
+| 플래그                                   | 축약 | 설명                                                                   |
+| ---------------------------------------- | ---- | ---------------------------------------------------------------------- |
+| <nobr><code>{"--continue"}</code></nobr> | `-c` | 마지막 세션 이어서 실행                                                |
+| <nobr><code>{"--session"}</code></nobr>  | `-s` | 이어서 실행할 세션 ID                                                  |
+| <nobr><code>{"--fork"}</code></nobr>     |      | 세션을 이어갈 때 포크 생성 (`--continue` 또는 `--session`과 함께 사용) |
+| `--prompt`                               |      | 사용할 프롬프트                                                        |
+| `--model`                                | `-m` | 사용할 모델 (`provider/model` 형식)                                    |
+| `--agent`                                |      | 사용할 에이전트                                                        |
+| `--port`                                 |      | 수신 포트                                                              |
+| `--hostname`                             |      | 수신 호스트명                                                          |
 
 ---
 
@@ -78,14 +78,14 @@ opencode attach http://10.20.30.40:4096
 
 #### 플래그
 
-| 플래그       | 축약 | 설명                                                                       |
-| ------------ | ---- | -------------------------------------------------------------------------- |
-| `--dir`      |      | TUI를 시작할 작업 디렉터리                                                 |
-| `--continue` | `-c` | 마지막 세션 이어서 실행                                                    |
-| `--session`  | `-s` | 이어서 실행할 세션 ID                                                      |
-| `--fork`     |      | 이어서 실행할 때 세션 포크 (`--continue` 또는 `--session`과 함께 사용)     |
-| `--password` | `-p` | 기본 인증 비밀번호 (기본값: `OPENCODE_SERVER_PASSWORD`)                    |
-| `--username` | `-u` | 기본 인증 사용자 이름 (기본값: `OPENCODE_SERVER_USERNAME` 또는 `opencode`) |
+| 플래그                                   | 축약 | 설명                                                                       |
+| ---------------------------------------- | ---- | -------------------------------------------------------------------------- |
+| <nobr><code>{"--dir"}</code></nobr>      |      | TUI를 시작할 작업 디렉터리                                                 |
+| <nobr><code>{"--continue"}</code></nobr> | `-c` | 마지막 세션 이어서 실행                                                    |
+| <nobr><code>{"--session"}</code></nobr>  | `-s` | 이어서 실행할 세션 ID                                                      |
+| <nobr><code>{"--fork"}</code></nobr>     |      | 이어서 실행할 때 세션 포크 (`--continue` 또는 `--session`과 함께 사용)     |
+| <nobr><code>{"--password"}</code></nobr> | `-p` | 기본 인증 비밀번호 (기본값: `OPENCODE_SERVER_PASSWORD`)                    |
+| <nobr><code>{"--username"}</code></nobr> | `-u` | 기본 인증 사용자 이름 (기본값: `OPENCODE_SERVER_USERNAME` 또는 `opencode`) |
 
 ---
 
@@ -339,20 +339,20 @@ opencode run --attach http://localhost:4096 "Explain async/await in JavaScript"
 
 #### 플래그
 
-| 플래그       | 축약 | 설명                                                                   |
-| ------------ | ---- | ---------------------------------------------------------------------- |
-| `--command`  |      | 실행할 명령(인수는 message로 전달)                                     |
-| `--continue` | `-c` | 마지막 세션 이어서 실행                                                |
-| `--session`  | `-s` | 이어서 실행할 세션 ID                                                  |
-| `--fork`     |      | 세션을 이어갈 때 포크 생성 (`--continue` 또는 `--session`과 함께 사용) |
-| `--share`    |      | 세션 공유                                                              |
-| `--model`    | `-m` | 사용할 모델 (`provider/model` 형식)                                    |
-| `--agent`    |      | 사용할 에이전트                                                        |
-| `--file`     | `-f` | 메시지에 첨부할 파일                                                   |
-| `--format`   |      | 출력 형식: default(포맷됨) 또는 json(원시 JSON 이벤트)                 |
-| `--title`    |      | 세션 제목(값이 없으면 프롬프트를 잘라 자동 생성)                       |
-| `--attach`   |      | 실행 중인 opencode 서버에 연결(예: http://localhost:4096)              |
-| `--port`     |      | 로컬 서버 포트(기본값: 랜덤 포트)                                      |
+| 플래그                                   | 축약 | 설명                                                                   |
+| ---------------------------------------- | ---- | ---------------------------------------------------------------------- |
+| `--command`                              |      | 실행할 명령(인수는 message로 전달)                                     |
+| <nobr><code>{"--continue"}</code></nobr> | `-c` | 마지막 세션 이어서 실행                                                |
+| <nobr><code>{"--session"}</code></nobr>  | `-s` | 이어서 실행할 세션 ID                                                  |
+| <nobr><code>{"--fork"}</code></nobr>     |      | 세션을 이어갈 때 포크 생성 (`--continue` 또는 `--session`과 함께 사용) |
+| `--share`                                |      | 세션 공유                                                              |
+| `--model`                                | `-m` | 사용할 모델 (`provider/model` 형식)                                    |
+| `--agent`                                |      | 사용할 에이전트                                                        |
+| `--file`                                 | `-f` | 메시지에 첨부할 파일                                                   |
+| `--format`                               |      | 출력 형식: default(포맷됨) 또는 json(원시 JSON 이벤트)                 |
+| `--title`                                |      | 세션 제목(값이 없으면 프롬프트를 잘라 자동 생성)                       |
+| `--attach`                               |      | 실행 중인 opencode 서버에 연결(예: http://localhost:4096)              |
+| `--port`                                 |      | 로컬 서버 포트(기본값: 랜덤 포트)                                      |
 
 ---
 
