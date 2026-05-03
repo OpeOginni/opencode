@@ -18,11 +18,11 @@ import { LSP } from "@/lsp/lsp"
 import { MCP } from "@/mcp"
 import { Permission } from "@/permission"
 import { Installation } from "@/installation"
-import { InstanceBootstrap } from "@/project/bootstrap"
-import { InstanceStore } from "@/project/instance-store"
+import { InstanceLayer } from "@/project/instance-layer"
 import { Plugin } from "@/plugin"
 import { Project } from "@/project/project"
 import { ProviderAuth } from "@/provider/auth"
+import { ModelsDev } from "@/provider/models"
 import { Provider } from "@/provider/provider"
 import { Pty } from "@/pty"
 import { Question } from "@/question"
@@ -64,6 +64,7 @@ import { questionHandlers } from "./handlers/question"
 import { sessionHandlers } from "./handlers/session"
 import { syncHandlers } from "./handlers/sync"
 import { tuiHandlers } from "./handlers/tui"
+import { v2Handlers } from "./handlers/v2"
 import { workspaceHandlers } from "./handlers/workspace"
 import { instanceContextLayer, instanceRouterMiddleware } from "./middleware/instance-context"
 import { workspaceRouterMiddleware, workspaceRoutingLayer } from "./middleware/workspace-routing"
@@ -115,6 +116,7 @@ const instanceApiRoutes = HttpApiBuilder.layer(InstanceHttpApi).pipe(
     providerHandlers,
     sessionHandlers,
     syncHandlers,
+    v2Handlers,
     tuiHandlers,
     workspaceHandlers,
   ]),
@@ -152,9 +154,8 @@ export function createRoutes(corsOptions?: CorsOptions) {
       Format.defaultLayer,
       LSP.defaultLayer,
       Installation.defaultLayer,
-      InstanceBootstrap.defaultLayer,
-      InstanceStore.defaultLayer,
       MCP.defaultLayer,
+      ModelsDev.defaultLayer,
       Permission.defaultLayer,
       Plugin.defaultLayer,
       Project.defaultLayer,
@@ -179,12 +180,13 @@ export function createRoutes(corsOptions?: CorsOptions) {
       ToolRegistry.defaultLayer,
       Vcs.defaultLayer,
       Workspace.defaultLayer,
-      Worktree.defaultLayer,
+      Worktree.appLayer,
       Bus.layer,
       AppFileSystem.defaultLayer,
       FetchHttpClient.layer,
       HttpServer.layerServices,
     ]),
+    Layer.provideMerge(InstanceLayer.layer),
     Layer.provideMerge(Observability.layer),
   )
 }
