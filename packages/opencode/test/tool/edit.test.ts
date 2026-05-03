@@ -4,7 +4,8 @@ import fs from "fs/promises"
 import { Effect, Layer, ManagedRuntime } from "effect"
 import { EditTool } from "../../src/tool/edit"
 import { Instance } from "../../src/project/instance"
-import { tmpdir } from "../fixture/fixture"
+import { WithInstance } from "../../src/project/with-instance"
+import { disposeAllInstances, tmpdir } from "../fixture/fixture"
 import { LSP } from "@/lsp/lsp"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { Format } from "../../src/format"
@@ -26,7 +27,7 @@ const ctx = {
 }
 
 afterEach(async () => {
-  await Instance.disposeAll()
+  await disposeAllInstances()
 })
 
 const runtime = ManagedRuntime.make(
@@ -73,7 +74,7 @@ describe("tool.edit", () => {
       await using tmp = await tmpdir()
       const filepath = path.join(tmp.path, "newfile.txt")
 
-      await Instance.provide({
+      await WithInstance.provide({
         directory: tmp.path,
         fn: async () => {
           const edit = await resolve()
@@ -102,7 +103,7 @@ describe("tool.edit", () => {
       const bom = String.fromCharCode(0xfeff)
       await fs.writeFile(filepath, `${bom}using System;\n`, "utf-8")
 
-      await Instance.provide({
+      await WithInstance.provide({
         directory: tmp.path,
         fn: async () => {
           const edit = await resolve()
@@ -131,7 +132,7 @@ describe("tool.edit", () => {
       await using tmp = await tmpdir()
       const filepath = path.join(tmp.path, "nested", "dir", "file.txt")
 
-      await Instance.provide({
+      await WithInstance.provide({
         directory: tmp.path,
         fn: async () => {
           const edit = await resolve()
@@ -188,7 +189,7 @@ describe("tool.edit", () => {
       await using tmp = await tmpdir()
       const filepath = path.join(tmp.path, "new.txt")
 
-      await Instance.provide({
+      await WithInstance.provide({
         directory: tmp.path,
         fn: async () => {
           const { FileWatcher } = await import("../../src/file/watcher")
@@ -223,7 +224,7 @@ describe("tool.edit", () => {
       const filepath = path.join(tmp.path, "existing.txt")
       await fs.writeFile(filepath, "old content here", "utf-8")
 
-      await Instance.provide({
+      await WithInstance.provide({
         directory: tmp.path,
         fn: async () => {
           const edit = await resolve()
@@ -252,7 +253,7 @@ describe("tool.edit", () => {
       const bom = String.fromCharCode(0xfeff)
       await fs.writeFile(filepath, `${bom}using System;\nclass Test {}\n`, "utf-8")
 
-      await Instance.provide({
+      await WithInstance.provide({
         directory: tmp.path,
         fn: async () => {
           const edit = await resolve()
@@ -282,7 +283,7 @@ describe("tool.edit", () => {
       await using tmp = await tmpdir()
       const filepath = path.join(tmp.path, "nonexistent.txt")
 
-      await Instance.provide({
+      await WithInstance.provide({
         directory: tmp.path,
         fn: async () => {
           const edit = await resolve()
@@ -307,7 +308,7 @@ describe("tool.edit", () => {
       const filepath = path.join(tmp.path, "file.txt")
       await fs.writeFile(filepath, "content", "utf-8")
 
-      await Instance.provide({
+      await WithInstance.provide({
         directory: tmp.path,
         fn: async () => {
           const edit = await resolve()
@@ -332,7 +333,7 @@ describe("tool.edit", () => {
       const filepath = path.join(tmp.path, "file.txt")
       await fs.writeFile(filepath, "actual content", "utf-8")
 
-      await Instance.provide({
+      await WithInstance.provide({
         directory: tmp.path,
         fn: async () => {
           const edit = await resolve()
@@ -357,7 +358,7 @@ describe("tool.edit", () => {
       const filepath = path.join(tmp.path, "file.txt")
       await fs.writeFile(filepath, "foo bar foo baz foo", "utf-8")
 
-      await Instance.provide({
+      await WithInstance.provide({
         directory: tmp.path,
         fn: async () => {
           const edit = await resolve()
@@ -384,7 +385,7 @@ describe("tool.edit", () => {
       const filepath = path.join(tmp.path, "file.txt")
       await fs.writeFile(filepath, "original", "utf-8")
 
-      await Instance.provide({
+      await WithInstance.provide({
         directory: tmp.path,
         fn: async () => {
           const { FileWatcher } = await import("../../src/file/watcher")
@@ -419,7 +420,7 @@ describe("tool.edit", () => {
       const filepath = path.join(tmp.path, "file.txt")
       await fs.writeFile(filepath, "line1\nline2\nline3", "utf-8")
 
-      await Instance.provide({
+      await WithInstance.provide({
         directory: tmp.path,
         fn: async () => {
           const edit = await resolve()
@@ -445,7 +446,7 @@ describe("tool.edit", () => {
       const filepath = path.join(tmp.path, "file.txt")
       await fs.writeFile(filepath, "line1\r\nold\r\nline3", "utf-8")
 
-      await Instance.provide({
+      await WithInstance.provide({
         directory: tmp.path,
         fn: async () => {
           const edit = await resolve()
@@ -471,7 +472,7 @@ describe("tool.edit", () => {
       const filepath = path.join(tmp.path, "file.txt")
       await fs.writeFile(filepath, "content", "utf-8")
 
-      await Instance.provide({
+      await WithInstance.provide({
         directory: tmp.path,
         fn: async () => {
           const edit = await resolve()
@@ -496,7 +497,7 @@ describe("tool.edit", () => {
       const dirpath = path.join(tmp.path, "adir")
       await fs.mkdir(dirpath)
 
-      await Instance.provide({
+      await WithInstance.provide({
         directory: tmp.path,
         fn: async () => {
           const edit = await resolve()
@@ -521,7 +522,7 @@ describe("tool.edit", () => {
       const filepath = path.join(tmp.path, "file.txt")
       await fs.writeFile(filepath, "line1\nline2\nline3", "utf-8")
 
-      await Instance.provide({
+      await WithInstance.provide({
         directory: tmp.path,
         fn: async () => {
           const edit = await resolve()
@@ -590,7 +591,7 @@ describe("tool.edit", () => {
         },
       })
 
-      return await Instance.provide({
+      return await WithInstance.provide({
         directory: tmp.path,
         fn: async () => {
           const edit = await resolve()
@@ -734,7 +735,7 @@ describe("tool.edit", () => {
       const filepath = path.join(tmp.path, "file.txt")
       await fs.writeFile(filepath, "top = 0\nmiddle = keep\nbottom = 0\n", "utf-8")
 
-      await Instance.provide({
+      await WithInstance.provide({
         directory: tmp.path,
         fn: async () => {
           const edit = await resolve()
