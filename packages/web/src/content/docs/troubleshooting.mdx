@@ -49,6 +49,18 @@ OpenCode Desktop runs a local OpenCode server (the `opencode-cli` sidecar) in th
 
 ---
 
+### Desktop app logs
+
+Log files for the desktop app are written to:
+
+- **macOS**: `~/Library/Logs/ai.opencode.desktop/`
+- **Linux**: `~/.local/share/ai.opencode.desktop/logs/`
+- **Windows**: Press `WIN+R` and paste `%LOCALAPPDATA%\ai.opencode.desktop\logs`
+
+Log files are named with timestamps (e.g., `opencode-desktop_2025-01-09_12-34-56.log`) and logs older than 7 days are cleaned up on startup.
+
+---
+
 ### Disable plugins
 
 If the desktop app is crashing on launch, hanging, or behaving strangely, start by disabling plugins.
