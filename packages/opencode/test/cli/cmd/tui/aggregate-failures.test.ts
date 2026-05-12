@@ -52,4 +52,47 @@ describe("aggregateFailures", () => {
     const err = aggregateFailures([{ name: "x", result: { status: "rejected", reason: 42 } }])
     expect(err!.message).toContain("x: 42")
   })
+
+  test("surfaces a shared named error as an Error with structured fields", () => {
+    const reason = { name: "ConfigInvalidError", data: { message: "bad config" } }
+    const result = aggregateFailures([
+      { name: "config", result: { status: "rejected", reason } },
+      { name: "providers", result: { status: "rejected", reason: { name: "ConfigInvalidError", data: { message: "bad config" } } } },
+    ])
+    expect(result).toBeInstanceOf(Error)
+    expect(result!.name).toBe("ConfigInvalidError")
+    expect((result as Error & { data: unknown }).data).toEqual(reason.data)
+  })
+
+  test("surfaces a wrapped named error from SDK throwOnError", () => {
+    const body = { name: "ConfigInvalidError", data: { issues: [{ message: "expected string", path: ["model"] }] } }
+    const reason = new Error("ConfigInvalidError", { cause: { body, status: 400 } })
+    const result = aggregateFailures([
+      { name: "config", result: { status: "rejected", reason } },
+      { name: "providers", result: { status: "rejected", reason } },
+    ])
+    expect(result).toBeInstanceOf(Error)
+    expect(result!.name).toBe("ConfigInvalidError")
+    expect((result as Error & { data: unknown }).data).toEqual(body.data)
+  })
+
+  test("aggregates when failures have different named error names", () => {
+    const result = aggregateFailures([
+      { name: "config", result: { status: "rejected", reason: { name: "ConfigInvalidError", data: {} } } },
+      { name: "providers", result: { status: "rejected", reason: { name: "ProviderInitError", data: {} } } },
+    ])
+    expect(result).toBeInstanceOf(Error)
+    expect(result!.message).toContain("ConfigInvalidError")
+    expect(result!.message).toContain("ProviderInitError")
+  })
+
+  test("aggregates generic Errors even when they all share the same name", () => {
+    const result = aggregateFailures([
+      { name: "a", result: { status: "rejected", reason: new Error("foo") } },
+      { name: "b", result: { status: "rejected", reason: new Error("bar") } },
+    ])
+    expect(result).toBeInstanceOf(Error)
+    expect(result!.message).toContain("foo")
+    expect(result!.message).toContain("bar")
+  })
 })

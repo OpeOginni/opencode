@@ -15,11 +15,25 @@ export function aggregateFailures(labeled: LabeledSettled[]): Error | null {
   )
   if (failed.length === 0) return null
 
+  const named = failed.map((f) => namedError(f.result.reason))
+  const name = named[0]?.name
+  if (typeof name === "string" && named.every((item) => item?.name === name)) {
+    return Object.assign(new Error(name), named[0])
+  }
+
   const reasons = failed.map((f) => `${f.name}: ${reasonMessage(f.result.reason)}`).join("; ")
   const summary = `${failed.length} of ${labeled.length} requests failed: ${reasons}`
   const err = new Error(summary)
   err.cause = { failures: failed.map((f) => ({ name: f.name, reason: f.result.reason })) }
   return err
+}
+
+function namedError(reason: unknown): { name: unknown } | undefined {
+  const value = reason instanceof Error && reason.cause && typeof reason.cause === "object" && "body" in reason.cause
+    ? reason.cause.body
+    : reason
+  if (!value || typeof value !== "object" || !("name" in value)) return undefined
+  return value
 }
 
 function reasonMessage(reason: unknown): string {

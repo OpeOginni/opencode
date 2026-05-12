@@ -33,6 +33,7 @@ import { emptyConsoleState, type ConsoleState } from "@/config/console-state"
 import path from "path"
 import { useKV } from "./kv"
 import { aggregateFailures } from "./aggregate-failures"
+import { errorData } from "@/util/error"
 
 export const { use: useSync, provider: SyncProvider } = createSimpleContext({
   name: "Sync",
@@ -465,11 +466,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
           })
         })
         .catch(async (e) => {
-          Log.Default.error("tui bootstrap failed", {
-            error: e instanceof Error ? e.message : String(e),
-            name: e instanceof Error ? e.name : undefined,
-            stack: e instanceof Error ? e.stack : undefined,
-          })
+          Log.Default.error("tui bootstrap failed", errorData(e))
           if (fatal) {
             await exit(e)
           } else {
