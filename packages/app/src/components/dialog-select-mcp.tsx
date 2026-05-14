@@ -13,6 +13,7 @@ const statusLabels = {
   connected: "mcp.status.connected",
   failed: "mcp.status.failed",
   needs_auth: "mcp.status.needs_auth",
+  needs_client_registration: "mcp.status.needs_client_registration",
   disabled: "mcp.status.disabled",
 } as const
 
@@ -34,6 +35,11 @@ export const DialogSelectMcp: Component = () => {
       if (sync.data.mcp[name]?.status === "connected") await sdk.client.mcp.disconnect({ name })
       else await sdk.client.mcp.connect({ name })
     },
+    onSuccess: () => queryClient.refetchQueries(queryOptions.mcp(pathKey(sync.directory))),
+  }))
+
+  const authenticate = useMutation(() => ({
+    mutationFn: (name: string) => sdk.client.mcp.auth.authenticate({ name }),
     onSuccess: () => queryClient.refetchQueries(queryOptions.mcp(pathKey(sync.directory))),
   }))
 
@@ -67,7 +73,7 @@ export const DialogSelectMcp: Component = () => {
           }
           const error = () => {
             const s = mcpStatus()
-            return s?.status === "failed" ? s.error : undefined
+            if (s?.status === "failed" || s?.status === "needs_client_registration") return s.error
           }
           const enabled = () => status() === "connected"
           return (
@@ -78,7 +84,12 @@ export const DialogSelectMcp: Component = () => {
                   <Show when={statusLabel()}>
                     <span class="text-11-regular text-text-weaker">{statusLabel()}</span>
                   </Show>
-                  <Show when={toggle.isPending && toggle.variables === i.name}>
+                  <Show
+                    when={
+                      (toggle.isPending && toggle.variables === i.name) ||
+                      (authenticate.isPending && authenticate.variables === i.name)
+                    }
+                  >
                     <span class="text-11-regular text-text-weak">{language.t("common.loading.ellipsis")}</span>
                   </Show>
                 </div>
@@ -89,9 +100,16 @@ export const DialogSelectMcp: Component = () => {
               <div onClick={(e) => e.stopPropagation()}>
                 <Switch
                   checked={enabled()}
-                  disabled={toggle.isPending && toggle.variables === i.name}
+                  disabled={
+                    (toggle.isPending && toggle.variables === i.name) ||
+                    (authenticate.isPending && authenticate.variables === i.name)
+                  }
                   onChange={() => {
-                    if (toggle.isPending) return
+                    if (toggle.isPending || authenticate.isPending) return
+                    if (status() === "needs_auth") {
+                      authenticate.mutate(i.name)
+                      return
+                    }
                     toggle.mutate(i.name)
                   }}
                 />
