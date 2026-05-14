@@ -344,9 +344,6 @@ export function StatusPopoverBody(props: { shown: Accessor<boolean> }) {
                         <span class="flex flex-col min-w-0 flex-1">
                           <span class="flex items-center gap-2 min-w-0">
                             <span class="text-14-regular text-text-base truncate">{name}</span>
-                            <Show when={toggleMcp.isPending && toggleMcp.variables === name}>
-                              <span class="text-11-regular text-text-weak">{language.t("common.loading.ellipsis")}</span>
-                            </Show>
                           </span>
                           <Show when={status() === "needs_auth"}>
                             <span class="text-11-regular text-text-weaker truncate">{language.t("mcp.auth.clickToAuthenticate")}</span>
