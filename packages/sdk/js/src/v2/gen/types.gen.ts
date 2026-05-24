@@ -4837,6 +4837,7 @@ export type VcsDiffData = {
     directory?: string
     workspace?: string
     mode: "git" | "branch"
+    context?: number
   }
   url: "/vcs/diff"
 }
@@ -8169,6 +8170,10 @@ export type ExperimentalWorkspaceWarpErrors = {
    * WorkspaceWarpError | VcsApplyError | InvalidRequestError
    */
   400: WorkspaceWarpError | VcsApplyError | InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
 }
 
 export type ExperimentalWorkspaceWarpError = ExperimentalWorkspaceWarpErrors[keyof ExperimentalWorkspaceWarpErrors]
