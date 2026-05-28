@@ -22,16 +22,16 @@ export const SkillTool = Tool.define(
       parameters: Parameters,
       execute: (params: Schema.Schema.Type<typeof Parameters>, ctx: Tool.Context) =>
         Effect.gen(function* () {
-          const info = yield* skill
-            .require(params.name)
-            .pipe(Effect.catchTag("Skill.NotFoundError", (error) => Effect.die(new Error(error.message))))
-
           yield* ctx.ask({
             permission: "skill",
             patterns: [params.name],
             always: [params.name],
             metadata: {},
           })
+
+          const info = yield* skill
+            .require(params.name)
+            .pipe(Effect.catchTag("Skill.NotFoundError", (error) => Effect.die(new Error(error.message))))
 
           const dir = path.dirname(info.location)
           const base = pathToFileURL(dir).href
