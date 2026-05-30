@@ -428,6 +428,7 @@ Current host slot names:
 - `home_prompt_right` with props `{ workspace_id? }`
 - `session_prompt` with props `{ session_id, visible?, disabled?, on_submit?, ref? }`
 - `session_prompt_right` with props `{ session_id }`
+- `session_assistant_footer` with props `{ session_id, message_id }`
 - `home_bottom`
 - `home_footer`
 - `sidebar_title` with props `{ session_id, title, share_url? }`
