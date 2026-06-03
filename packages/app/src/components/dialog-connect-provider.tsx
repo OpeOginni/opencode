@@ -9,7 +9,7 @@ import { ProviderIcon } from "@opencode-ai/ui/provider-icon"
 import { Spinner } from "@opencode-ai/ui/spinner"
 import { TextField } from "@opencode-ai/ui/text-field"
 import { showToast } from "@/utils/toast"
-import { createEffect, createMemo, createResource, Match, onCleanup, onMount, Switch } from "solid-js"
+import { createEffect, createMemo, createResource, Match, onCleanup, onMount, Show, Switch } from "solid-js"
 import { createStore, produce } from "solid-js/store"
 import { Link } from "@/components/link"
 import { useServerSDK } from "@/context/server-sdk"
@@ -560,19 +560,17 @@ export function DialogConnectProvider(props: { provider: string }) {
             ? language.t("provider.connect.oauth.auto.visit.suffix", { provider: provider().name })
             : language.t("provider.connect.oauth.auto.browser", { provider: provider().name })}
         </div>
-        <Switch>
-          <Match when={code()}>
-            {(value) => (
-              <TextField
-                label={language.t("provider.connect.oauth.auto.confirmationCode")}
-                class="font-mono"
-                value={value()}
-                readOnly
-                copyable
-              />
-            )}
-          </Match>
-        </Switch>
+        <Show when={code()}>
+          {(value) => (
+            <TextField
+              label={language.t("provider.connect.oauth.auto.confirmationCode")}
+              class="font-mono"
+              value={value()}
+              readOnly
+              copyable
+            />
+          )}
+        </Show>
         <div class="text-14-regular text-text-base flex items-center gap-4">
           <Spinner />
           <span>{language.t("provider.connect.status.waiting")}</span>
