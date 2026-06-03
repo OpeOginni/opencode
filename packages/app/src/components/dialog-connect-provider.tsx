@@ -525,10 +525,8 @@ export function DialogConnectProvider(props: { provider: string }) {
   function OAuthAutoView() {
     const code = createMemo(() => {
       const instructions = store.authorization?.instructions
-      if (instructions?.includes(":")) {
-        return instructions.split(":").pop()?.trim()
-      }
-      return instructions
+      if (!instructions?.includes(":")) return
+      return instructions.split(":").pop()?.trim()
     })
 
     onMount(() => {
@@ -558,15 +556,23 @@ export function DialogConnectProvider(props: { provider: string }) {
         <div class="text-14-regular text-text-base">
           {language.t("provider.connect.oauth.auto.visit.prefix")}
           <Link href={store.authorization!.url}>{language.t("provider.connect.oauth.auto.visit.link")}</Link>
-          {language.t("provider.connect.oauth.auto.visit.suffix", { provider: provider().name })}
+          {code()
+            ? language.t("provider.connect.oauth.auto.visit.suffix", { provider: provider().name })
+            : language.t("provider.connect.oauth.auto.noConfirmationCode", { provider: provider().name })}
         </div>
-        <TextField
-          label={language.t("provider.connect.oauth.auto.confirmationCode")}
-          class="font-mono"
-          value={code()}
-          readOnly
-          copyable
-        />
+        <Switch>
+          <Match when={code()}>
+            {(value) => (
+              <TextField
+                label={language.t("provider.connect.oauth.auto.confirmationCode")}
+                class="font-mono"
+                value={value()}
+                readOnly
+                copyable
+              />
+            )}
+          </Match>
+        </Switch>
         <div class="text-14-regular text-text-base flex items-center gap-4">
           <Spinner />
           <span>{language.t("provider.connect.status.waiting")}</span>

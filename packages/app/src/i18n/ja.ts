@@ -138,6 +138,8 @@ export const dict = {
   "provider.connect.oauth.auto.visit.link": "このリンク",
   "provider.connect.oauth.auto.visit.suffix":
     " にアクセスし、以下のコードを入力してアカウントを接続し、OpenCodeで{{provider}}モデルを使用してください。",
+  "provider.connect.oauth.auto.noConfirmationCode":
+    " にアクセスしてブラウザでの認証を完了してください。このウィンドウは自動的に閉じます。",
   "provider.connect.oauth.auto.confirmationCode": "確認コード",
   "provider.connect.toast.connected.title": "{{provider}}が接続されました",
   "provider.connect.toast.connected.description": "{{provider}}モデルが使用可能になりました。",

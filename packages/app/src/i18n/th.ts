@@ -151,6 +151,8 @@ export const dict = {
   "provider.connect.oauth.auto.visit.link": "ลิงก์นี้",
   "provider.connect.oauth.auto.visit.suffix":
     " และป้อนรหัสด้านล่างเพื่อเชื่อมต่อบัญชีและใช้โมเดล {{provider}} ใน OpenCode",
+  "provider.connect.oauth.auto.noConfirmationCode":
+    " เพื่อดำเนินการอนุมัติให้เสร็จสมบูรณ์ในเบราว์เซอร์ของคุณ หน้าต่างนี้จะปิดลงโดยอัตโนมัติ",
   "provider.connect.oauth.auto.confirmationCode": "รหัสยืนยัน",
   "provider.connect.toast.connected.title": "{{provider}} ที่เชื่อมต่อแล้ว",
   "provider.connect.toast.connected.description": "โมเดล {{provider}} พร้อมใช้งานแล้ว",

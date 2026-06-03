@@ -154,6 +154,8 @@ export const dict = {
   "provider.connect.oauth.auto.visit.link": "це посилання",
   "provider.connect.oauth.auto.visit.suffix":
     " і введіть код нижче, щоб підключити обліковий запис і використовувати моделі {{provider}} у OpenCode.",
+  "provider.connect.oauth.auto.noConfirmationCode":
+    " щоб завершити авторизацію у вашому браузері. Це вікно закриється автоматично.",
   "provider.connect.oauth.auto.confirmationCode": "Код підтвердження",
   "provider.connect.toast.connected.title": "{{provider}} підключено",
   "provider.connect.toast.connected.description": "Моделі {{provider}} тепер доступні для використання.",
