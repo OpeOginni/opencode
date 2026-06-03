@@ -155,7 +155,7 @@ export const dict = {
   "provider.connect.oauth.auto.visit.link": "Bu bağlantıya",
   "provider.connect.oauth.auto.visit.suffix":
     " tıklayarak aşağıdaki kodu girin ve hesabınızı bağlayarak OpenCode'da {{provider}} modellerini kullanın.",
-  "provider.connect.oauth.auto.noConfirmationCode":
+  "provider.connect.oauth.auto.browser":
     " tıklayarak tarayıcınızda yetkilendirmeyi tamamlayın. Bu pencere otomatik olarak kapanacaktır.",
   "provider.connect.oauth.auto.confirmationCode": "Onay kodu",
   "provider.connect.toast.connected.title": "{{provider}} bağlandı",

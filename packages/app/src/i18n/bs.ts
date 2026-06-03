@@ -151,7 +151,7 @@ export const dict = {
   "provider.connect.oauth.auto.visit.link": "ovaj link",
   "provider.connect.oauth.auto.visit.suffix":
     " i unesi kod ispod da povežeš račun i koristiš {{provider}} modele u OpenCode-u.",
-  "provider.connect.oauth.auto.noConfirmationCode":
+  "provider.connect.oauth.auto.browser":
     " da završiš autorizaciju u svom pretraživaču. Ovaj prozor će se automatski zatvoriti.",
   "provider.connect.oauth.auto.confirmationCode": "Kod za potvrdu",
   "provider.connect.toast.connected.title": "{{provider}} povezan",

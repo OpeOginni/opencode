@@ -173,7 +173,7 @@ export const dict = {
   "provider.connect.oauth.auto.visit.prefix": "访问 ",
   "provider.connect.oauth.auto.visit.link": "此链接",
   "provider.connect.oauth.auto.visit.suffix": " 并输入以下代码，以连接你的帐户并在 OpenCode 中使用 {{provider}} 模型。",
-  "provider.connect.oauth.auto.noConfirmationCode": " 以在浏览器中完成授权。此窗口将自动关闭。",
+  "provider.connect.oauth.auto.browser": " 以在浏览器中完成授权。此窗口将自动关闭。",
   "provider.connect.oauth.auto.confirmationCode": "确认码",
   "provider.connect.toast.connected.title": "{{provider}} 已连接",
   "provider.connect.toast.connected.description": "现在可以使用 {{provider}} 模型了。",

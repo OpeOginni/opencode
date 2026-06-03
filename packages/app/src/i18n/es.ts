@@ -151,7 +151,7 @@ export const dict = {
   "provider.connect.oauth.auto.visit.link": "este enlace",
   "provider.connect.oauth.auto.visit.suffix":
     " e introduce el código a continuación para conectar tu cuenta y usar modelos de {{provider}} en OpenCode.",
-  "provider.connect.oauth.auto.noConfirmationCode":
+  "provider.connect.oauth.auto.browser":
     " para completar la autorización en tu navegador. Esta ventana se cerrará automáticamente.",
   "provider.connect.oauth.auto.confirmationCode": "Código de confirmación",
   "provider.connect.toast.connected.title": "{{provider}} conectado",

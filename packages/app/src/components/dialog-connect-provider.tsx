@@ -558,7 +558,7 @@ export function DialogConnectProvider(props: { provider: string }) {
           <Link href={store.authorization!.url}>{language.t("provider.connect.oauth.auto.visit.link")}</Link>
           {code()
             ? language.t("provider.connect.oauth.auto.visit.suffix", { provider: provider().name })
-            : language.t("provider.connect.oauth.auto.noConfirmationCode", { provider: provider().name })}
+            : language.t("provider.connect.oauth.auto.browser", { provider: provider().name })}
         </div>
         <Switch>
           <Match when={code()}>
