@@ -442,16 +442,25 @@ function ReasoningHeader(props: { toggleable: boolean; open: boolean; done: bool
       : theme.warning
 
   return (
-    <text fg={fg()} wrapMode="none">
-      <Show when={props.toggleable}>
-        <span>{props.open ? "- " : "+ "}</span>
-      </Show>
-      <span>{props.done ? "Thought" : "Thinking"}</span>
-      <Show when={props.title}>
-        <span>: </span>
-        <span>{props.title}</span>
-      </Show>
-    </text>
+    <Switch>
+      <Match when={!props.done}>
+        <box flexDirection="row">
+          <Spinner color={fg()}>{props.title ? "Thinking: " + props.title : "Thinking"}</Spinner>
+        </box>
+      </Match>
+      <Match when={true}>
+        <text fg={fg()} wrapMode="none">
+          <Show when={props.toggleable}>
+            <span>{props.open ? "- " : "+ "}</span>
+          </Show>
+          <span>Thought</span>
+          <Show when={props.title}>
+            <span>: </span>
+            <span>{props.title}</span>
+          </Show>
+        </text>
+      </Match>
+    </Switch>
   )
 }
 
@@ -1078,7 +1087,9 @@ function toolOutput(content?: Array<ToolTextContent | ToolFileContent>) {
   return (content ?? [])
     .map((item) => {
       if (item.type === "text") return item.text.trim()
-      return `[file ${item.name ?? item.uri}]`
+      const source =
+        item.source.type === "data" ? "inline data" : item.source.type === "url" ? item.source.url : item.source.uri
+      return `[file ${item.name ?? source}]`
     })
     .filter(Boolean)
     .join("\n")
