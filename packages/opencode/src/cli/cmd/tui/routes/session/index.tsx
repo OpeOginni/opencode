@@ -328,6 +328,8 @@ export function Session() {
     if (!r) return
     if (!sync.ready || !local.model.ready) return
     if (!route.autoSubmit || !route.prompt?.input) return
+    const target = session()
+    if (!target || target.parentID) return
     if (r.current.input !== route.prompt.input) return
     submitted = true
     r.submit()
