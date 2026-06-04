@@ -28,6 +28,10 @@ export function Home() {
   const editor = useEditorContext()
   const dimensions = useTerminalDimensions()
   const tuiConfig = useTuiConfig()
+  const homePrompt = () => {
+    if (args.continue || args.sessionID || args.fork) return
+    return args.prompt
+  }
   const promptMaxWidth = createMemo(() => {
     const configured = tuiConfig.prompt?.max_width
     if (configured === "auto") return Math.max(75, Math.floor(dimensions().width * 0.7))
@@ -48,8 +52,9 @@ export function Home() {
       once = true
       return
     }
-    if (!args.prompt) return
-    r.set({ input: args.prompt, parts: [] })
+    const input = homePrompt()
+    if (!input) return
+    r.set({ input, parts: [] })
     once = true
   }
 
@@ -59,8 +64,9 @@ export function Home() {
     if (sent) return
     if (!r) return
     if (!sync.ready || !local.model.ready) return
-    if (!args.prompt) return
-    if (r.current.input !== args.prompt) return
+    const input = homePrompt()
+    if (!input) return
+    if (r.current.input !== input) return
     sent = true
     r.submit()
   })
