@@ -184,6 +184,7 @@ export function Session() {
   const route = useRouteData("session")
   const { navigate } = useRoute()
   const sync = useSync()
+  const local = useLocal()
   const event = useEvent()
   const project = useProject()
   const tuiConfig = useTuiConfig()
@@ -308,16 +309,29 @@ export function Session() {
   })
 
   let seeded = false
+  let submitted = false
   let scroll: ScrollBoxRenderable
   let prompt: PromptRef | undefined
+  const [promptSignal, setPromptSignal] = createSignal<PromptRef | undefined>()
   const bind = (r: PromptRef | undefined) => {
     prompt = r
+    setPromptSignal(r)
     promptRef.set(r)
     if (seeded || !route.prompt || !r) return
     seeded = true
     r.set(route.prompt)
-    if (route.autoSubmit && route.prompt.input) r.submit()
   }
+
+  createEffect(() => {
+    const r = promptSignal()
+    if (submitted) return
+    if (!r) return
+    if (!sync.ready || !local.model.ready) return
+    if (!route.autoSubmit || !route.prompt?.input) return
+    if (r.current.input !== route.prompt.input) return
+    submitted = true
+    r.submit()
+  })
   const keymap = useOpencodeKeymap()
   const dialog = useDialog()
   const renderer = useRenderer()
@@ -415,8 +429,6 @@ export function Session() {
       scroll.scrollTo(scroll.scrollHeight)
     }, 50)
   }
-
-  const local = useLocal()
 
   function enterChild(sessionID: string) {
     navigate({
