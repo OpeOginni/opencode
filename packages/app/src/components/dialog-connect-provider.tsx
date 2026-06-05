@@ -523,11 +523,8 @@ export function DialogConnectProvider(props: { provider: string }) {
   }
 
   function OAuthAutoView() {
-    const code = createMemo(() => {
-      const instructions = store.authorization?.instructions
-      if (!instructions?.includes(":")) return
-      return instructions.split(":").pop()?.trim()
-    })
+    const instructions = createMemo(() => store.authorization?.instructions.trim())
+    const code = createMemo(() => store.authorization?.code?.trim())
 
     onMount(() => {
       void (async () => {
@@ -560,6 +557,9 @@ export function DialogConnectProvider(props: { provider: string }) {
             ? language.t("provider.connect.oauth.auto.visit.suffix", { provider: provider().name })
             : language.t("provider.connect.oauth.auto.browser", { provider: provider().name })}
         </div>
+        <Show when={!code() && instructions()}>
+          {(value) => <div class="text-14-regular text-text-base whitespace-pre-wrap">{value()}</div>}
+        </Show>
         <Show when={code()}>
           {(value) => (
             <TextField
