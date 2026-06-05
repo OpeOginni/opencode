@@ -322,6 +322,9 @@ export function Session() {
     r.set(route.prompt)
   }
 
+  // CLI prompts can be routed into an existing session before sync/model hydration finishes.
+  // Wait for those stores so the submission uses the right defaults, and only auto-submit if
+  // the prompt still matches the seeded value so user edits are not submitted unexpectedly.
   createEffect(() => {
     const r = promptSignal()
     if (submitted) return

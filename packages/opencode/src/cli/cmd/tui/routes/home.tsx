@@ -12,7 +12,6 @@ import { useEditorContext } from "@tui/context/editor"
 import { useTerminalDimensions } from "@opentui/solid"
 import { useTuiConfig } from "../context/tui-config"
 
-let once = false
 const placeholder = {
   normal: ["Fix a TODO in the codebase", "What is the tech stack of this project?", "Fix broken tests"],
   shell: ["ls -la", "git status", "pwd"],
@@ -28,10 +27,8 @@ export function Home() {
   const editor = useEditorContext()
   const dimensions = useTerminalDimensions()
   const tuiConfig = useTuiConfig()
-  const homePrompt = () => {
-    if (args.continue || args.sessionID || args.fork) return
-    return args.prompt
-  }
+  const [argPrompt, setArgPrompt] = createSignal<string | undefined>()
+  const [seededPrompt, setSeededPrompt] = createSignal(false)
   const promptMaxWidth = createMemo(() => {
     const configured = tuiConfig.prompt?.max_width
     if (configured === "auto") return Math.max(75, Math.floor(dimensions().width * 0.7))
@@ -46,16 +43,18 @@ export function Home() {
   const bind = (r: PromptRef | undefined) => {
     setRef(r)
     promptRef.set(r)
-    if (once || !r) return
+    if (seededPrompt() || !r) return
     if (route.prompt) {
       r.set(route.prompt)
-      once = true
+      setSeededPrompt(true)
       return
     }
-    const input = homePrompt()
+    if (args.continue || args.sessionID || args.fork) return
+    const input = args.consumePrompt()
     if (!input) return
+    setArgPrompt(input)
+    setSeededPrompt(true)
     r.set({ input, parts: [] })
-    once = true
   }
 
   // Wait for sync and model store to be ready before auto-submitting --prompt
@@ -64,7 +63,7 @@ export function Home() {
     if (sent) return
     if (!r) return
     if (!sync.ready || !local.model.ready) return
-    const input = homePrompt()
+    const input = argPrompt()
     if (!input) return
     if (r.current.input !== input) return
     sent = true

@@ -478,13 +478,16 @@ function App(props: { onSnapshot?: () => Promise<string[]> }) {
   })
 
   const args = useArgs()
-  const seedInitialPrompt = () =>
-    args.prompt
+  const seedInitialPrompt = () => {
+    const prompt = args.consumePrompt()
+    
+    return prompt
       ? {
-          prompt: { input: args.prompt, parts: [] },
+          prompt: { input: prompt, parts: [] },
           autoSubmit: true,
         }
       : {}
+  }
   onMount(() => {
     batch(() => {
       if (args.agent) local.agent.set(args.agent)
