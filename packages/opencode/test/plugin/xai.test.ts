@@ -447,7 +447,8 @@ describe("plugin.xai", () => {
       expect(result.method).toBe("auto")
       expect(result.url).toBe("https://x.ai/device?user_code=ABCD-1234")
       expect(result.instructions).toContain("https://x.ai/device")
-      expect(result.instructions).toContain("ABCD-1234")
+      expect(result.instructions).not.toContain("ABCD-1234")
+      expect(result.code).toBe("ABCD-1234")
       expect(await (result as any).callback()).toMatchObject({ type: "success", refresh: "RT", access: "AT" })
     })
 

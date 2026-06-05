@@ -102,6 +102,9 @@ const handlePluginAuth = Effect.fn("Cli.providers.pluginAuth")(function* (
       if (authorize.instructions) {
         yield* Prompt.log.info(authorize.instructions)
       }
+      if (authorize.code) {
+        yield* Prompt.log.info("Code: " + authorize.code)
+      }
       const spinner = Prompt.spinner()
       yield* spinner.start("Waiting for authorization...")
       const result = yield* cliTry("Failed to authorize: ", () => authorize.callback())

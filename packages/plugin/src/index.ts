@@ -162,7 +162,7 @@ export type AuthHook = {
   )[]
 }
 
-export type AuthOAuthResult = { url: string; instructions: string } & (
+export type AuthOAuthResult = { url: string; instructions: string; code?: string } & (
   | {
       method: "auto"
       callback(): Promise<

@@ -713,7 +713,8 @@ export async function XaiAuthPlugin(input: PluginInput, options: XaiAuthPluginOp
             const browserUrl = device.verification_uri_complete ?? device.verification_uri
             return {
               url: browserUrl,
-              instructions: `Open ${device.verification_uri} on any device and enter code: ${device.user_code}`,
+              instructions: `Open ${device.verification_uri} on any device and enter the confirmation code.`,
+              code: device.user_code,
               method: "auto" as const,
               callback: async () => {
                 try {

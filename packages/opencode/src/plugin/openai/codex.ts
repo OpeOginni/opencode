@@ -559,7 +559,8 @@ export async function CodexAuthPlugin(input: PluginInput, options: CodexAuthPlug
 
             return {
               url: `${ISSUER}/codex/device`,
-              instructions: `Enter code: ${deviceData.user_code}`,
+              instructions: "Enter the confirmation code in your browser.",
+              code: deviceData.user_code,
               method: "auto" as const,
               async callback() {
                 while (true) {

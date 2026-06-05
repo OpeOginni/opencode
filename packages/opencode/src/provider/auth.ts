@@ -50,6 +50,7 @@ export class Authorization extends Schema.Class<Authorization>("ProviderAuthAuth
   url: Schema.String,
   method: Schema.Literals(["auto", "code"]),
   instructions: Schema.String,
+  code: Schema.optional(Schema.String),
 }) {}
 
 export const AuthorizeInput = Schema.Struct({
@@ -181,6 +182,7 @@ export const layer: Layer.Layer<Service, never, Auth.Service | Plugin.Service> =
         url: result.url,
         method: result.method,
         instructions: result.instructions,
+        ...(result.code ? { code: result.code } : {}),
       }
     })
 

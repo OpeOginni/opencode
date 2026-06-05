@@ -260,7 +260,8 @@ export async function CopilotAuthPlugin(input: PluginInput): Promise<Hooks> {
 
             return {
               url: deviceData.verification_uri,
-              instructions: `Enter code: ${deviceData.user_code}`,
+              instructions: "Enter the confirmation code in your browser.",
+              code: deviceData.user_code,
               method: "auto" as const,
               async callback() {
                 while (true) {
