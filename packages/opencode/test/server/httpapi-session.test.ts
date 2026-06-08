@@ -584,17 +584,19 @@ describe("session HttpApi", () => {
           request(`/api/session/${session.id}/prompt`, {
             method: "POST",
             headers: { ...headers, "content-type": "application/json" },
-            body: JSON.stringify({ id: "evt_http_prompt", prompt: { text: "hello" } }),
+            body: JSON.stringify({ id: "msg_http_prompt", prompt: { text: "hello" } }),
           })
         const first = yield* recordPrompt()
         const retried = yield* recordPrompt()
-        type PromptBody = { id: string; type: string; text: string }
+        type PromptBody = { id: string; prompt: { text: string }; delivery: string; promotedSeq?: number }
         const firstBody = yield* json<{ data: PromptBody }>(first)
         const retriedBody = yield* json<{ data: PromptBody }>(retried)
         expect(first.status).toBe(200)
         expect(retried.status).toBe(200)
         expect(retriedBody).toEqual(firstBody)
-        expect(firstBody).toMatchObject({ data: { type: "user", text: "hello" } })
+        expect(firstBody).toMatchObject({
+          data: { id: "msg_http_prompt", prompt: { text: "hello" }, delivery: "steer" },
+        })
 
         const messages = yield* requestJson<{ data: PromptBody[] }>(`/api/session/${session.id}/message`, {
           headers,
@@ -604,27 +606,26 @@ describe("session HttpApi", () => {
           db
             .select()
             .from(SessionInputTable)
-            .where(eq(SessionInputTable.id, SessionMessage.ID.make("evt_http_prompt")))
+            .where(eq(SessionInputTable.id, SessionMessage.ID.make("msg_http_prompt")))
             .get()
             .pipe(Effect.orDie),
         )
         expect(admitted).toMatchObject({
-          id: "evt_http_prompt",
+          id: "msg_http_prompt",
           session_id: session.id,
           delivery: "steer",
           promoted_seq: null,
         })
-
         const conflict = yield* request(`/api/session/${session.id}/prompt`, {
           method: "POST",
           headers: { ...headers, "content-type": "application/json" },
-          body: JSON.stringify({ id: "evt_http_prompt", prompt: { text: "goodbye" } }),
+          body: JSON.stringify({ id: "msg_http_prompt", prompt: { text: "goodbye" } }),
         })
         expect(conflict.status).toBe(409)
         expect(yield* responseJson(conflict)).toEqual({
           _tag: "ConflictError",
-          message: "Prompt message ID conflicts with an existing durable record: evt_http_prompt",
-          resource: "evt_http_prompt",
+          message: "Prompt message ID conflicts with an existing durable record: msg_http_prompt",
+          resource: "msg_http_prompt",
         })
       }),
     { git: true, config: { formatter: false, lsp: false } },
@@ -642,16 +643,16 @@ describe("session HttpApi", () => {
         expect(compact.status).toBe(503)
         expect(yield* responseJson(compact)).toEqual({
           _tag: "ServiceUnavailableError",
-          message: "V2 session compact is not available yet",
-          service: "v2.session.compact",
+          message: "Session compact is not available yet",
+          service: "session.compact",
         })
 
         const wait = yield* request(`/api/session/${session.id}/wait`, { method: "POST", headers })
         expect(wait.status).toBe(503)
         expect(yield* responseJson(wait)).toEqual({
           _tag: "ServiceUnavailableError",
-          message: "V2 session wait is not available yet",
-          service: "v2.session.wait",
+          message: "Session wait is not available yet",
+          service: "session.wait",
         })
       }),
     { git: true, config: { formatter: false, lsp: false } },
