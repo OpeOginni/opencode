@@ -1,5 +1,5 @@
 import path from "path"
-import { type InstanceContext } from "../project/instance"
+import type { InstanceContext } from "@/project/instance-context"
 
 export function relative(instance: InstanceContext, file: string) {
 

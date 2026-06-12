@@ -1,13 +1,11 @@
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Plugin } from "../plugin"
 import { Format } from "../format"
 import { LSP } from "@/lsp/lsp"
-import { File } from "../file"
 import { Snapshot } from "../snapshot"
 import * as Project from "./project"
 import * as Vcs from "./vcs"
-import { Bus } from "../bus"
 import { InstanceState } from "@/effect/instance-state"
-import { FileWatcher } from "@/file/watcher"
 import { ShareNext } from "@/share/share-next"
 import { Effect, Layer } from "effect"
 import { Config } from "@/config/config"
@@ -23,8 +21,6 @@ export const layer = Layer.effect(
     // InstanceStore imports only the lightweight tag from bootstrap-service.ts,
     // so it can depend on bootstrap without importing this implementation graph.
     const config = yield* Config.Service
-    const file = yield* File.Service
-    const fileWatcher = yield* FileWatcher.Service
     const format = yield* Format.Service
     const lsp = yield* LSP.Service
     const plugin = yield* Plugin.Service
@@ -43,7 +39,7 @@ export const layer = Layer.effect(
       // Each service self-manages its own slow work via Effect.forkScoped against
       // its per-instance state scope. We just await materialization here.
       yield* Effect.forEach(
-        [lsp, shareNext, format, file, fileWatcher, vcs, snapshot, project],
+        [lsp, shareNext, format, vcs, snapshot, project],
         (s) => s.init().pipe(Effect.catchCause((cause) => Effect.logWarning("init failed", { cause }))),
         { concurrency: "unbounded", discard: true },
       ).pipe(Effect.withSpan("InstanceBootstrap.init"))
@@ -55,10 +51,7 @@ export const layer = Layer.effect(
 
 export const defaultLayer: Layer.Layer<Service> = layer.pipe(
   Layer.provide([
-    Bus.layer,
     Config.defaultLayer,
-    File.defaultLayer,
-    FileWatcher.defaultLayer,
     Format.defaultLayer,
     LSP.defaultLayer,
     Plugin.defaultLayer,
@@ -68,5 +61,16 @@ export const defaultLayer: Layer.Layer<Service> = layer.pipe(
     Vcs.defaultLayer,
   ]),
 )
+
+export const node = LayerNode.make(layer, [
+  Config.node,
+  Format.node,
+  LSP.node,
+  Plugin.node,
+  Project.node,
+  ShareNext.node,
+  Snapshot.node,
+  Vcs.node,
+])
 
 export * as InstanceBootstrap from "./bootstrap"

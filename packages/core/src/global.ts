@@ -5,6 +5,7 @@ import os from "os"
 import { Context, Effect, Layer } from "effect"
 import { Flock } from "./util/flock"
 import { Flag } from "./flag/flag"
+import { LayerNode } from "./effect/layer-node"
 
 const app = "opencode"
 const data = path.join(xdgData!, app)
@@ -20,6 +21,7 @@ const paths = {
   data,
   bin: path.join(cache, "bin"),
   log: path.join(data, "log"),
+  repos: path.join(data, "repos"),
   cache,
   config,
   state,
@@ -37,6 +39,7 @@ await Promise.all([
   fs.mkdir(Path.tmp, { recursive: true }),
   fs.mkdir(Path.log, { recursive: true }),
   fs.mkdir(Path.bin, { recursive: true }),
+  fs.mkdir(Path.repos, { recursive: true }),
 ])
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Global") {}
@@ -50,6 +53,7 @@ export interface Interface {
   readonly tmp: string
   readonly bin: string
   readonly log: string
+  readonly repos: string
 }
 
 export function make(input: Partial<Interface> = {}): Interface {
@@ -62,6 +66,7 @@ export function make(input: Partial<Interface> = {}): Interface {
     tmp: Path.tmp,
     bin: Path.bin,
     log: Path.log,
+    repos: Path.repos,
     ...input,
   }
 }
@@ -72,6 +77,7 @@ export const layer = Layer.effect(
 )
 
 export const defaultLayer = layer
+export const node = LayerNode.make(layer, [])
 
 export const layerWith = (input: Partial<Interface>) =>
   Layer.effect(
