@@ -150,7 +150,10 @@ export const TuiThreadCommand = cmd({
       const external =
         process.argv.includes("--port") ||
         process.argv.includes("--hostname") ||
-        process.argv.includes("--mdns")
+        process.argv.includes("--mdns") ||
+        network.mdns ||
+        network.port !== 0 ||
+        network.hostname !== "127.0.0.1"
 
       const headers = external ? ServerAuth.headers() : undefined
 
