@@ -54,12 +54,31 @@ export function applyOnly(db: Database, input: Migration[]) {
       if (
         yield* db.get(sql`SELECT name FROM sqlite_master WHERE type = 'table' AND name = ${"__drizzle_migrations"}`)
       ) {
-        yield* db.run(sql`
-          INSERT OR IGNORE INTO ${sql.identifier("migration")} (id, time_completed)
-          SELECT name, ${Date.now()}
-          FROM ${sql.identifier("__drizzle_migrations")}
-          WHERE name IS NOT NULL
-        `)
+        const columns = yield* db.all<{ name: string }>(
+          sql`PRAGMA table_info(${sql.identifier("__drizzle_migrations")})`,
+        )
+        if (columns.some((column) => column.name === "name")) {
+          // This repo's vendored adapter stores the migration tag in `name`.
+          yield* db.run(sql`
+            INSERT OR IGNORE INTO ${sql.identifier("migration")} (id, time_completed)
+            SELECT name, ${Date.now()}
+            FROM ${sql.identifier("__drizzle_migrations")}
+            WHERE name IS NOT NULL
+          `)
+        } else {
+          // Stock drizzle-orm journals only record id/hash/created_at and never
+          // the migration tag. Drizzle applies migrations in folder order, which
+          // matches the order of `input`, so seed the first N as completed where
+          // N is the number of rows already recorded.
+          const applied = yield* db.get<{ count: number }>(
+            sql`SELECT count(*) as count FROM ${sql.identifier("__drizzle_migrations")}`,
+          )
+          yield* Effect.forEach(input.slice(0, applied?.count ?? 0), (migration) =>
+            db.run(
+              sql`INSERT OR IGNORE INTO ${sql.identifier("migration")} (id, time_completed) VALUES (${migration.id}, ${Date.now()})`,
+            ),
+          )
+        }
         completed = new Set(
           (yield* db.all<{ id: string }>(sql`SELECT id FROM ${sql.identifier("migration")}`)).map((row) => row.id),
         )

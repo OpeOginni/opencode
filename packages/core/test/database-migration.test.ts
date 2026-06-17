@@ -490,6 +490,30 @@ describe("DatabaseMigration", () => {
     )
   })
 
+  test("imports legacy drizzle migration state without a name column", async () => {
+    await run(
+      Effect.gen(function* () {
+        const db = yield* makeDb
+        // Stock drizzle-orm (used by older opencode releases) creates the journal
+        // with only id/hash/created_at -- no name column.
+        yield* db.run(sql`CREATE TABLE __drizzle_migrations (id INTEGER PRIMARY KEY, hash text NOT NULL, created_at numeric)`)
+        yield* db.run(sql`
+          INSERT INTO __drizzle_migrations (hash, created_at)
+          VALUES ('hash', 1), ('hash', 2)
+        `)
+
+        // Two legacy rows -> first two migrations in order seeded as completed,
+        // so their SQL is never replayed.
+        const input = migrations.slice(0, 2)
+        yield* DatabaseMigration.applyOnly(db, input)
+
+        expect(yield* db.all(sql`SELECT id FROM migration ORDER BY time_completed, id`)).toEqual(
+          input.map((migration) => ({ id: migration.id })),
+        )
+      }),
+    )
+  })
+
   test("does not replay a migrated session metadata column", async () => {
     await run(
       Effect.gen(function* () {
