@@ -171,6 +171,7 @@ export const layer = Layer.effect(
   Effect.gen(function* () {
     const auth = yield* Auth.Service
     const session = yield* Session.Service
+    const projectSvc = yield* Project.Service
     const prompt = yield* SessionPrompt.Service
     const http = yield* HttpClient.HttpClient
     const events = yield* EventV2Bridge.Service
@@ -575,7 +576,7 @@ export const layer = Layer.effect(
     const sessionWarp = Effect.fn("Workspace.sessionWarp")(function* (input: SessionWarpInput) {
       return yield* Effect.gen(function* () {
         const current = yield* db
-          .select({ workspaceID: SessionTable.workspace_id })
+          .select({ projectID: SessionTable.project_id, workspaceID: SessionTable.workspace_id })
           .from(SessionTable)
           .where(eq(SessionTable.id, input.sessionID))
           .get()
@@ -637,7 +638,13 @@ export const layer = Layer.effect(
         }
 
         if (input.workspaceID === null) {
-          yield* session.setWorkspace({ sessionID: input.sessionID, workspaceID: undefined })
+          const project = current?.projectID ? yield* projectSvc.get(current.projectID) : undefined
+          yield* session.setWorkspace({
+            sessionID: input.sessionID,
+            workspaceID: undefined,
+            directory: project?.worktree,
+            path: null,
+          })
 
           return
         }
@@ -653,7 +660,12 @@ export const layer = Layer.effect(
         const target = yield* WorkspaceAdapterRuntime.target(space)
 
         if (target.type === "local") {
-          yield* session.setWorkspace({ sessionID: input.sessionID, workspaceID: input.workspaceID })
+          yield* session.setWorkspace({
+            sessionID: input.sessionID,
+            workspaceID: input.workspaceID,
+            directory: target.directory,
+            path: null,
+          })
 
           return
         }
@@ -725,7 +737,12 @@ export const layer = Layer.effect(
           })
         }
 
-        yield* session.setWorkspace({ sessionID: input.sessionID, workspaceID: input.workspaceID })
+        yield* session.setWorkspace({
+          sessionID: input.sessionID,
+          workspaceID: input.workspaceID,
+          directory: space.directory ?? undefined,
+          path: null,
+        })
       })
     })
 
@@ -977,6 +994,7 @@ function route(url: string | URL, path: string) {
 export const node = LayerNode.make(layer, [
   Auth.node,
   Session.node,
+  Project.node,
   SessionPrompt.node,
   httpClient,
   EventV2Bridge.node,

@@ -529,13 +529,25 @@ export function Prompt(props: PromptProps) {
       },
       {
         title: "Warp",
-        desc: "Change the workspace for the session",
+        desc: "Move this session to another workspace",
         name: "workspace.set",
         category: "Session",
         enabled: Flag.OPENCODE_EXPERIMENTAL_WORKSPACES,
         slashName: "warp",
         run: () => {
           workspace.open()
+        },
+      },
+      {
+        title: "Switch workspace",
+        desc: "Change workspace without moving the session",
+        name: "workspace.switch",
+        category: "Workspace",
+        enabled: Flag.OPENCODE_EXPERIMENTAL_WORKSPACES,
+        slashName: "switch",
+        slashAliases: ["switch-workspace"],
+        run: () => {
+          workspace.openSwitch()
         },
       },
       {
@@ -569,6 +581,7 @@ export function Prompt(props: PromptProps) {
       "prompt.stash.list",
       "session.interrupt",
       "workspace.set",
+      "workspace.switch",
       "session.move",
     ]),
   }))
@@ -985,7 +998,11 @@ export function Prompt(props: PromptProps) {
     let finishMoveProgress = false
     if (sessionID == null) {
       const selectedWorkspace = workspace.selection()
-      const workspaceID = selectedWorkspace?.type === "existing" ? selectedWorkspace.workspaceID : undefined
+      const workspaceID = selectedWorkspace
+        ? selectedWorkspace.type === "existing"
+          ? selectedWorkspace.workspaceID
+          : undefined
+        : project.workspace.current()
 
       const directory = await move.getDirectory(store.prompt.input)
       if (move.pending() && !directory) return false
@@ -994,6 +1011,7 @@ export function Prompt(props: PromptProps) {
       const res = await sdk.client.session.create({
         directory,
         workspace: workspaceID,
+        workspaceID,
         agent: agent.name,
         model: {
           providerID: selectedModel.providerID,

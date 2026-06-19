@@ -44,6 +44,19 @@ export function DialogSessionList() {
 
   const currentSessionID = createMemo(() => (route.data.type === "session" ? route.data.sessionID : undefined))
   const sessions = createMemo(() => searchResults() ?? sync.data.session)
+  const [workspaceSessionStatus] = createResource(
+    () => project.workspace.list().map((workspace) => `${workspace.id}:${project.workspace.status(workspace.id)}`).join("|"),
+    async () => {
+      const responses = await Promise.all([
+        sdk.client.session.status().catch(() => undefined),
+        ...project.workspace
+          .list()
+          .filter((workspace) => project.workspace.status(workspace.id) === "connected")
+          .map((workspace) => sdk.client.session.status({ workspace: workspace.id }).catch(() => undefined)),
+      ])
+      return Object.assign({}, ...responses.flatMap((response) => (response?.data ? [response.data] : [])))
+    },
+  )
 
   function recover(session: NonNullable<ReturnType<typeof sessions>[number]>) {
     const workspace = project.workspace.get(session.workspaceID!)
@@ -178,7 +191,7 @@ export function DialogSessionList() {
         directory && directory !== project.data.project.mainDir ? Locale.truncate(path.basename(directory), 20) : ""
 
       const isDeleting = toDelete() === x.id
-      const status = sync.data.session_status?.[x.id]
+      const status = workspaceSessionStatus()?.[x.id] ?? sync.data.session_status?.[x.id]
       const isWorking = status?.type === "busy" || status?.type === "retry"
       const slot = slotByID.get(x.id)
       const gutter = isWorking

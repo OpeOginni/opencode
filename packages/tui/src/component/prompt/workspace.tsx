@@ -5,6 +5,7 @@ import { useProject } from "../../context/project"
 import { useSync } from "../../context/sync"
 import { useToast } from "../../ui/toast"
 import { errorMessage } from "../../util/error"
+import { useRoute } from "../../context/route"
 import {
   confirmWorkspaceFileChanges,
   openWorkspaceSelect,
@@ -19,12 +20,13 @@ export function usePromptWorkspace(sessionID?: string) {
   const project = useProject()
   const sync = useSync()
   const toast = useToast()
+  const route = useRoute()
   const [selection, setSelection] = createSignal<WorkspaceSelection>()
   const [creating, setCreating] = createSignal(false)
   const [creatingDots, setCreatingDots] = createSignal(3)
   const [notice, setNotice] = createSignal<string>()
 
-  async function create(selection: Extract<WorkspaceSelection, { type: "new" }>) {
+  async function create(selection: Extract<WorkspaceSelection, { type: "new" }>, pending = true) {
     setCreating(true)
     let result
     try {
@@ -48,14 +50,42 @@ export function usePromptWorkspace(sessionID?: string) {
 
     await project.workspace.sync()
     const workspace = result.data
-    setSelection({
-      type: "existing",
-      workspaceID: workspace.id,
-      workspaceType: workspace.type,
-      workspaceName: workspace.name,
-    })
+    if (pending) {
+      setSelection({
+        type: "existing",
+        workspaceID: workspace.id,
+        workspaceType: workspace.type,
+        workspaceName: workspace.name,
+      })
+    }
     setCreating(false)
     return workspace
+  }
+
+  async function switchWorkspace(selection: WorkspaceSelection) {
+    const workspace =
+      selection.type === "none"
+        ? { id: null, name: "local project" }
+        : selection.type === "existing"
+          ? { id: selection.workspaceID, name: selection.workspaceName }
+          : await create(selection, false)
+    if (!workspace) return
+
+    const workspaceID = workspace.id ?? undefined
+    if (project.workspace.current() === workspaceID) {
+      dialog.clear()
+      showNotice(`Already in ${workspace.name}`)
+      return
+    }
+
+    setSelection(undefined)
+    project.workspace.set(workspace.id)
+    dialog.clear()
+    if (route.data.type === "session") route.navigate({ type: "home" })
+    await sync.bootstrap({ fatal: false }).catch((err) => {
+      toast.show({ title: "Failed to switch workspace", message: errorMessage(err), variant: "error" })
+    })
+    showNotice(`Switched to ${workspace.name}`)
   }
 
   async function warp(selection: WorkspaceSelection) {
@@ -103,7 +133,11 @@ export function usePromptWorkspace(sessionID?: string) {
   }
 
   function open() {
-    void openWorkspaceSelect({ dialog, sdk, sync, project, toast, onSelect: warp })
+    void openWorkspaceSelect({ dialog, sdk, sync, project, toast, omitCurrent: true, onSelect: warp })
+  }
+
+  function openSwitch() {
+    void openWorkspaceSelect({ dialog, sdk, sync, project, toast, title: "Switch workspace", onSelect: switchWorkspace })
   }
 
   createEffect(() => {
@@ -133,5 +167,5 @@ export function usePromptWorkspace(sessionID?: string) {
     }
   })
 
-  return { selection, creating, creatingDots, notice, label, open, warp, clearNotice }
+  return { selection, creating, creatingDots, notice, label, open, openSwitch, warp, clearNotice }
 }

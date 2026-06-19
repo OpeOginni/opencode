@@ -485,7 +485,12 @@ export interface Interface {
   readonly clearRevert: (sessionID: SessionID) => Effect.Effect<void>
   readonly setSummary: (input: { sessionID: SessionID; summary: Info["summary"] }) => Effect.Effect<void>
   readonly setShare: (input: { sessionID: SessionID; share: Info["share"] }) => Effect.Effect<void>
-  readonly setWorkspace: (input: { sessionID: SessionID; workspaceID: Info["workspaceID"] }) => Effect.Effect<void>
+  readonly setWorkspace: (input: {
+    sessionID: SessionID
+    workspaceID: Info["workspaceID"]
+    directory?: Info["directory"]
+    path?: Info["path"] | null
+  }) => Effect.Effect<void>
   readonly diff: (sessionID: SessionID) => Effect.Effect<Snapshot.FileDiff[]>
   readonly messages: (input: { sessionID: SessionID; limit?: number }) => Effect.Effect<SessionV1.WithParts[], NotFound>
   readonly children: (parentID: SessionID) => Effect.Effect<Info[]>
@@ -843,10 +848,15 @@ export const layer: Layer.Layer<
     const setWorkspace = Effect.fn("Session.setWorkspace")(function* (input: {
       sessionID: SessionID
       workspaceID: Info["workspaceID"]
+      directory?: Info["directory"]
+      path?: Info["path"] | null
     }) {
-      yield* patch(input.sessionID, { workspaceID: input.workspaceID, time: { updated: Date.now() } }).pipe(
-        Effect.orDie,
-      )
+      yield* patch(input.sessionID, {
+        workspaceID: input.workspaceID,
+        ...(input.directory !== undefined ? { directory: input.directory } : {}),
+        ...(input.path !== undefined ? { path: input.path ?? undefined } : {}),
+        time: { updated: Date.now() },
+      }).pipe(Effect.orDie)
     })
 
     const diff = Effect.fn("Session.diff")(function* (sessionID: SessionID) {
