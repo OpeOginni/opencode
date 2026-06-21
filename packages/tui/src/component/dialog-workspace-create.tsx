@@ -10,7 +10,6 @@ import { useSDK } from "../context/sdk"
 import { useToast } from "../ui/toast"
 import { DialogAlert } from "../ui/dialog-alert"
 import { DialogWorkspaceFileChanges } from "./dialog-workspace-file-changes"
-import { useTheme } from "../context/theme"
 
 type Adapter = ExperimentalWorkspaceAdapterListResponse[number]
 
@@ -39,9 +38,7 @@ export function recentConnectedWorkspaces<WorkspaceInfo extends { id: string; ti
   limit?: number
   omitWorkspaceID?: string
 }) {
-  const allWorkspaces = input.workspaces
-    .filter((workspace) => input.status(workspace.id) === "connected")
-    .filter((workspace) => workspace.id !== input.omitWorkspaceID)
+  const allWorkspaces = input.workspaces.filter((workspace) => input.status(workspace.id) === "connected")
   const workspaces = allWorkspaces.toSorted((a, b) => Number(b.timeUsed) - Number(a.timeUsed))
   const recent = workspaces.slice(0, input.limit ?? 3)
 
@@ -78,8 +75,6 @@ export async function openWorkspaceSelect(input: {
   sync: ReturnType<typeof useSync>
   project: ReturnType<typeof useProject>
   toast: ReturnType<typeof useToast>
-  title?: string
-  omitCurrent?: boolean
   onSelect: (selection: WorkspaceSelection) => Promise<void> | void
 }) {
   input.dialog.clear()
@@ -87,14 +82,7 @@ export async function openWorkspaceSelect(input: {
   await input.project.workspace.sync().catch(() => undefined)
   const adapters = await loadWorkspaceAdapters(input)
   if (!adapters) return
-  input.dialog.replace(() => (
-    <DialogWorkspaceSelect
-      title={input.title}
-      omitCurrent={input.omitCurrent}
-      adapters={adapters}
-      onSelect={input.onSelect}
-    />
-  ))
+  input.dialog.replace(() => <DialogWorkspaceSelect adapters={adapters} onSelect={input.onSelect} />)
 }
 
 export async function warpWorkspaceSession(input: {
@@ -188,8 +176,6 @@ export async function confirmWorkspaceFileChanges(input: {
 }
 
 export function DialogWorkspaceSelect(props: {
-  title?: string
-  omitCurrent?: boolean
   adapters?: Adapter[]
   onSelect: (selection: WorkspaceSelection) => Promise<void> | void
 }) {
@@ -199,21 +185,8 @@ export function DialogWorkspaceSelect(props: {
   const sync = useSync()
   const sdk = useSDK()
   const toast = useToast()
-  const { theme } = useTheme()
   const [adapters, setAdapters] = createSignal<Adapter[] | undefined>(props.adapters)
-  const currentWorkspaceID = createMemo(() => project.workspace.current())
-  const omittedWorkspaceID = createMemo(() => (props.omitCurrent && route.data.type === "session" ? currentWorkspaceID() : undefined))
-  const currentSelection = createMemo<WorkspaceSelectValue>(() => {
-    const workspaceID = currentWorkspaceID()
-    if (!workspaceID) return { type: "none" }
-    const workspace = project.workspace.get(workspaceID)
-    return {
-      type: "existing",
-      workspaceID,
-      workspaceType: workspace?.type ?? "workspace",
-      workspaceName: workspace?.name ?? workspaceID,
-    }
-  })
+  const omittedWorkspaceID = createMemo(() => (route.data.type === "session" ? project.workspace.current() : undefined))
 
   onMount(() => {
     dialog.setSize("medium")
@@ -233,10 +206,6 @@ export function DialogWorkspaceSelect(props: {
       status: project.workspace.status,
       omitWorkspaceID: omittedWorkspaceID(),
     })
-    const currentWorkspace = props.omitCurrent ? undefined : currentWorkspaceID() ? project.workspace.get(currentWorkspaceID()!) : undefined
-    const workspaces = currentWorkspace
-      ? [currentWorkspace, ...recent.filter((workspace) => workspace.id !== currentWorkspace.id)]
-      : recent
     return [
       ...list.map((adapter) => ({
         title: adapter.name,
@@ -249,9 +218,8 @@ export function DialogWorkspaceSelect(props: {
         value: { type: "none" as const },
         description: "Use the local project",
         category: "Choose workspace",
-        gutter: currentWorkspaceID() ? undefined : () => <text fg={theme.success}>●</text>,
       },
-      ...workspaces.map((workspace: Workspace) => ({
+      ...recent.map((workspace: Workspace) => ({
         title: workspace.name,
         description: `(${workspace.type})`,
         value: {
@@ -261,7 +229,6 @@ export function DialogWorkspaceSelect(props: {
           workspaceName: workspace.name,
         },
         category: "Choose workspace",
-        gutter: currentWorkspaceID() === workspace.id ? () => <text fg={theme.success}>●</text> : undefined,
       })),
       ...(hasMore
         ? [
@@ -279,11 +246,10 @@ export function DialogWorkspaceSelect(props: {
   if (!adapters()) return null
   return (
     <DialogSelect<WorkspaceSelectValue>
-      title={props.title ?? "Warp"}
+      title="Warp"
       skipFilter={true}
       renderFilter={false}
       options={options()}
-      current={currentSelection()}
       onSelect={(option) => {
         if (!option.value) return
         if (option.value.type === "none") {

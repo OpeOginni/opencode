@@ -5,7 +5,6 @@ import { useProject } from "../../context/project"
 import { useSync } from "../../context/sync"
 import { useToast } from "../../ui/toast"
 import { errorMessage } from "../../util/error"
-import { useRoute } from "../../context/route"
 import {
   confirmWorkspaceFileChanges,
   openWorkspaceSelect,
@@ -20,13 +19,12 @@ export function usePromptWorkspace(sessionID?: string) {
   const project = useProject()
   const sync = useSync()
   const toast = useToast()
-  const route = useRoute()
   const [selection, setSelection] = createSignal<WorkspaceSelection>()
   const [creating, setCreating] = createSignal(false)
   const [creatingDots, setCreatingDots] = createSignal(3)
   const [notice, setNotice] = createSignal<string>()
 
-  async function create(selection: Extract<WorkspaceSelection, { type: "new" }>, pending = true) {
+  async function create(selection: Extract<WorkspaceSelection, { type: "new" }>) {
     setCreating(true)
     let result
     try {
@@ -50,14 +48,12 @@ export function usePromptWorkspace(sessionID?: string) {
 
     await project.workspace.sync()
     const workspace = result.data
-    if (pending) {
-      setSelection({
-        type: "existing",
-        workspaceID: workspace.id,
-        workspaceType: workspace.type,
-        workspaceName: workspace.name,
-      })
-    }
+    setSelection({
+      type: "existing",
+      workspaceID: workspace.id,
+      workspaceType: workspace.type,
+      workspaceName: workspace.name,
+    })
     setCreating(false)
     return workspace
   }
@@ -107,7 +103,7 @@ export function usePromptWorkspace(sessionID?: string) {
   }
 
   function open() {
-    void openWorkspaceSelect({ dialog, sdk, sync, project, toast, omitCurrent: true, onSelect: warp })
+    void openWorkspaceSelect({ dialog, sdk, sync, project, toast, onSelect: warp })
   }
 
   createEffect(() => {
