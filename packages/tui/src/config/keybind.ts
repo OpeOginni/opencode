@@ -208,6 +208,7 @@ export const Definitions = {
   "dialog.move_session.new": keybind("ctrl+m", "New project copy"),
   "dialog.move_session.delete": keybind("ctrl+d", "Delete project copy"),
   "dialog.move_session.refresh": keybind("ctrl+r", "Refresh project copies"),
+  "dialog.workspace.details": keybind("ctrl+i", "Show workspace details"),
   "prompt.autocomplete.prev": keybind("up,ctrl+p", "Move to previous autocomplete item"),
   "prompt.autocomplete.next": keybind("down,ctrl+n", "Move to next autocomplete item"),
   "prompt.autocomplete.hide": keybind("escape", "Hide autocomplete"),

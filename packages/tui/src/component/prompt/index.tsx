@@ -539,18 +539,6 @@ export function Prompt(props: PromptProps) {
         },
       },
       {
-        title: "Switch workspace",
-        desc: "Change workspace without moving the session",
-        name: "workspace.switch",
-        category: "Workspace",
-        enabled: Flag.OPENCODE_EXPERIMENTAL_WORKSPACES,
-        slashName: "switch",
-        slashAliases: ["switch-workspace"],
-        run: () => {
-          workspace.openSwitch()
-        },
-      },
-      {
         title: "Move session",
         desc: "Move to another project dir",
         name: "session.move",
@@ -581,7 +569,6 @@ export function Prompt(props: PromptProps) {
       "prompt.stash.list",
       "session.interrupt",
       "workspace.set",
-      "workspace.switch",
       "session.move",
     ]),
   }))
