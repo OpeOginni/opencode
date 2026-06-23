@@ -14,6 +14,18 @@
           "smoke_dialog_close": "escape,q"
         }
       }
+    ],
+    [
+      "./plugins/search-messages.tsx",
+      {
+        "enabled": true,
+        "keybinds": {
+          "search_open": "ctrl+f",
+          "search_next": "down,enter,ctrl+n",
+          "search_prev": "up,ctrl+p",
+          "search_close": "escape"
+        }
+      }
     ]
   ]
 }
