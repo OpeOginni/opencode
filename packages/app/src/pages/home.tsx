@@ -1,5 +1,17 @@
 import type { Session } from "@opencode-ai/sdk/v2/client"
-import { batch, createEffect, createMemo, For, Match, on, onCleanup, onMount, Show, Switch } from "solid-js"
+import {
+  batch,
+  createEffect,
+  createMemo,
+  For,
+  Match,
+  on,
+  onCleanup,
+  onMount,
+  Show,
+  startTransition,
+  Switch,
+} from "solid-js"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { createStore } from "solid-js/store"
 import { useQuery } from "@tanstack/solid-query"
@@ -32,13 +44,12 @@ import {
   displayName,
   getProjectAvatarSource,
   homeProjectDirectories,
-  homeProjectNavigation,
   type HomeProjectSelection,
   projectForSession,
   sortedRootSessions,
   toggleHomeProjectSelection,
 } from "@/pages/layout/helpers"
-import { useSessionTabAvatarState } from "@/pages/layout/project-avatar-state"
+import { SessionTabAvatar } from "@/pages/layout/session-tab-avatar"
 import { sessionTitle } from "@/utils/session-title"
 import { pathKey } from "@/utils/path-key"
 import { useGlobal } from "@/context/global"
@@ -125,6 +136,7 @@ export function NewHome() {
   const global = useGlobal()
   const command = useCommand()
   const notification = useNotification()
+  const tabs = useTabs()
   let focusSessionSearch: (() => void) | undefined
   const [state, setState] = createStore({
     search: "",
@@ -261,21 +273,11 @@ export function NewHome() {
     openProjectNewSession(conn, project.worktree)
   }
 
-  function navigateOnServer(conn: ServerConnection.Any, href: string) {
-    const next = homeProjectNavigation(server.key, ServerConnection.key(conn), href)
-    if (!next.server) {
-      navigate(next.href)
-      return
-    }
-    pendingHomeNavigation = next
-    server.setActive(next.server)
-  }
-
   function openProjectNewSession(conn: ServerConnection.Any, directory: string) {
     const ctx = global.createServerCtx(conn)
     ctx.projects.open(directory)
     ctx.projects.touch(directory)
-    navigateOnServer(conn, `/${base64Encode(directory)}/session`)
+    tabs.newDraft({ server: ServerConnection.key(conn), directory })
   }
 
   function editProject(conn: ServerConnection.Any, project: LocalProject) {
@@ -304,15 +306,16 @@ export function NewHome() {
     const ctx = global.createServerCtx(conn)
     ctx.projects.open(directory)
     ctx.projects.touch(directory)
-    navigateOnServer(conn, `/server/${base64Encode(ServerConnection.key(conn))}/session/${session.id}`)
+    startTransition(() => {
+      const tab = tabs.addSessionTab({ server: ServerConnection.key(conn), sessionId: session.id })
+      tabs.select(tab)
+    })
   }
 
   function chooseProject(conn: ServerConnection.Any) {
     function resolve(result: string | string[] | null) {
       addProjects(conn, homeProjectDirectories(result))
     }
-
-    const server = global.createServerCtx(conn)
 
     pickDirectory({
       server: conn,
@@ -755,21 +758,6 @@ function HomeProjectAvatar(props: { project: LocalProject }) {
   )
 }
 
-function HomeSessionAvatar(props: { project: LocalProject; session: Session; activeServer: boolean }) {
-  const directory = () => props.session.directory
-  const sessionId = () => props.session.id
-  const state = useSessionTabAvatarState(directory, sessionId, () => props.activeServer)
-  return (
-    <ProjectAvatar
-      fallback={displayName(props.project)}
-      src={getProjectAvatarSource(props.project.id, props.project.icon)}
-      variant={getProjectAvatarVariant(props.project.icon?.color)}
-      unread={state.unread()}
-      loading={state.loading()}
-    />
-  )
-}
-
 function HomeSessionLeading(props: {
   project: LocalProject
   session: Session
@@ -787,7 +775,12 @@ function HomeSessionLeading(props: {
           style={{ right: "calc(100% + 12px)" }}
         />
       </Show>
-      <HomeSessionAvatar project={props.project} session={props.session} activeServer={props.activeServer} />
+      <SessionTabAvatar
+        project={props.project}
+        directory={props.session.directory}
+        sessionId={props.session.id}
+        activeServer={props.activeServer}
+      />
     </div>
   )
 }
