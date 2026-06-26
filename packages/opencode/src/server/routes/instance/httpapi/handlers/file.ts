@@ -10,6 +10,7 @@ import ignore from "ignore"
 import path from "path"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
+import { notFound } from "../errors"
 
 export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handlers) =>
   Effect.gen(function* () {
@@ -65,6 +66,9 @@ export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handl
 
     const list = Effect.fn("FileHttpApi.list")(function* (ctx: { query: { path: string } }) {
       const directory = (yield* InstanceState.context).directory
+      const target = path.resolve(directory, ctx.query.path)
+      if (!FSUtil.contains(directory, target)) return yield* Effect.die(new Error("Path escapes the location"))
+      if (!(yield* FSUtil.Service.use((fs) => fs.isDir(target)))) return yield* notFound("Directory not found")
       return yield* filesystem(
         Effect.gen(function* () {
           const fs = yield* FileSystem.Service

@@ -52,6 +52,14 @@ function errorMessage(error: unknown, fallback: string) {
   return fallback
 }
 
+function errorStatus(error: unknown) {
+  if (!(error instanceof Error)) return
+  const cause = error.cause
+  if (typeof cause !== "object" || cause === null) return
+  const status = "status" in cause ? cause.status : undefined
+  return typeof status === "number" ? status : undefined
+}
+
 export const { use: useFile, provider: FileProvider } = createSimpleContext({
   name: "File",
   gate: false,
@@ -82,7 +90,11 @@ export const { use: useFile, provider: FileProvider } = createSimpleContext({
       list: (dir) =>
         sdk()
           .client.file.list({ path: dir })
-          .then((x) => x.data ?? []),
+          .then((x) => x.data ?? [])
+          .catch((error) => {
+            if (errorStatus(error) === 404) return [] // cause: directory not found
+            throw error
+          }),
       onError: (message) => {
         showToast({
           variant: "error",

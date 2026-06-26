@@ -52,6 +52,15 @@ describe("file HttpApi", () => {
     expect(await status.json()).toEqual([])
   })
 
+  test("returns not found for missing directory", async () => {
+    await using tmp = await tmpdir({ git: true })
+
+    const response = await request(FilePaths.list, tmp.path, { path: path.join("does", "not", "exist") })
+
+    expect(response.status).toBe(404)
+    expect(await response.json()).toMatchObject({ name: "NotFoundError", data: { message: "Directory not found" } })
+  })
+
   test("serves search endpoints", async () => {
     await using tmp = await tmpdir({ git: true })
     await Bun.write(path.join(tmp.path, "hello.txt"), "needle")

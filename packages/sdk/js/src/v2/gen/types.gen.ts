@@ -2266,6 +2266,13 @@ export type FileNode = {
   ignored: boolean
 }
 
+export type NotFoundError = {
+  name: "NotFoundError"
+  data: {
+    message: string
+  }
+}
+
 export type FileContent = {
   type: "text" | "binary"
   content: string
@@ -2532,13 +2539,6 @@ export type ProviderAuthError1 = {
     field?: string
     message?: string
     kind?: string
-  }
-}
-
-export type NotFoundError = {
-  name: "NotFoundError"
-  data: {
-    message: string
   }
 }
 
@@ -8549,6 +8549,10 @@ export type FileListErrors = {
    * Bad request
    */
   400: BadRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
 }
 
 export type FileListError = FileListErrors[keyof FileListErrors]
