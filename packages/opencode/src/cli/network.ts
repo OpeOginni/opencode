@@ -39,7 +39,18 @@ export function withNetworkOptions<T>(yargs: Argv<T>) {
 }
 
 export function hasArg(name: string) {
-  return process.argv.some((arg) => arg === name || arg.startsWith(name + "="))
+  return networkArgs().some((arg) => arg === name || arg.startsWith(name + "="))
+}
+
+function hasBooleanArg(name: string) {
+  return networkArgs().some(
+    (arg) => arg === name || arg === name + "=true" || arg === name + "=false" || arg === "--no-" + name.slice(2),
+  )
+}
+
+function networkArgs() {
+  const separator = process.argv.indexOf("--")
+  return process.argv.slice(2, separator === -1 ? undefined : separator)
 }
 
 export const resolveNetworkOptions = Effect.fn("Cli.resolveNetworkOptions")(function* (args: NetworkOptions) {
@@ -51,7 +62,7 @@ export const resolveNetworkOptions = Effect.fn("Cli.resolveNetworkOptions")(func
 export function resolveNetworkOptionsNoConfig(args: NetworkOptions, config?: ConfigV1.Info) {
   const portExplicitlySet = hasArg("--port")
   const hostnameExplicitlySet = hasArg("--hostname")
-  const mdnsExplicitlySet = hasArg("--mdns")
+  const mdnsExplicitlySet = hasBooleanArg("--mdns")
   const mdnsDomainExplicitlySet = hasArg("--mdns-domain")
   const mdns = mdnsExplicitlySet ? args.mdns : (config?.server?.mdns ?? args.mdns)
   const mdnsDomain = mdnsDomainExplicitlySet ? args["mdns-domain"] : (config?.server?.mdnsDomain ?? args["mdns-domain"])

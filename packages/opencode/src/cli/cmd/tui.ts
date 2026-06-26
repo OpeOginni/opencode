@@ -147,7 +147,7 @@ export const TuiThreadCommand = cmd({
       const config = await TuiConfig.get()
 
       const network = resolveNetworkOptionsNoConfig(args)
-      const external = hasArg("--port") || hasArg("--hostname") || hasArg("--mdns")
+      const external = hasArg("--port") || hasArg("--hostname") || network.mdns === true
 
       const headers = external ? ServerAuth.headers() : undefined
 
