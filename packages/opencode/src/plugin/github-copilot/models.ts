@@ -74,6 +74,28 @@ type SelectableItem = Item & {
 }
 const decodeModels = Schema.decodeUnknownSync(schema)
 const decodeItem = Schema.decodeUnknownOption(item)
+const AUTO_BASE_URL = "https://api.individual.githubcopilot.com"
+
+function autoModel(): SelectableItem {
+  return {
+    model_picker_enabled: true,
+    id: "auto",
+    name: "Auto",
+    version: "auto",
+    capabilities: {
+      family: "gpt",
+      limits: {
+        max_context_window_tokens: 128000,
+        max_output_tokens: 16384,
+        max_prompt_tokens: 128000,
+      },
+      supports: {
+        streaming: true,
+        tool_calls: true,
+      },
+    },
+  }
+}
 
 function build(key: string, remote: SelectableItem, url: string, prev?: Model): Model {
   const reasoning =
@@ -237,9 +259,14 @@ export async function get(
     result[id] = build(id, m, baseURL)
   }
 
+  const picker = [...remote].filter(([, item]) => item.model_picker_enabled)
+  const model = autoModel()
+  result.auto = build("auto", model, AUTO_BASE_URL)
+  picker.unshift(["auto", model])
+
   return {
     models: result,
-    pickerEnabled: new Set([...remote].filter(([, item]) => item.model_picker_enabled).map(([id]) => id)),
+    pickerEnabled: new Set(picker.map(([id]) => id)),
   }
 }
 

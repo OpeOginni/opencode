@@ -218,7 +218,15 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
     "github-copilot": () =>
       Effect.succeed({
         autoload: false,
-        async getModel(sdk: any, modelID: string, _options?: Record<string, any>) {
+        async getModel(sdk: any, modelID: string, options?: Record<string, any>) {
+          if (modelID === "auto") {
+            const { CopilotAuto } = await import("@/plugin/github-copilot/auto")
+            return CopilotAuto.create({
+              sdk,
+              baseURL: typeof options?.baseURL === "string" ? options.baseURL : "https://api.individual.githubcopilot.com",
+              fetch: typeof options?.fetch === "function" ? options.fetch : undefined,
+            })
+          }
           if (sdk.responses === undefined && sdk.chat === undefined) return sdk.languageModel(modelID)
           const match = /^gpt-(\d+)/.exec(modelID)
           if (match && Number(match[1]) >= 5 && !modelID.startsWith("gpt-5-mini")) return sdk.responses(modelID)
