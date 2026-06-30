@@ -2,7 +2,6 @@ import type { LanguageModelV3, LanguageModelV3CallOptions } from "@ai-sdk/provid
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
 
 const API_VERSION = "2026-06-01"
-const INTEGRATION_ID = "vscode-chat"
 
 const sessions = new Map<
   string,
@@ -55,7 +54,6 @@ class CopilotAutoLanguageModel implements LanguageModelV3 {
       ...options,
       headers: {
         ...options.headers,
-        "copilot-integration-id": INTEGRATION_ID,
         "copilot-session-token": routed.sessionToken,
       },
     })
@@ -67,7 +65,6 @@ class CopilotAutoLanguageModel implements LanguageModelV3 {
       ...options,
       headers: {
         ...options.headers,
-        "copilot-integration-id": INTEGRATION_ID,
         "copilot-session-token": routed.sessionToken,
       },
     })
@@ -148,7 +145,6 @@ class CopilotAutoLanguageModel implements LanguageModelV3 {
       "Content-Type": "text/plain;charset=UTF-8",
       "User-Agent": `opencode/${InstallationVersion}`,
       "X-GitHub-Api-Version": API_VERSION,
-      "copilot-integration-id": INTEGRATION_ID,
     }
   }
 
