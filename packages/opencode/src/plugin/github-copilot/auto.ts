@@ -2,6 +2,7 @@ import type { LanguageModelV3, LanguageModelV3CallOptions } from "@ai-sdk/provid
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
 
 const API_VERSION = "2026-06-01"
+type CopilotEndpoint = "chat" | "responses" | "messages"
 
 const sessions = new Map<
   string,
@@ -22,6 +23,7 @@ export function create(input: {
   baseURL: string
   fetch?: typeof fetch
   sessionID?: string
+  endpoints?: Record<string, CopilotEndpoint>
 }) {
   return new CopilotAutoLanguageModel(input)
 }
@@ -41,6 +43,7 @@ class CopilotAutoLanguageModel implements LanguageModelV3 {
       baseURL: string
       fetch?: typeof fetch
       sessionID?: string
+      endpoints?: Record<string, CopilotEndpoint>
     },
   ) {}
 
@@ -129,6 +132,10 @@ class CopilotAutoLanguageModel implements LanguageModelV3 {
   }
 
   private model(modelID: string) {
+    const endpoint = this.input.endpoints?.[modelID]
+    if (endpoint === "responses" && this.input.sdk.responses) return this.input.sdk.responses(modelID)
+    if (endpoint === "chat" && this.input.sdk.chat) return this.input.sdk.chat(modelID)
+
     const match = /^gpt-(\d+)/.exec(modelID)
     if (match && Number(match[1]) >= 5 && !modelID.startsWith("gpt-5-mini")) {
       return (

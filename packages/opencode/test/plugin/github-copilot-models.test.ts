@@ -214,6 +214,46 @@ test("keeps sparse Copilot auto model selectable", async () => {
   expect(result.pickerEnabled.has("auto")).toBe(true)
 })
 
+test("records Copilot advertised responses endpoint for non-GPT model IDs", async () => {
+  globalThis.fetch = mock(() =>
+    Promise.resolve(
+      new Response(
+        JSON.stringify({
+          data: [
+            {
+              model_picker_enabled: true,
+              id: "mai-code-1-flash-picker",
+              name: "MAI-Code-1-Flash",
+              version: "mai-code-1-flash-picker",
+              supported_endpoints: ["/responses"],
+              capabilities: {
+                family: "oswe-vscode-modelD",
+                limits: {
+                  max_context_window_tokens: 256000,
+                  max_output_tokens: 128000,
+                  max_prompt_tokens: 128000,
+                },
+                supports: {
+                  streaming: true,
+                  structured_outputs: true,
+                  tool_calls: true,
+                },
+              },
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    ),
+  ) as unknown as typeof fetch
+
+  const result = await CopilotModels.get("https://api.githubcopilot.com")
+  const model = result.models["mai-code-1-flash-picker"]
+
+  expect("endpoint" in model.api ? model.api.endpoint : undefined).toBe("responses")
+  expect(result.models.auto.options.endpoints).toEqual({ "mai-code-1-flash-picker": "responses" })
+})
+
 test("falls back to auto when Copilot picker flags are all false", async () => {
   globalThis.fetch = mock(() =>
     Promise.resolve(
