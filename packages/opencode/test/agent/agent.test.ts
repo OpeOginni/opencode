@@ -1,4 +1,5 @@
 import { afterEach, expect } from "bun:test"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Cause, Effect, Exit, Layer } from "effect"
 import path from "path"
 import { disposeAllInstances, TestInstance } from "../fixture/fixture"
@@ -14,17 +15,11 @@ import { Plugin } from "../../src/plugin"
 import { Provider } from "../../src/provider/provider"
 import { Skill } from "../../src/skill"
 import { Truncate } from "../../src/tool/truncate"
-import { LocationServiceMap } from "@opencode-ai/core/location-layer"
 
 const agentLayer = (flags: Partial<RuntimeFlags.Info> = {}) =>
-  Agent.layer.pipe(
-    Layer.provide(Plugin.defaultLayer),
-    Layer.provide(Provider.defaultLayer),
-    Layer.provide(Auth.defaultLayer),
-    Layer.provide(Config.defaultLayer),
-    Layer.provide(Skill.defaultLayer),
-    Layer.provide(LocationServiceMap.layer),
-    Layer.provide(RuntimeFlags.layer(flags)),
+  LayerNode.compile(
+    LayerNode.group([Agent.node, Plugin.node, Provider.node, Auth.node, Config.node, Skill.node, RuntimeFlags.node]),
+    [[RuntimeFlags.node, RuntimeFlags.layer(flags)]],
   )
 
 const it = testEffect(agentLayer())
@@ -83,6 +78,35 @@ it.instance("plan agent denies edits except .opencode/plans/*", () =>
     // But specific path is allowed
     expect(Permission.evaluate("edit", ".opencode/plans/foo.md", plan!.permission).action).toBe("allow")
   }),
+)
+
+it.instance("plan agent denies the general subagent by default", () =>
+  Effect.gen(function* () {
+    const plan = yield* load((svc) => svc.get("plan"))
+    expect(plan).toBeDefined()
+    expect(Permission.evaluate("task", "general", plan!.permission).action).toBe("deny")
+    expect(Permission.evaluate("task", "explore", plan!.permission).action).toBe("allow")
+    expect(Permission.evaluate("task", "custom", plan!.permission).action).toBe("allow")
+  }),
+)
+
+it.instance(
+  "user permission can allow the general subagent from plan mode",
+  () =>
+    Effect.gen(function* () {
+      const plan = yield* load((svc) => svc.get("plan"))
+      expect(plan).toBeDefined()
+      expect(Permission.evaluate("task", "general", plan!.permission).action).toBe("allow")
+    }),
+  {
+    config: {
+      permission: {
+        task: {
+          general: "allow",
+        },
+      },
+    },
+  },
 )
 
 it.instance("explore agent denies edit and write", () =>
