@@ -90,9 +90,26 @@ function getLastActiveUrl(windowID: string) {
   if (typeof localStorage !== "object") return "/"
   try {
     const value = localStorage.getItem(windowLastActiveUrlKey(windowID))
-    if (value?.startsWith("/") && !value.startsWith("//")) return value
+    if (value?.startsWith("/") && !value.startsWith("//") && !isStaleWindowsRemoteSessionUrl(value)) return value
   } catch {}
   return "/"
+}
+
+function isStaleWindowsRemoteSessionUrl(value: string) {
+  if (!navigator.userAgent.includes("Windows")) return false
+  const match = value.match(/^\/([^/]+)\/session(?:\/|$)/)
+  if (!match) return false
+  const directory = decodeRouteSegment(match[1])
+  return directory?.startsWith("/") ?? false
+}
+
+function decodeRouteSegment(value: string) {
+  try {
+    const binary = atob(value.replace(/-/g, "+").replace(/_/g, "/"))
+    return new TextDecoder().decode(Uint8Array.from(binary, (char) => char.charCodeAt(0)))
+  } catch {
+    return undefined
+  }
 }
 
 function setLastActiveUrl(windowID: string, value: string) {
