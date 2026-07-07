@@ -287,10 +287,11 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
       const auth = yield* dep.auth("amazon-bedrock")
       const env = yield* dep.env()
 
-      // Region precedence: 1) config file, 2) env var, 3) default
+      // Region precedence: 1) config file, 2) env var, 3) /connect metadata, 4) default
       const configRegion = providerConfig?.options?.region
       const envRegion = env["AWS_REGION"]
-      const defaultRegion = configRegion ?? envRegion ?? "us-east-1"
+      const authRegion = auth?.type === "api" ? auth.metadata?.region : undefined
+      const defaultRegion = configRegion ?? envRegion ?? authRegion ?? "us-east-1"
 
       // Profile: config file takes precedence over env var
       const configProfile = providerConfig?.options?.profile

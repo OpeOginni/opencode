@@ -90,6 +90,17 @@ it.instance("Bedrock: falls back to AWS_REGION env var when no config region", (
   }),
 )
 
+it.instance("Bedrock: falls back to region stored by connect prompt", () =>
+  Effect.gen(function* () {
+    yield* withAuthJson(
+      JSON.stringify({ "amazon-bedrock": { type: "api", key: "test-bearer-token", metadata: { region: "eu-west-1" } } }),
+    )
+    const providers = yield* list
+    expect(providers[ProviderV2.ID.amazonBedrock]).toBeDefined()
+    expect(providers[ProviderV2.ID.amazonBedrock].options?.region).toBe("eu-west-1")
+  }),
+)
+
 it.instance(
   "Bedrock: loads when bearer token from auth.json is present",
   () =>

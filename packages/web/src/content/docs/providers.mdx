@@ -207,17 +207,19 @@ To use Amazon Bedrock with OpenCode:
 
    #### Environment Variables (Quick Start)
 
-   Set one of these environment variables while running opencode:
+   If you use `/connect` or `opencode auth login amazon-bedrock`, OpenCode
+   prompts for your Bedrock API key and region. You can also set credentials
+   with environment variables. Bedrock needs a region, set with `AWS_REGION`:
 
    ```bash
    # Option 1: Using AWS access keys
-   AWS_ACCESS_KEY_ID=XXX AWS_SECRET_ACCESS_KEY=YYY opencode
+   AWS_REGION=us-east-1 AWS_ACCESS_KEY_ID=XXX AWS_SECRET_ACCESS_KEY=YYY opencode
 
    # Option 2: Using named AWS profile
-   AWS_PROFILE=my-profile opencode
+   AWS_REGION=us-east-1 AWS_PROFILE=my-profile opencode
 
    # Option 3: Using Bedrock bearer token
-   AWS_BEARER_TOKEN_BEDROCK=XXX opencode
+   AWS_REGION=us-east-1 AWS_BEARER_TOKEN_BEDROCK=XXX opencode
    ```
 
    Or add them to your bash profile:
