@@ -90,13 +90,12 @@ function getLastActiveUrl(windowID: string) {
   if (typeof localStorage !== "object") return "/"
   try {
     const value = localStorage.getItem(windowLastActiveUrlKey(windowID))
-    if (value?.startsWith("/") && !value.startsWith("//") && !isStaleWindowsRemoteSessionUrl(value)) return value
+    if (value?.startsWith("/") && !value.startsWith("//") && !isStaleRemoteSessionUrl(value)) return value
   } catch {}
   return "/"
 }
 
-function isStaleWindowsRemoteSessionUrl(value: string) {
-  if (!navigator.userAgent.includes("Windows")) return false
+function isStaleRemoteSessionUrl(value: string) {
   const match = value.match(/^\/([^/]+)\/session(?:\/|$)/)
   if (!match) return false
   const directory = decodeRouteSegment(match[1])
