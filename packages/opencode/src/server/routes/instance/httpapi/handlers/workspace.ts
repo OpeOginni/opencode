@@ -7,7 +7,14 @@ import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
 import { notFound } from "../errors"
 import { ApiVcsApplyError } from "../groups/instance"
-import { ApiWorkspaceCreateError, ApiWorkspaceWarpError, CreatePayload, WarpPayload } from "../groups/workspace"
+import {
+  ApiWorkspaceCreateError,
+  ApiWorkspaceMoveSessionError,
+  ApiWorkspaceWarpError,
+  CreatePayload,
+  MoveSessionPayload,
+  WarpPayload,
+} from "../groups/workspace"
 
 export const workspaceHandlers = HttpApiBuilder.group(InstanceHttpApi, "workspace", (handlers) =>
   Effect.gen(function* () {
@@ -61,9 +68,11 @@ export const workspaceHandlers = HttpApiBuilder.group(InstanceHttpApi, "workspac
       return yield* workspace.remove(ctx.params.id)
     })
 
-    const warp = Effect.fn("WorkspaceHttpApi.warp")(function* (ctx: { payload: typeof WarpPayload.Type }) {
+    const moveSession = Effect.fn("WorkspaceHttpApi.moveSession")(function* (ctx: {
+      payload: typeof MoveSessionPayload.Type
+    }) {
       yield* workspace
-        .sessionWarp({
+        .moveSession({
           workspaceID: ctx.payload.id,
           sessionID: ctx.payload.sessionID,
           copyChanges: ctx.payload.copyChanges,
@@ -80,14 +89,24 @@ export const workspaceHandlers = HttpApiBuilder.group(InstanceHttpApi, "workspac
                 },
               })
             }
-            return new ApiWorkspaceWarpError({
-              name: "WorkspaceWarpError",
+            return new ApiWorkspaceMoveSessionError({
+              name: "WorkspaceMoveSessionError",
               data: {
                 message: error.message,
               },
             })
           }),
         )
+    })
+    const warp = Effect.fn("WorkspaceHttpApi.warp")(function* (ctx: { payload: typeof WarpPayload.Type }) {
+      yield* moveSession(ctx).pipe(
+        Effect.mapError((error) => {
+          if (error instanceof ApiWorkspaceMoveSessionError) {
+            return new ApiWorkspaceWarpError({ name: "WorkspaceWarpError", data: error.data })
+          }
+          return error
+        }),
+      )
     })
 
     return handlers
@@ -97,6 +116,7 @@ export const workspaceHandlers = HttpApiBuilder.group(InstanceHttpApi, "workspac
       .handle("syncList", syncList)
       .handle("status", status)
       .handle("remove", remove)
+      .handle("moveSession", moveSession)
       .handle("warp", warp)
   }),
 )

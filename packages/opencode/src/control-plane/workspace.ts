@@ -68,12 +68,14 @@ export const CreateInput = Schema.Struct({
 })
 export type CreateInput = Schema.Schema.Type<typeof CreateInput>
 
-export const SessionWarpInput = Schema.Struct({
+export const MoveSessionInput = Schema.Struct({
   workspaceID: Schema.NullOr(WorkspaceV2.ID),
   sessionID: SessionID,
   copyChanges: Schema.optional(Schema.Boolean),
 })
-export type SessionWarpInput = Schema.Schema.Type<typeof SessionWarpInput>
+export type MoveSessionInput = Schema.Schema.Type<typeof MoveSessionInput>
+export const SessionWarpInput = MoveSessionInput
+export type SessionWarpInput = MoveSessionInput
 
 export class SyncHttpError extends Schema.TaggedErrorClass<SyncHttpError>()("WorkspaceSyncHttpError", {
   message: Schema.String,
@@ -97,8 +99,8 @@ export class SessionEventsNotFoundError extends Schema.TaggedErrorClass<SessionE
   },
 ) {}
 
-export class SessionWarpHttpError extends Schema.TaggedErrorClass<SessionWarpHttpError>()(
-  "WorkspaceSessionWarpHttpError",
+export class MoveSessionHttpError extends Schema.TaggedErrorClass<MoveSessionHttpError>()(
+  "WorkspaceMoveSessionHttpError",
   {
     message: Schema.String,
     workspaceID: WorkspaceV2.ID,
@@ -107,6 +109,7 @@ export class SessionWarpHttpError extends Schema.TaggedErrorClass<SessionWarpHtt
     body: Schema.String,
   },
 ) {}
+export const SessionWarpHttpError = MoveSessionHttpError
 
 export class SyncTimeoutError extends Schema.TaggedErrorClass<SyncTimeoutError>()("WorkspaceSyncTimeoutError", {
   message: Schema.String,
@@ -119,17 +122,19 @@ export class SyncAbortedError extends Schema.TaggedErrorClass<SyncAbortedError>(
 }) {}
 
 type CreateError = Auth.AuthError
-type SessionWarpError =
+type MoveSessionError =
   | WorkspaceNotFoundError
   | SessionEventsNotFoundError
-  | SessionWarpHttpError
+  | MoveSessionHttpError
   | Vcs.PatchApplyError
   | HttpClientError.HttpClientError
+type SessionWarpError = MoveSessionError
 type WaitForSyncError = SyncTimeoutError | SyncAbortedError
 type SyncLoopError = SyncHttpError | HttpClientError.HttpClientError
 
 export interface Interface {
   readonly create: (input: CreateInput) => Effect.Effect<Info, CreateError>
+  readonly moveSession: (input: MoveSessionInput) => Effect.Effect<void, MoveSessionError>
   readonly sessionWarp: (input: SessionWarpInput) => Effect.Effect<void, SessionWarpError>
   readonly list: (project: Project.Info) => Effect.Effect<Info[]>
   readonly syncList: (project: Project.Info) => Effect.Effect<void>
@@ -556,7 +561,7 @@ const layer = Layer.effect(
       return info
     })
 
-    const sessionWarp = Effect.fn("Workspace.sessionWarp")(function* (input: SessionWarpInput) {
+    const moveSession = Effect.fn("Workspace.moveSession")(function* (input: MoveSessionInput) {
       return yield* Effect.gen(function* () {
         const current = yield* db
           .select({ workspaceID: SessionTable.workspace_id })
@@ -573,7 +578,7 @@ const layer = Layer.effect(
             if (target.type === "remote") {
               yield* syncHistory(previous, target.url, target.headers).pipe(
                 Effect.catch((error) =>
-                  Effect.logWarning("session warp final source sync failed", {
+                  Effect.logWarning("session move final source sync failed", {
                     workspaceID: previous.id,
                     sessionID: input.sessionID,
                     error: errorData(error),
@@ -590,23 +595,22 @@ const layer = Layer.effect(
           }
         }
 
-        const sourcePatch =
-          input.copyChanges && current?.workspaceID
-            ? yield* runInWorkspace({
-                workspaceID: current?.workspaceID ?? undefined,
-                local: () => vcs.diffRaw(),
-                remote: ({ target }) =>
-                  HttpClientRequest.get(route(target.url, "/vcs/diff/raw"), {
-                    headers: new Headers(target.headers),
-                  }),
-                fallback: "",
-                response: "text",
-              }).pipe(Effect.provide(AppNodeBuilderV1.build(InstanceStore.node)))
-            : ""
+        const sourcePatch = input.copyChanges
+          ? yield* runInWorkspace({
+              workspaceID: current?.workspaceID ?? undefined,
+              local: () => vcs.diffRaw(),
+              remote: ({ target }) =>
+                HttpClientRequest.get(route(target.url, "/vcs/diff/raw"), {
+                  headers: new Headers(target.headers),
+                }),
+              fallback: "",
+              response: "text",
+            }).pipe(Effect.provide(AppNodeBuilderV1.build(InstanceStore.node)))
+          : ""
 
         if (sourcePatch) {
           // Attempt to apply the file changes to the new workspace.
-          // We intentionally do first so if it fails we don't warp
+          // We intentionally do first so if it fails we don't move
           // the session.
           yield* runInWorkspace({
             workspaceID: input.workspaceID ?? undefined,
@@ -680,8 +684,8 @@ const layer = Layer.effect(
 
               if (response.status < 200 || response.status >= 300) {
                 const body = yield* response.text
-                return yield* new SessionWarpHttpError({
-                  message: `Failed to warp session ${input.sessionID} into workspace ${workspaceID}: HTTP ${response.status} ${body}`,
+                return yield* new MoveSessionHttpError({
+                  message: `Failed to move session ${input.sessionID} into workspace ${workspaceID}: HTTP ${response.status} ${body}`,
                   workspaceID,
                   sessionID: input.sessionID,
                   status: response.status,
@@ -700,8 +704,8 @@ const layer = Layer.effect(
         )
         if (response.status < 200 || response.status >= 300) {
           const body = yield* response.text
-          return yield* new SessionWarpHttpError({
-            message: `Failed to steal session ${input.sessionID} into workspace ${workspaceID}: HTTP ${response.status} ${body}`,
+          return yield* new MoveSessionHttpError({
+            message: `Failed to move session ${input.sessionID} into workspace ${workspaceID}: HTTP ${response.status} ${body}`,
             workspaceID,
             sessionID: input.sessionID,
             status: response.status,
@@ -712,6 +716,7 @@ const layer = Layer.effect(
         yield* session.setWorkspace({ sessionID: input.sessionID, workspaceID: input.workspaceID })
       })
     })
+    const sessionWarp = moveSession
 
     const list = Effect.fn("Workspace.list")(function* (project: Project.Info) {
       return (yield* db
@@ -872,6 +877,7 @@ const layer = Layer.effect(
 
     return Service.of({
       create,
+      moveSession,
       sessionWarp,
       list,
       syncList,

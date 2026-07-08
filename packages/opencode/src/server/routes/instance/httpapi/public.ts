@@ -127,7 +127,7 @@ function matchLegacyOpenApi(input: Record<string, unknown>) {
           if (properties?.branch) properties.branch = { anyOf: [properties.branch, { type: "null" }] }
           if (properties?.extra) properties.extra = { anyOf: [properties.extra, { type: "null" }] }
         }
-        if (path === "/experimental/workspace/warp" && method === "post") {
+        if ((path === "/experimental/workspace/move-session" || path === "/experimental/workspace/warp") && method === "post") {
           const ref = operation.requestBody.content?.["application/json"]?.schema?.$ref?.replace(
             "#/components/schemas/",
             "",

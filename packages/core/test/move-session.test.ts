@@ -17,6 +17,8 @@ import { SessionV2 } from "@opencode-ai/core/session"
 import { SessionProjector } from "@opencode-ai/core/session/projector"
 import { SessionTable } from "@opencode-ai/core/session/sql"
 import { SessionStore } from "@opencode-ai/core/session/store"
+import { WorkspaceV2 } from "@opencode-ai/core/workspace"
+import { WorkspaceTable } from "@opencode-ai/core/control-plane/workspace.sql"
 import { tmpdir } from "./fixture/tmpdir"
 import { testEffect } from "./lib/effect"
 
@@ -230,6 +232,108 @@ describe("MoveSession", () => {
       )
       expect(yield* Effect.promise(() => fs.readFile(path.join(source, "tracked.txt"), "utf8"))).toBe("unrelated\n")
       expect(yield* Effect.promise(() => fs.readFile(path.join(source, "untracked.txt"), "utf8"))).toBe("unrelated\n")
+    }),
+  )
+
+  it.live("moves a session to a workspace destination without transferring changes", () =>
+    Effect.gen(function* () {
+      const root = yield* Effect.acquireRelease(
+        Effect.promise(() => tmpdir()),
+        (dir) => Effect.promise(() => dir[Symbol.asyncDispose]()),
+      )
+      yield* Effect.promise(() => initRepo(root.path))
+      const source = abs(yield* Effect.promise(() => fs.realpath(root.path)))
+      const remote = abs("/remote/workspace/repo")
+
+      const projectID = (yield* Project.Service.use((service) => service.resolve(source))).id
+      const sessionID = SessionV2.ID.make("ses_move_workspace")
+      const workspaceID = WorkspaceV2.ID.make("wrk_move_workspace")
+      const { db } = yield* Database.Service
+      yield* db
+        .insert(ProjectTable)
+        .values({ id: projectID, worktree: source, sandboxes: [], time_created: 1, time_updated: 1 })
+        .run()
+        .pipe(Effect.orDie)
+      yield* db
+        .insert(WorkspaceTable)
+        .values({ id: workspaceID, type: "remote", name: "remote", directory: remote, project_id: projectID })
+        .run()
+        .pipe(Effect.orDie)
+      yield* db
+        .insert(SessionTable)
+        .values({
+          id: sessionID,
+          project_id: projectID,
+          slug: "move-workspace",
+          directory: source,
+          title: "move workspace",
+          version: "test",
+          time_created: 1,
+          time_updated: 1,
+        })
+        .run()
+        .pipe(Effect.orDie)
+
+      yield* MoveSession.Service.use((service) =>
+        service.moveSession({ sessionID, destination: { directory: remote, workspaceID } }),
+      )
+
+      expect(
+        yield* db
+          .select({ directory: SessionTable.directory, path: SessionTable.path, workspaceID: SessionTable.workspace_id })
+          .from(SessionTable)
+          .where(eq(SessionTable.id, sessionID))
+          .get(),
+      ).toEqual({ directory: remote, path: "", workspaceID })
+    }),
+  )
+
+  it.live("rejects workspace moves that request change transfer", () =>
+    Effect.gen(function* () {
+      const root = yield* Effect.acquireRelease(
+        Effect.promise(() => tmpdir()),
+        (dir) => Effect.promise(() => dir[Symbol.asyncDispose]()),
+      )
+      yield* Effect.promise(() => initRepo(root.path))
+      const source = abs(yield* Effect.promise(() => fs.realpath(root.path)))
+      const remote = abs("/remote/workspace/repo")
+
+      const projectID = (yield* Project.Service.use((service) => service.resolve(source))).id
+      const sessionID = SessionV2.ID.make("ses_move_workspace_changes")
+      const workspaceID = WorkspaceV2.ID.make("wrk_move_workspace_changes")
+      const { db } = yield* Database.Service
+      yield* db
+        .insert(ProjectTable)
+        .values({ id: projectID, worktree: source, sandboxes: [], time_created: 1, time_updated: 1 })
+        .run()
+        .pipe(Effect.orDie)
+      yield* db
+        .insert(WorkspaceTable)
+        .values({ id: workspaceID, type: "remote", name: "remote", directory: remote, project_id: projectID })
+        .run()
+        .pipe(Effect.orDie)
+      yield* db
+        .insert(SessionTable)
+        .values({
+          id: sessionID,
+          project_id: projectID,
+          slug: "move-workspace-changes",
+          directory: source,
+          title: "move workspace changes",
+          version: "test",
+          time_created: 1,
+          time_updated: 1,
+        })
+        .run()
+        .pipe(Effect.orDie)
+
+      const error = yield* MoveSession.Service.use((service) =>
+        service.moveSession({ sessionID, destination: { directory: remote, workspaceID }, moveChanges: true }).pipe(
+          Effect.flip,
+        ),
+      )
+
+      expect(error).toBeInstanceOf(MoveSession.WorkspaceChangeTransferUnsupportedError)
     }),
   )
 })

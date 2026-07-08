@@ -217,12 +217,12 @@ describe("workspace HttpApi", () => {
       expect(workspace).toMatchObject({ type: "local-test", name: "local-test" })
 
       const session = yield* Session.use.create({}).pipe(provideInstance(dir))
-      const warped = yield* request(WorkspacePaths.warp, dir, {
+      const moved = yield* request(WorkspacePaths.moveSession, dir, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ id: workspace.id, sessionID: session.id }),
       })
-      expect(warped.status).toBe(204)
+      expect(moved.status).toBe(204)
 
       const removed = yield* request(WorkspacePaths.remove.replace(":id", workspace.id), dir, { method: "DELETE" })
       expect(removed.status).toBe(200)

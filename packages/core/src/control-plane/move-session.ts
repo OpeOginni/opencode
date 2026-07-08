@@ -10,11 +10,16 @@ import { SessionV2 } from "../session"
 import { SessionEvent } from "../session/event"
 import { SessionSchema } from "../session/schema"
 import { SessionStore } from "../session/store"
-import { AbsolutePath, RelativePath } from "../schema"
+import { Database } from "../database/database"
+import { WorkspaceTable } from "./workspace.sql"
+import { AbsolutePath, RelativePath, optional } from "../schema"
+import { WorkspaceV2 } from "../workspace"
+import { eq } from "drizzle-orm"
 import path from "path"
 
 export const Destination = Schema.Struct({
   directory: AbsolutePath,
+  workspaceID: optional(WorkspaceV2.ID),
 }).annotate({ identifier: "MoveSession.Destination" })
 export type Destination = typeof Destination.Type
 
@@ -53,12 +58,29 @@ export class ResetSourceChangesError extends Schema.TaggedErrorClass<ResetSource
   },
 ) {}
 
+export class DestinationWorkspaceNotFoundError extends Schema.TaggedErrorClass<DestinationWorkspaceNotFoundError>()(
+  "MoveSession.DestinationWorkspaceNotFoundError",
+  {
+    workspaceID: WorkspaceV2.ID,
+  },
+) {}
+
+export class WorkspaceChangeTransferUnsupportedError extends Schema.TaggedErrorClass<WorkspaceChangeTransferUnsupportedError>()(
+  "MoveSession.WorkspaceChangeTransferUnsupportedError",
+  {
+    source: Schema.NullOr(WorkspaceV2.ID),
+    destination: Schema.NullOr(WorkspaceV2.ID),
+  },
+) {}
+
 export type Error =
   | SessionV2.NotFoundError
   | DestinationProjectMismatchError
   | CaptureChangesError
   | ApplyChangesError
   | ResetSourceChangesError
+  | DestinationWorkspaceNotFoundError
+  | WorkspaceChangeTransferUnsupportedError
 
 export interface Interface {
   readonly moveSession: (input: Input) => Effect.Effect<void, Error>
@@ -73,20 +95,40 @@ const layer = Layer.effect(
     const events = yield* EventV2.Service
     const project = yield* ProjectV2.Service
     const sessions = yield* SessionStore.Service
+    const { db } = yield* Database.Service
 
     const moveSession = Effect.fn("MoveSession.moveSession")(function* (input: Input) {
       const current = yield* sessions.get(input.sessionID)
       if (!current) return yield* new SessionV2.NotFoundError({ sessionID: input.sessionID })
       const directory = AbsolutePath.make(input.destination.directory)
-      if (current.location.directory === directory) return
+      if (current.location.directory === directory && current.location.workspaceID === input.destination.workspaceID) return
 
-      const source = yield* project.resolve(current.location.directory)
-      const destination = yield* project.resolve(directory)
-      if (current.projectID !== destination.id) {
-        return yield* new DestinationProjectMismatchError({ expected: current.projectID, actual: destination.id })
-      }
+      const destination = input.destination.workspaceID
+        ? yield* db
+            .select({ id: WorkspaceTable.id, projectID: WorkspaceTable.project_id, directory: WorkspaceTable.directory })
+            .from(WorkspaceTable)
+            .where(eq(WorkspaceTable.id, input.destination.workspaceID))
+            .get()
+            .pipe(Effect.orDie)
+        : yield* project.resolve(directory).pipe(
+            Effect.map((resolved) => ({ id: undefined, projectID: resolved.id, directory: resolved.directory })),
+          )
+      if (!destination && input.destination.workspaceID)
+        return yield* new DestinationWorkspaceNotFoundError({ workspaceID: input.destination.workspaceID })
+      if (!destination) return yield* new ApplyChangesError({ message: "Destination workspace not found" })
+      if (current.projectID !== destination.projectID)
+        return yield* new DestinationProjectMismatchError({ expected: current.projectID, actual: destination.projectID })
 
-      const moveChanges = input.moveChanges && source.directory !== destination.directory
+      const sourceWorkspaceID = current.location.workspaceID
+      const destinationWorkspaceID = input.destination.workspaceID
+      if (input.moveChanges && (sourceWorkspaceID || destinationWorkspaceID))
+        return yield* new WorkspaceChangeTransferUnsupportedError({
+          source: sourceWorkspaceID ?? null,
+          destination: destinationWorkspaceID ?? null,
+        })
+
+      const source = input.moveChanges ? yield* project.resolve(current.location.directory) : undefined
+      const moveChanges = input.moveChanges && source?.directory !== destination.directory
       const sourceRepository = moveChanges ? yield* git.repo.discover(current.location.directory) : undefined
       if (moveChanges && !sourceRepository)
         return yield* new CaptureChangesError({ message: "Source is not a Git repository" })
@@ -105,8 +147,8 @@ const layer = Layer.effect(
 
       yield* events.publish(SessionEvent.Moved, {
         sessionID: input.sessionID,
-        location: Location.Ref.make({ directory }),
-        subdirectory: RelativePath.make(path.relative(destination.directory, directory).replaceAll("\\", "/")),
+        location: Location.Ref.make({ directory, workspaceID: input.destination.workspaceID }),
+        subdirectory: RelativePath.make(path.relative(destination.directory ?? directory, directory).replaceAll("\\", "/")),
         timestamp: yield* DateTime.now,
       })
 
@@ -144,5 +186,5 @@ const layer = Layer.effect(
 export const node = makeGlobalNode({
   service: Service,
   layer,
-  deps: [Git.node, EventV2.node, ProjectV2.node, SessionStore.node],
+  deps: [Git.node, EventV2.node, ProjectV2.node, SessionStore.node, Database.node],
 })

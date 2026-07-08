@@ -258,6 +258,45 @@ const serveProbe = HttpApiBuilder.layer(ProbeApi).pipe(
 )
 
 describe("HttpApi workspace routing middleware", () => {
+  it.live("creates and routes a built-in remote workspace from generic target metadata", () =>
+    Effect.gen(function* () {
+      const dir = yield* tmpdirScoped({ git: true })
+      const project = yield* Project.use.fromDirectory(dir)
+      let forwarded: ProxiedRequest | undefined
+
+      const remoteUrl = yield* startRemoteWorkspaceHttpServer((request) => {
+        forwarded = request
+        return HttpServerResponse.json({ proxied: true })
+      })
+      const workspace = yield* Workspace.Service.use((workspace) =>
+        workspace.create({
+          type: "remote",
+          branch: "main",
+          projectID: project.project.id,
+          extra: {
+            url: `${remoteUrl}/base`,
+            headers: { "x-target-auth": "remote-token" },
+            directory: "/workspace/repo",
+          },
+        }),
+      )
+      yield* Effect.addFinalizer(() => Workspace.use.remove(workspace.id).pipe(Effect.ignore))
+
+      expect(workspace.type).toBe("remote")
+      expect(workspace.branch).toBe("main")
+      expect(workspace.directory).toBe("/workspace/repo")
+
+      yield* serveProbe
+
+      const response = yield* HttpClient.get(`/probe?workspace=${workspace.id}`).pipe(Effect.timeout("2 seconds"))
+
+      expect(response.status).toBe(200)
+      expect(yield* response.json).toEqual({ proxied: true })
+      expect(forwarded ? requestURL(forwarded).pathname : undefined).toBe("/base/probe")
+      expect(forwarded?.headers["x-target-auth"]).toBe("remote-token")
+    }),
+  )
+
   it.live("proxies remote workspace HTTP requests through the selected workspace target", () =>
     Effect.gen(function* () {
       const dir = yield* tmpdirScoped({ git: true })
@@ -347,6 +386,7 @@ describe("HttpApi workspace routing middleware", () => {
 
       const workspace = Workspace.Service.of({
         create: () => Effect.die("unused"),
+        moveSession: () => Effect.die("unused"),
         sessionWarp: () => Effect.die("unused"),
         list: () => Effect.die("unused"),
         syncList: () => Effect.die("unused"),
