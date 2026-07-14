@@ -12,7 +12,12 @@ import { useLocal } from "../context/local"
 import { DialogSessionRename } from "./dialog-session-rename"
 import { createDebouncedSignal } from "../util/signal"
 import { useToast } from "../ui/toast"
-import { moveWorkspaceSession, openWorkspaceSelect, type WorkspaceSelection } from "./dialog-workspace-create"
+import {
+  confirmWorkspaceFileChanges,
+  moveWorkspaceSession,
+  openWorkspaceSelect,
+  type WorkspaceSelection,
+} from "./dialog-workspace-create"
 import { Spinner } from "./spinner"
 import { errorMessage } from "../util/error"
 import { DialogSessionDeleteFailed } from "./dialog-session-delete-failed"
@@ -102,6 +107,12 @@ export function DialogSessionList() {
     const workspace = project.workspace.get(session.workspaceID!)
     const list = () => dialog.replace(() => <DialogSessionList />)
     const move = async (selection: WorkspaceSelection) => {
+      const copyChanges = await confirmWorkspaceFileChanges({
+        dialog,
+        sdk,
+        sourceWorkspaceID: session.workspaceID,
+      })
+      if (copyChanges === undefined) return
       const workspaceID = await (async () => {
         if (selection.type === "none") return null
         if (selection.type === "existing") return selection.workspaceID
@@ -138,7 +149,7 @@ export function DialogSessionList() {
         sourceWorkspaceID: session.workspaceID,
         workspaceID,
         sessionID: session.id,
-        copyChanges: false,
+        copyChanges,
         done: list,
       })
     }
