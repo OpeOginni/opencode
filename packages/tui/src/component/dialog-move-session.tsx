@@ -16,7 +16,7 @@ import { useCommandShortcut } from "../keymap"
 import { useProject } from "../context/project"
 import { Spinner } from "./spinner"
 import { DialogWorkspaceFileChanges } from "./dialog-workspace-file-changes"
-import { remoteWorkspaceAdapters } from "./dialog-workspace-create"
+import { remoteWorkspaceAdapters, workspaceProvenance } from "./dialog-workspace-create"
 import type { ExperimentalWorkspaceAdapterListResponse, ProjectDirectories } from "@opencode-ai/sdk/v2"
 import { useRoute } from "../context/route"
 
@@ -178,6 +178,16 @@ export function DialogMoveSession(props: DialogMoveSessionProps) {
       .filter((workspace) => ["connected", "paused"].includes(projectContext.workspace.status(workspace.id) ?? ""))
       .filter((workspace): workspace is typeof workspace & { directory: string } => Boolean(workspace.directory))
     const workspaceDirectories = new Set(workspaces.map((workspace) => workspace.directory))
+    // The current workspace is excluded from the selectable workspace rows,
+    // so its directory (e.g. a remote sandbox path) surfaces as a plain
+    // directory row — label it with the adapter's provenance instead of
+    // letting it read as a local path.
+    const workspaceByDirectory = new Map(
+      projectContext.workspace
+        .list()
+        .filter((workspace): workspace is typeof workspace & { directory: string } => Boolean(workspace.directory))
+        .map((workspace) => [workspace.directory, workspace]),
+    )
     const local = list
       .filter((item) => !workspaceDirectories.has(item.location))
       .map((item) => {
@@ -190,8 +200,14 @@ export function DialogMoveSession(props: DialogMoveSessionProps) {
         const split = suffix ? Math.max(0, visible.length - suffix.length) : visible.length
         const deleting = toDelete() === item.location
         const isRemoving = removing() === item.location
+        const rowWorkspace = workspaceByDirectory.get(item.location)
         return {
           title,
+          detail: rowWorkspace
+            ? workspaceProvenance(adapters(), rowWorkspace)
+            : item.location === item.root.directory
+              ? "local · main"
+              : "local",
           titleView: isRemoving ? (
             <span style={{ fg: theme.error }}>Deleting {item.location}</span>
           ) : deleting ? (
@@ -217,7 +233,7 @@ export function DialogMoveSession(props: DialogMoveSessionProps) {
 
     const existing = workspaces.map((workspace) => ({
       title: workspace.name,
-      detail: `${workspace.type === "worktree" ? "local" : workspace.type}  ${workspace.directory}`,
+      detail: `${workspaceProvenance(adapters(), workspace)}  ${workspace.directory}`,
       titleWidth,
       category: "Workspaces",
       value: { type: "workspace", workspaceID: workspace.id, directory: workspace.directory } as const,
