@@ -331,8 +331,20 @@ const layer = Layer.effect(
         const workspace = yield* get(input.workspaceID)
         if (!workspace) return input.fallback
 
-        if (!(yield* FiberMap.has(syncFibers, workspace.id))) yield* ensureReady(workspace.id)
-        const target = yield* WorkspaceAdapterRuntime.target(workspace)
+        // Adapter readiness/target failures (e.g. a provider reporting the
+        // sandbox paused) must surface as the caller's fallback, not as a
+        // defect that turns the whole request into an opaque 500.
+        const target = yield* Effect.gen(function* () {
+          if (!(yield* FiberMap.has(syncFibers, workspace.id))) yield* ensureReady(workspace.id)
+          return yield* WorkspaceAdapterRuntime.target(workspace)
+        }).pipe(
+          Effect.catchCause((cause) =>
+            Effect.logWarning("workspace target unavailable", { workspaceID: workspace.id, cause }).pipe(
+              Effect.as(undefined),
+            ),
+          ),
+        )
+        if (!target) return input.fallback
 
         if (target.type === "local") {
           const store = yield* InstanceStore.Service

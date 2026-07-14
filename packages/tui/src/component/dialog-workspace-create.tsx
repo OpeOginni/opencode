@@ -84,7 +84,10 @@ async function loadWorkspaceAdapters(input: {
   sync: ReturnType<typeof useSync>
   toast: ReturnType<typeof useToast>
 }) {
-  const dir = input.sync.path.directory || input.sdk.directory
+  // sync.path can hold a REMOTE workspace's directory after a move; adapter
+  // listing is a control-plane call and must use a directory that exists on
+  // this machine.
+  const dir = input.sdk.directory || input.sync.path.directory
   try {
     const response = await input.sdk.client.experimental.workspace.adapter.list({ directory: dir })
     if (response.error) throw response.error

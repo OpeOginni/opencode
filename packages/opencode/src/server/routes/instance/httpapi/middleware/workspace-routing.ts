@@ -9,6 +9,8 @@ import { getWorkspaceRouteSessionID, isLocalWorkspaceRoute, workspaceProxyURL } 
 import { NotFoundError } from "@/storage/storage"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { Context, Data, Effect, Layer, Option, Schema } from "effect"
+import fs from "fs"
+import path from "path"
 import { HttpClient, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { HttpApiMiddleware } from "effect/unstable/httpapi"
 import * as Socket from "effect/unstable/socket/Socket"
@@ -84,8 +86,31 @@ function selectedV2WorkspaceID(
   return workspaceID.value
 }
 
-function defaultDirectory(request: HttpServerRequest.HttpServerRequest, url: URL): string {
-  return url.searchParams.get("directory") || request.headers["x-opencode-directory"] || process.cwd()
+// A locally-planned request can carry a directory that only exists on a
+// remote workspace host (a session's pre-move directory, or path/project
+// data synced back from a remote instance and echoed by the client).
+// Booting a local instance for it fails every time, so decoded directory
+// sources are only used when they exist here. The x-opencode-directory
+// header is exempt: it arrives URI-encoded and is decoded downstream.
+// Synchronous on purpose: this runs for WebSocket upgrades too, where an
+// async hop in request planning stalls the upgrade window.
+function firstExistingDirectory(candidates: (string | null | undefined)[]): string | undefined {
+  for (const candidate of candidates) {
+    if (!candidate) continue
+    // Only vet absolute paths; anything else is an opaque value that
+    // downstream middleware decodes and resolves with its own fallbacks.
+    if (!path.isAbsolute(candidate)) return candidate
+    if (fs.existsSync(candidate)) return candidate
+  }
+  return undefined
+}
+
+function defaultDirectory(
+  request: HttpServerRequest.HttpServerRequest,
+  url: URL,
+  checked?: string,
+): string {
+  return checked || request.headers["x-opencode-directory"] || process.cwd()
 }
 
 function shouldStayOnControlPlane(request: HttpServerRequest.HttpServerRequest, url: URL): boolean {
@@ -185,8 +210,10 @@ function planRequest(
       // server addressed as a plain remote workspace stores the control
       // plane's workspace id when the session's moved event replays. Serve
       // the session from its own directory instead of failing the request.
-      if (session?.workspaceID === workspaceID && session.directory)
-        return RequestPlan.Local({ directory: session.directory })
+      if (session?.workspaceID === workspaceID && session.directory) {
+        const checked = firstExistingDirectory([session.directory, url.searchParams.get("directory")])
+        return RequestPlan.Local({ directory: defaultDirectory(request, url, checked) })
+      }
       return RequestPlan.MissingWorkspace({ workspaceID })
     }
 
@@ -199,8 +226,9 @@ function planRequest(
     // local instance for a nonexistent path. Use the request's own directory.
     const sessionDirectory =
       workspace !== undefined && WorkspaceAdapterRuntime.kind(workspace) !== "local" ? undefined : session?.directory
+    const checked = firstExistingDirectory([sessionDirectory, url.searchParams.get("directory")])
     return RequestPlan.Local({
-      directory: sessionDirectory || defaultDirectory(request, url),
+      directory: defaultDirectory(request, url, checked),
       workspaceID: envWorkspaceID ?? workspaceID,
     })
   })

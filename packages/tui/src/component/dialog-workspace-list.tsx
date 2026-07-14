@@ -32,7 +32,9 @@ export function DialogWorkspaceList() {
     return project.workspace.current()
   })
 
-  const mainDirectory = createMemo(() => project.instance.directory() || sync.path.directory || sdk.directory)
+  // The "Main" row is the LOCAL project; instance/path context can point at a
+  // remote workspace's directory after a move, so prefer the SDK's directory.
+  const mainDirectory = createMemo(() => sdk.directory || project.instance.directory() || sync.path.directory)
 
   const options = createMemo<DialogSelectOption<WorkspaceOption>[]>(() => [
     {

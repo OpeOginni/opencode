@@ -633,6 +633,8 @@ describe("HttpApi workspace routing middleware", () => {
       const dir = yield* tmpdirScoped()
       const queryDir = path.join(dir, "query-target")
       const headerDir = path.join(dir, "header-target")
+      yield* Effect.promise(() => mkdir(queryDir, { recursive: true }))
+      yield* Effect.promise(() => mkdir(headerDir, { recursive: true }))
       yield* serveProbe
 
       // Without a selected workspace, the middleware falls back to request
@@ -647,6 +649,22 @@ describe("HttpApi workspace routing middleware", () => {
       expect(yield* queryResponse.json).toEqual({ directory: queryDir, workspaceID: null })
       expect(headerResponse.status).toBe(200)
       expect(yield* headerResponse.json).toEqual({ directory: headerDir, workspaceID: null })
+    }),
+  )
+
+  it.live("falls back to the server directory when the requested directory does not exist locally", () =>
+    Effect.gen(function* () {
+      yield* serveProbe
+
+      // A directory hint that only exists on a remote workspace host (e.g. a
+      // sandbox path echoed back by the client after a move) cannot boot a
+      // local instance; serve from the server's own directory instead.
+      const response = yield* HttpClient.get(
+        `/probe?directory=${encodeURIComponent("/gitterm-e2e-nonexistent/tui-invaders")}`,
+      )
+
+      expect(response.status).toBe(200)
+      expect(yield* response.json).toEqual({ directory: process.cwd(), workspaceID: null })
     }),
   )
 
