@@ -274,13 +274,24 @@ describe("MoveSession", () => {
         .run()
         .pipe(Effect.orDie)
 
+      const mismatch = yield* MoveSession.Service.use((service) =>
+        service
+          .moveSession({ sessionID, destination: { directory: abs("/different/workspace/repo"), workspaceID } })
+          .pipe(Effect.flip),
+      )
+      expect(mismatch).toBeInstanceOf(MoveSession.DestinationDirectoryMismatchError)
+
       yield* MoveSession.Service.use((service) =>
         service.moveSession({ sessionID, destination: { directory: remote, workspaceID } }),
       )
 
       expect(
         yield* db
-          .select({ directory: SessionTable.directory, path: SessionTable.path, workspaceID: SessionTable.workspace_id })
+          .select({
+            directory: SessionTable.directory,
+            path: SessionTable.path,
+            workspaceID: SessionTable.workspace_id,
+          })
           .from(SessionTable)
           .where(eq(SessionTable.id, sessionID))
           .get(),
@@ -328,9 +339,9 @@ describe("MoveSession", () => {
         .pipe(Effect.orDie)
 
       const error = yield* MoveSession.Service.use((service) =>
-        service.moveSession({ sessionID, destination: { directory: remote, workspaceID }, moveChanges: true }).pipe(
-          Effect.flip,
-        ),
+        service
+          .moveSession({ sessionID, destination: { directory: remote, workspaceID }, moveChanges: true })
+          .pipe(Effect.flip),
       )
 
       expect(error).toBeInstanceOf(MoveSession.WorkspaceChangeTransferUnsupportedError)

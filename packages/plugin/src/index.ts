@@ -45,11 +45,26 @@ export type WorkspaceTarget =
     }
 
 export type WorkspaceAdapter = {
+  kind?: "local" | "remote"
   name: string
   description: string
   configure(config: WorkspaceInfo): WorkspaceInfo | Promise<WorkspaceInfo>
-  create(config: WorkspaceInfo, env: Record<string, string | undefined>, from?: WorkspaceInfo): Promise<void>
+  create(
+    config: WorkspaceInfo,
+    env: Record<string, string | undefined>,
+    from?: WorkspaceInfo,
+  ): Promise<WorkspaceInfo | void>
   remove(config: WorkspaceInfo): Promise<void>
+  ensureReady?(config: WorkspaceInfo): Promise<void>
+  status?(
+    config: WorkspaceInfo,
+  ):
+    | "connected"
+    | "connecting"
+    | "paused"
+    | "disconnected"
+    | "error"
+    | Promise<"connected" | "connecting" | "paused" | "disconnected" | "error">
   target(config: WorkspaceInfo): WorkspaceTarget | Promise<WorkspaceTarget>
 }
 

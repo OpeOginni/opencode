@@ -2,8 +2,6 @@ import { Workspace } from "@/control-plane/workspace"
 import { WorkspaceAdapterEntry } from "@/control-plane/types"
 import { Schema, Struct } from "effect"
 import { HttpApi, HttpApiEndpoint, HttpApiError, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
-import { ApiVcsApplyError } from "./instance"
-import { ApiNotFoundError } from "../errors"
 import { Authorization } from "../middleware/authorization"
 import { InstanceContextMiddleware } from "../middleware/instance-context"
 import { WorkspaceRoutingMiddleware, WorkspaceRoutingQuery } from "../middleware/workspace-routing"
@@ -11,35 +9,6 @@ import { described } from "./metadata"
 
 const root = "/experimental/workspace"
 export const CreatePayload = Schema.Struct(Struct.omit(Workspace.CreateInput.fields, ["projectID"]))
-export const MoveSessionPayload = Schema.Struct({
-  id: Schema.NullOr(Workspace.Info.fields.id),
-  sessionID: Workspace.MoveSessionInput.fields.sessionID,
-  copyChanges: Workspace.MoveSessionInput.fields.copyChanges,
-})
-export const WarpPayload = MoveSessionPayload
-
-export class ApiWorkspaceWarpError extends Schema.ErrorClass<ApiWorkspaceWarpError>("WorkspaceWarpError")(
-  {
-    name: Schema.Literal("WorkspaceWarpError"),
-    data: Schema.Struct({
-      message: Schema.String,
-    }),
-  },
-  { httpApiStatus: 400 },
-) {}
-
-export class ApiWorkspaceMoveSessionError extends Schema.ErrorClass<ApiWorkspaceMoveSessionError>(
-  "WorkspaceMoveSessionError",
-)(
-  {
-    name: Schema.Literal("WorkspaceMoveSessionError"),
-    data: Schema.Struct({
-      message: Schema.String,
-    }),
-  },
-  { httpApiStatus: 400 },
-) {}
-
 export class ApiWorkspaceCreateError extends Schema.ErrorClass<ApiWorkspaceCreateError>("WorkspaceCreateError")(
   {
     name: Schema.Literal("WorkspaceCreateError"),
@@ -56,8 +25,6 @@ export const WorkspacePaths = {
   syncList: `${root}/sync-list`,
   status: `${root}/status`,
   remove: `${root}/:id`,
-  moveSession: `${root}/move-session`,
-  warp: `${root}/warp`,
 } as const
 
 export const WorkspaceApi = HttpApi.make("workspace")
@@ -126,30 +93,6 @@ export const WorkspaceApi = HttpApi.make("workspace")
             identifier: "experimental.workspace.remove",
             summary: "Remove workspace",
             description: "Remove an existing workspace.",
-          }),
-        ),
-        HttpApiEndpoint.post("moveSession", WorkspacePaths.moveSession, {
-          query: WorkspaceRoutingQuery,
-          payload: MoveSessionPayload,
-          success: described(HttpApiSchema.NoContent, "Session moved"),
-          error: [ApiWorkspaceMoveSessionError, ApiVcsApplyError, ApiNotFoundError],
-        }).annotateMerge(
-          OpenApi.annotations({
-            identifier: "experimental.workspace.moveSession",
-            summary: "Move session into workspace",
-            description: "Move a session's sync history and optional file changes into the target workspace, or back to the local project.",
-          }),
-        ),
-        HttpApiEndpoint.post("warp", WorkspacePaths.warp, {
-          query: WorkspaceRoutingQuery,
-          payload: WarpPayload,
-          success: described(HttpApiSchema.NoContent, "Session warped"),
-          error: [ApiWorkspaceWarpError, ApiVcsApplyError, ApiNotFoundError],
-        }).annotateMerge(
-          OpenApi.annotations({
-            identifier: "experimental.workspace.warp",
-            summary: "Warp session into workspace",
-            description: "Move a session's sync history into the target workspace, or detach it to the local project.",
           }),
         ),
       )

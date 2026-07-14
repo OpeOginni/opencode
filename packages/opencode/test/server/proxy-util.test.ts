@@ -90,6 +90,20 @@ describe("ProxyUtil", () => {
       expect(result.get("content-type")).toBe("text/plain")
     })
 
+    test("drops client authorization so workspace target credentials win", () => {
+      const req = new Request("http://localhost", {
+        headers: {
+          authorization: "Bearer host-token",
+          "content-type": "application/json",
+        },
+      })
+      const result = ProxyUtil.headers(req, {
+        Authorization: "Basic cmVtb3RlOnBhc3M=",
+      })
+      expect(result.get("authorization")).toBe("Basic cmVtb3RlOnBhc3M=")
+      expect(result.get("content-type")).toBe("application/json")
+    })
+
     test("returns original headers when no extra", () => {
       const req = new Request("http://localhost", {
         headers: { "content-type": "application/json", "x-foo": "bar" },

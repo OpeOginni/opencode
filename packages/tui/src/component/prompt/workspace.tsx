@@ -8,7 +8,7 @@ import { errorMessage } from "../../util/error"
 import {
   confirmWorkspaceFileChanges,
   openWorkspaceSelect,
-  warpWorkspaceSession,
+  moveWorkspaceSession,
   type WorkspaceSelection,
 } from "../dialog-workspace-create"
 import type { WorkspaceStatus } from "../workspace-label"
@@ -58,7 +58,7 @@ export function usePromptWorkspace(sessionID?: string) {
     return workspace
   }
 
-  async function warp(selection: WorkspaceSelection) {
+  async function move(selection: WorkspaceSelection) {
     if (!sessionID) {
       setSelection(selection)
       dialog.clear()
@@ -79,7 +79,7 @@ export function usePromptWorkspace(sessionID?: string) {
           : await create(selection)
     if (!workspace) return
 
-    const warped = await warpWorkspaceSession({
+    const moved = await moveWorkspaceSession({
       dialog,
       sdk,
       sync,
@@ -90,11 +90,11 @@ export function usePromptWorkspace(sessionID?: string) {
       sessionID,
       copyChanges,
     })
-    if (warped) showNotice(workspace.name)
+    if (moved) showNotice(workspace.name)
   }
 
   function showNotice(name: string) {
-    setNotice(`Warped to ${name}`)
+    setNotice(`Moved to ${name}`)
     setTimeout(() => setNotice(undefined), 4000)
   }
 
@@ -103,7 +103,7 @@ export function usePromptWorkspace(sessionID?: string) {
   }
 
   function open() {
-    void openWorkspaceSelect({ dialog, sdk, sync, project, toast, onSelect: warp })
+    void openWorkspaceSelect({ dialog, sdk, sync, project, toast, onSelect: move })
   }
 
   createEffect(() => {
@@ -133,5 +133,5 @@ export function usePromptWorkspace(sessionID?: string) {
     }
   })
 
-  return { selection, creating, creatingDots, notice, label, open, warp, clearNotice }
+  return { selection, creating, creatingDots, notice, label, open, move, clearNotice }
 }

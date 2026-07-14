@@ -5,6 +5,7 @@ import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { Workspace } from "@/control-plane/workspace"
 import { RootHttpApi } from "../api"
 import { ApiMoveSessionError, MoveSessionPayload } from "../groups/control-plane"
+import { notFound } from "../errors"
 
 export const controlPlaneHandlers = HttpApiBuilder.group(RootHttpApi, "controlPlane", (handlers) =>
   Effect.gen(function* () {
@@ -14,6 +15,22 @@ export const controlPlaneHandlers = HttpApiBuilder.group(RootHttpApi, "controlPl
       payload: typeof MoveSessionPayload.Type
     }) {
       if (!ctx.payload.destination.workspaceID) {
+        if (yield* service.atDestination(ctx.payload)) {
+          const workspace = yield* Workspace.Service
+          yield* workspace
+            .moveSession({
+              sessionID: ctx.payload.sessionID,
+              workspaceID: null,
+              destinationDirectory: ctx.payload.destination.directory,
+              copyChanges: ctx.payload.moveChanges,
+            })
+            .pipe(
+              Effect.mapError(
+                (error) => new ApiMoveSessionError({ name: "MoveSessionError", data: { message: error.message } }),
+              ),
+            )
+          return
+        }
         const moved = yield* service.moveSession(ctx.payload).pipe(
           Effect.as(true),
           Effect.catch((error) => {
@@ -33,14 +50,14 @@ export const controlPlaneHandlers = HttpApiBuilder.group(RootHttpApi, "controlPl
           .moveSession({
             sessionID: ctx.payload.sessionID,
             workspaceID: null,
+            destinationDirectory: ctx.payload.destination.directory,
             copyChanges: ctx.payload.moveChanges,
           })
-          .pipe(Effect.mapError((error) => new ApiMoveSessionError({ name: "MoveSessionError", data: { message: error.message } })))
-        yield* service.moveSession({ ...ctx.payload, moveChanges: false }).pipe(
-          Effect.mapError(
-            (error) => new ApiMoveSessionError({ name: "MoveSessionError", data: { message: message(error) } }),
-          ),
-        )
+          .pipe(
+            Effect.mapError(
+              (error) => new ApiMoveSessionError({ name: "MoveSessionError", data: { message: error.message } }),
+            ),
+          )
         return
       }
 
@@ -49,27 +66,23 @@ export const controlPlaneHandlers = HttpApiBuilder.group(RootHttpApi, "controlPl
         .moveSession({
           sessionID: ctx.payload.sessionID,
           workspaceID: ctx.payload.destination.workspaceID,
+          destinationDirectory: ctx.payload.destination.directory,
           copyChanges: ctx.payload.moveChanges,
         })
         .pipe(
-          Effect.mapError(
-            (error) =>
-              new ApiMoveSessionError({
+          Effect.mapError((error) => {
+            if (error instanceof Workspace.WorkspaceNotFoundError) return notFound(error.message)
+            if (error instanceof Workspace.WorkspaceNotReadyError)
+              return new ApiMoveSessionError({
                 name: "MoveSessionError",
                 data: { message: error.message },
-              }),
-          ),
-        )
-
-      yield* service.moveSession({ ...ctx.payload, moveChanges: false }).pipe(
-        Effect.mapError(
-          (error) =>
-            new ApiMoveSessionError({
+              })
+            return new ApiMoveSessionError({
               name: "MoveSessionError",
-              data: { message: message(error) },
-            }),
-        ),
-      )
+              data: { message: error.message },
+            })
+          }),
+        )
     })
 
     return handlers.handle("moveSession", moveSession)

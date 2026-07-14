@@ -308,6 +308,142 @@ describe("Vcs diff", () => {
   )
 
   it.instance(
+    "apply() converges when the patch was already applied",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* TestInstance
+        const file = path.join(test.directory, "file.txt")
+        yield* write(file, "original\n")
+        yield* git(test.directory, ["add", "."])
+        yield* git(test.directory, ["commit", "--no-gpg-sign", "-m", "add file"])
+        yield* write(file, "changed\n")
+
+        const vcs = yield* init()
+        const patch = yield* vcs.diffRaw()
+        yield* git(test.directory, ["checkout", "--", "."])
+
+        expect(yield* vcs.apply({ patch })).toEqual({ applied: true })
+        expect(yield* Effect.promise(() => fs.readFile(file, "utf8"))).toBe("changed\n")
+        expect(yield* vcs.apply({ patch })).toEqual({ applied: true })
+        expect(yield* Effect.promise(() => fs.readFile(file, "utf8"))).toBe("changed\n")
+      }),
+    { git: true },
+  )
+
+  it.instance(
+    "apply() fails with the git error when the patch conflicts",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* TestInstance
+        const file = path.join(test.directory, "file.txt")
+        yield* write(file, "original\n")
+        yield* git(test.directory, ["add", "."])
+        yield* git(test.directory, ["commit", "--no-gpg-sign", "-m", "add file"])
+        yield* write(file, "changed\n")
+
+        const vcs = yield* init()
+        const patch = yield* vcs.diffRaw()
+        yield* write(file, "conflicting\n")
+
+        const exit = yield* Effect.exit(vcs.apply({ patch }))
+        expect(exit._tag).toBe("Failure")
+        expect(String(exit)).toContain("patch does not apply")
+      }),
+    { git: true },
+  )
+
+  it.instance(
+    "applied() reports whether the working tree contains the patch",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* TestInstance
+        const file = path.join(test.directory, "file.txt")
+        yield* write(file, "original\n")
+        yield* git(test.directory, ["add", "."])
+        yield* git(test.directory, ["commit", "--no-gpg-sign", "-m", "add file"])
+        yield* write(file, "changed\n")
+
+        const vcs = yield* init()
+        const patch = yield* vcs.diffRaw()
+
+        expect(yield* vcs.applied({ patch })).toBe(true)
+        yield* git(test.directory, ["checkout", "--", "."])
+        expect(yield* vcs.applied({ patch })).toBe(false)
+      }),
+    { git: true },
+  )
+
+  it.instance(
+    "discard() reverses only the transferred changes",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* TestInstance
+        const tracked = path.join(test.directory, "tracked.txt")
+        const created = path.join(test.directory, "created.txt")
+        const unrelated = path.join(test.directory, "unrelated.txt")
+        yield* write(tracked, "original\n")
+        yield* git(test.directory, ["add", "."])
+        yield* git(test.directory, ["commit", "--no-gpg-sign", "-m", "add file"])
+        yield* write(tracked, "changed\n")
+        yield* write(created, "new\n")
+
+        const vcs = yield* init()
+        const patch = yield* vcs.diffRaw()
+        yield* write(unrelated, "keep me\n")
+
+        expect(yield* vcs.discard({ patch })).toEqual({ applied: true })
+        expect(yield* Effect.promise(() => fs.readFile(tracked, "utf8"))).toBe("original\n")
+        expect(yield* Effect.promise(() => fs.readFile(unrelated, "utf8"))).toBe("keep me\n")
+        expect(yield* Effect.promise(() => fs.stat(created).then(() => true, () => false))).toBe(false)
+      }),
+    { git: true },
+  )
+
+  it.instance(
+    "discard() converges when the changes were already discarded",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* TestInstance
+        const file = path.join(test.directory, "file.txt")
+        yield* write(file, "original\n")
+        yield* git(test.directory, ["add", "."])
+        yield* git(test.directory, ["commit", "--no-gpg-sign", "-m", "add file"])
+        yield* write(file, "changed\n")
+
+        const vcs = yield* init()
+        const patch = yield* vcs.diffRaw()
+        yield* git(test.directory, ["checkout", "--", "."])
+
+        expect(yield* vcs.discard({ patch })).toEqual({ applied: true })
+        expect(yield* Effect.promise(() => fs.readFile(file, "utf8"))).toBe("original\n")
+      }),
+    { git: true },
+  )
+
+  it.instance(
+    "discard() fails when transferred changes were edited afterwards",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* TestInstance
+        const file = path.join(test.directory, "file.txt")
+        yield* write(file, "original\n")
+        yield* git(test.directory, ["add", "."])
+        yield* git(test.directory, ["commit", "--no-gpg-sign", "-m", "add file"])
+        yield* write(file, "changed\n")
+
+        const vcs = yield* init()
+        const patch = yield* vcs.diffRaw()
+        yield* write(file, "changed\nedited\n")
+
+        const exit = yield* Effect.exit(vcs.discard({ patch }))
+        expect(exit._tag).toBe("Failure")
+        expect(String(exit)).toContain("Source changes changed")
+        expect(yield* Effect.promise(() => fs.readFile(file, "utf8"))).toBe("changed\nedited\n")
+      }),
+    { git: true },
+  )
+
+  it.instance(
     "diff('branch') returns changes against default branch",
     () =>
       Effect.gen(function* () {

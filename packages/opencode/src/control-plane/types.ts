@@ -10,7 +10,7 @@ export const WorkspaceInfo = Schema.Struct({
   name: Schema.String,
   branch: Schema.optional(Schema.NullOr(Schema.String)),
   directory: Schema.optional(Schema.NullOr(Schema.String)),
-  extra: Schema.optional(Schema.NullOr(Schema.Unknown)),
+  extra: Schema.optional(Schema.NullOr(Schema.MutableJson)),
   projectID: ProjectV2.ID,
 }).annotate({ identifier: "Workspace" })
 export type WorkspaceInfo = DeepMutable<Schema.Schema.Type<typeof WorkspaceInfo>>
@@ -24,6 +24,7 @@ export const WorkspaceAdapterEntry = Schema.Struct({
   type: Schema.String,
   name: Schema.String,
   description: Schema.String,
+  kind: Schema.optional(Schema.Literals(["local", "remote"])),
 })
 export type WorkspaceAdapterEntry = Schema.Schema.Type<typeof WorkspaceAdapterEntry>
 
@@ -44,6 +45,7 @@ export type WorkspaceAdapterContext = {
 }
 
 export type WorkspaceAdapter = {
+  kind?: "local" | "remote"
   name: string
   description: string
   configure(info: WorkspaceInfo, context?: WorkspaceAdapterContext): WorkspaceInfo | Promise<WorkspaceInfo>
@@ -52,8 +54,19 @@ export type WorkspaceAdapter = {
     env: Record<string, string | undefined>,
     from?: WorkspaceInfo,
     context?: WorkspaceAdapterContext,
-  ): Promise<void>
+  ): Promise<WorkspaceInfo | void>
   list?(context?: WorkspaceAdapterContext): WorkspaceListedInfo[] | Promise<WorkspaceListedInfo[]>
   remove(info: WorkspaceInfo, context?: WorkspaceAdapterContext): Promise<void>
+  ensureReady?(info: WorkspaceInfo, context?: WorkspaceAdapterContext): Promise<void>
+  status?(
+    info: WorkspaceInfo,
+    context?: WorkspaceAdapterContext,
+  ):
+    | "connected"
+    | "connecting"
+    | "paused"
+    | "disconnected"
+    | "error"
+    | Promise<"connected" | "connecting" | "paused" | "disconnected" | "error">
   target(info: WorkspaceInfo, context?: WorkspaceAdapterContext): Target | Promise<Target>
 }

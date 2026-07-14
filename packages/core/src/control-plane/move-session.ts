@@ -8,6 +8,7 @@ import { Location } from "../location"
 import { ProjectV2 } from "../project"
 import { SessionV2 } from "../session"
 import { SessionEvent } from "../session/event"
+import { SessionMessage } from "../session/message"
 import { SessionSchema } from "../session/schema"
 import { SessionStore } from "../session/store"
 import { Database } from "../database/database"
@@ -27,6 +28,7 @@ export const Input = Schema.Struct({
   sessionID: SessionSchema.ID,
   destination: Destination,
   moveChanges: Schema.optional(Schema.Boolean),
+  transferHash: Schema.optional(Schema.String),
 }).annotate({ identifier: "MoveSession.Input" })
 export type Input = typeof Input.Type
 
@@ -35,6 +37,14 @@ export class DestinationProjectMismatchError extends Schema.TaggedErrorClass<Des
   {
     expected: ProjectV2.ID,
     actual: ProjectV2.ID,
+  },
+) {}
+
+export class DestinationDirectoryMismatchError extends Schema.TaggedErrorClass<DestinationDirectoryMismatchError>()(
+  "MoveSession.DestinationDirectoryMismatchError",
+  {
+    expected: AbsolutePath,
+    actual: AbsolutePath,
   },
 ) {}
 
@@ -76,6 +86,7 @@ export class WorkspaceChangeTransferUnsupportedError extends Schema.TaggedErrorC
 export type Error =
   | SessionV2.NotFoundError
   | DestinationProjectMismatchError
+  | DestinationDirectoryMismatchError
   | CaptureChangesError
   | ApplyChangesError
   | ResetSourceChangesError
@@ -84,6 +95,7 @@ export type Error =
 
 export interface Interface {
   readonly moveSession: (input: Input) => Effect.Effect<void, Error>
+  readonly atDestination: (input: Input) => Effect.Effect<boolean>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/ControlPlaneMoveSession") {}
@@ -101,23 +113,40 @@ const layer = Layer.effect(
       const current = yield* sessions.get(input.sessionID)
       if (!current) return yield* new SessionV2.NotFoundError({ sessionID: input.sessionID })
       const directory = AbsolutePath.make(input.destination.directory)
-      if (current.location.directory === directory && current.location.workspaceID === input.destination.workspaceID) return
+      if (current.location.directory === directory && current.location.workspaceID === input.destination.workspaceID)
+        return
 
       const destination = input.destination.workspaceID
         ? yield* db
-            .select({ id: WorkspaceTable.id, projectID: WorkspaceTable.project_id, directory: WorkspaceTable.directory })
+            .select({
+              id: WorkspaceTable.id,
+              projectID: WorkspaceTable.project_id,
+              directory: WorkspaceTable.directory,
+            })
             .from(WorkspaceTable)
             .where(eq(WorkspaceTable.id, input.destination.workspaceID))
             .get()
             .pipe(Effect.orDie)
-        : yield* project.resolve(directory).pipe(
-            Effect.map((resolved) => ({ id: undefined, projectID: resolved.id, directory: resolved.directory })),
-          )
+        : yield* project
+            .resolve(directory)
+            .pipe(Effect.map((resolved) => ({ id: undefined, projectID: resolved.id, directory: resolved.directory })))
       if (!destination && input.destination.workspaceID)
         return yield* new DestinationWorkspaceNotFoundError({ workspaceID: input.destination.workspaceID })
       if (!destination) return yield* new ApplyChangesError({ message: "Destination workspace not found" })
       if (current.projectID !== destination.projectID)
-        return yield* new DestinationProjectMismatchError({ expected: current.projectID, actual: destination.projectID })
+        return yield* new DestinationProjectMismatchError({
+          expected: current.projectID,
+          actual: destination.projectID,
+        })
+      if (
+        input.destination.workspaceID &&
+        destination.directory &&
+        directory !== AbsolutePath.make(destination.directory)
+      )
+        return yield* new DestinationDirectoryMismatchError({
+          expected: AbsolutePath.make(destination.directory),
+          actual: directory,
+        })
 
       const sourceWorkspaceID = current.location.workspaceID
       const destinationWorkspaceID = input.destination.workspaceID
@@ -145,12 +174,42 @@ const layer = Layer.effect(
           .pipe(Effect.mapError((error) => new ApplyChangesError({ message: error.message })))
       }
 
-      yield* events.publish(SessionEvent.Moved, {
-        sessionID: input.sessionID,
-        location: Location.Ref.make({ directory, workspaceID: input.destination.workspaceID }),
-        subdirectory: RelativePath.make(path.relative(destination.directory ?? directory, directory).replaceAll("\\", "/")),
-        timestamp: yield* DateTime.now,
-      })
+      const destinationLocation = Location.Ref.make({ directory, workspaceID: input.destination.workspaceID })
+      yield* events.publish(
+        SessionEvent.Moved,
+        {
+          sessionID: input.sessionID,
+          source: current.location,
+          location: destinationLocation,
+          subdirectory: RelativePath.make(
+            path.relative(destination.directory ?? directory, directory).replaceAll("\\", "/"),
+          ),
+          transferHash: input.transferHash,
+          timestamp: yield* DateTime.now,
+        },
+        // Route the event to the destination instance so directory-scoped
+        // consumers (e.g. workspace plugins reacting to a session leaving)
+        // receive it; core publishes with no ambient Location.Service.
+        { location: destinationLocation },
+      )
+
+      // Earlier turns reference absolute paths under the old directory, and
+      // models keep reusing them long after the working directory changed —
+      // on a remote destination those paths don't even exist. A synthetic
+      // message travels with the session's events, so every server that
+      // replays the move surfaces the same notice to the model.
+      if (current.location.directory !== directory) {
+        yield* events.publish(SessionEvent.Synthetic, {
+          sessionID: input.sessionID,
+          messageID: SessionMessage.ID.create(),
+          text: [
+            `This session moved to a different workspace. Its working directory changed from ${current.location.directory} to ${directory}.`,
+            `Files referenced earlier under ${current.location.directory} now live under ${directory}; the old paths no longer exist here.`,
+            `Use only paths under ${directory} from now on.`,
+          ].join(" "),
+          timestamp: yield* DateTime.now,
+        })
+      }
 
       if (patch) {
         const repository = yield* git.repo.discover(current.location.directory)
@@ -179,7 +238,15 @@ const layer = Layer.effect(
       }
     })
 
-    return Service.of({ moveSession })
+    const atDestination = Effect.fn("MoveSession.atDestination")(function* (input: Input) {
+      const current = yield* sessions.get(input.sessionID)
+      return (
+        current?.location.directory === input.destination.directory &&
+        current.location.workspaceID === input.destination.workspaceID
+      )
+    })
+
+    return Service.of({ moveSession, atDestination })
   }),
 )
 

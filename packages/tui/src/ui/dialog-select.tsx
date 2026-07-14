@@ -58,6 +58,7 @@ export interface DialogSelectOption<T = any> {
   titleView?: JSX.Element
   value: T
   description?: string
+  detail?: string
   details?: string[]
   footer?: JSX.Element | string
   titleWidth?: number
@@ -688,6 +689,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
                               titleWidth={option.titleWidth}
                               truncateTitle={option.truncateTitle}
                               description={option.description !== category ? option.description : undefined}
+                              detail={option.detail}
                               active={active()}
                               current={current()}
                               muted={actionFocused()}
@@ -732,6 +734,7 @@ function Option(props: {
   title: string
   titleView?: JSX.Element
   description?: string
+  detail?: string
   active?: boolean
   current?: boolean
   muted?: boolean
@@ -771,11 +774,28 @@ function Option(props: {
         paddingLeft={3}
       >
         {props.titleView ??
-          (props.truncateTitle === false
-            ? props.title
-            : props.truncateTitle === "left"
-              ? Locale.truncateLeft(props.title, props.titleWidth ?? 61)
-              : Locale.truncate(props.title, props.titleWidth ?? 61))}
+          (() => {
+            const width = props.titleWidth ?? 61
+            const detail = props.detail
+              ? Locale.truncateLeft(props.detail, Math.max(1, width - Math.min(props.title.length, 24) - 2))
+              : ""
+            const available = Math.max(1, width - detail.length - (detail ? 2 : 0))
+            const title =
+              props.truncateTitle === false
+                ? props.title
+                : props.truncateTitle === "left"
+                  ? Locale.truncateLeft(props.title, available)
+                  : Locale.truncate(props.title, available)
+            return (
+              <>
+                {title}
+                <Show when={detail}>
+                  {" ".repeat(Math.max(1, width - title.length - detail.length))}
+                  <span style={{ fg: props.active && !props.muted ? fg : theme.textMuted }}>{detail}</span>
+                </Show>
+              </>
+            )
+          })()}
         <Show when={props.description}>
           <span style={{ fg: props.active && !props.muted ? fg : theme.textMuted }}> {props.description}</span>
         </Show>

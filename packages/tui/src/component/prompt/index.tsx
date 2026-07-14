@@ -530,17 +530,6 @@ export function Prompt(props: PromptProps) {
         },
       },
       {
-        title: "Warp",
-        desc: "Change the workspace for the session",
-        name: "workspace.set",
-        category: "Session",
-        enabled: Flag.OPENCODE_EXPERIMENTAL_WORKSPACES,
-        slashName: "warp",
-        run: () => {
-          workspace.open()
-        },
-      },
-      {
         title: "Move session",
         desc: "Move to another project dir",
         name: "session.move",

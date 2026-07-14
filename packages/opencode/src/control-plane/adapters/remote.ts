@@ -17,6 +17,7 @@ const RemoteConfig = Schema.Struct({
 const decodeRemoteConfig = Schema.decodeUnknownSync(RemoteConfig)
 
 export const RemoteAdapter: WorkspaceAdapter = {
+  kind: "remote",
   name: "Remote",
   description: "Connect to an existing remote opencode server",
   configure(info) {
@@ -31,10 +32,14 @@ export const RemoteAdapter: WorkspaceAdapter = {
   async remove() {},
   target(info) {
     const config = decodeRemoteConfig(info)
+    // Instance-scoped requests (e.g. /vcs/apply) carry no directory, so the
+    // remote server would fall back to its own cwd. Pin the configured
+    // directory so transfers land in the right checkout.
+    const directory = config.directory ?? config.extra.directory
     return {
       type: "remote",
       url: config.extra.url,
-      headers: config.extra.headers,
+      headers: directory ? { ...config.extra.headers, "x-opencode-directory": directory } : config.extra.headers,
     }
   },
 }

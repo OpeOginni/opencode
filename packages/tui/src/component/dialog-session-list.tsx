@@ -12,7 +12,7 @@ import { useLocal } from "../context/local"
 import { DialogSessionRename } from "./dialog-session-rename"
 import { createDebouncedSignal } from "../util/signal"
 import { useToast } from "../ui/toast"
-import { openWorkspaceSelect, type WorkspaceSelection, warpWorkspaceSession } from "./dialog-workspace-create"
+import { moveWorkspaceSession, openWorkspaceSelect, type WorkspaceSelection } from "./dialog-workspace-create"
 import { Spinner } from "./spinner"
 import { errorMessage } from "../util/error"
 import { DialogSessionDeleteFailed } from "./dialog-session-delete-failed"
@@ -101,7 +101,7 @@ export function DialogSessionList() {
   function recover(session: NonNullable<ReturnType<typeof sessions>[number]>) {
     const workspace = project.workspace.get(session.workspaceID!)
     const list = () => dialog.replace(() => <DialogSessionList />)
-    const warp = async (selection: WorkspaceSelection) => {
+    const move = async (selection: WorkspaceSelection) => {
       const workspaceID = await (async () => {
         if (selection.type === "none") return null
         if (selection.type === "existing") return selection.workspaceID
@@ -129,7 +129,7 @@ export function DialogSessionList() {
         return workspace.id
       })()
       if (workspaceID === undefined) return
-      await warpWorkspaceSession({
+      await moveWorkspaceSession({
         dialog,
         sdk,
         sync,
@@ -176,7 +176,7 @@ export function DialogSessionList() {
             project,
             toast,
             onSelect: (selection) => {
-              void warp(selection)
+              void move(selection)
             },
           })
           return false

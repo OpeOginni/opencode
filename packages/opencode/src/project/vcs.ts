@@ -273,9 +273,19 @@ export const ApplyResult = Schema.Struct({
 })
 export type ApplyResult = Schema.Schema.Type<typeof ApplyResult>
 
+export const DiscardInput = Schema.Struct({
+  patch: Schema.String,
+})
+export type DiscardInput = Schema.Schema.Type<typeof DiscardInput>
+
 export class PatchApplyError extends Schema.TaggedErrorClass<PatchApplyError>()("VcsPatchApplyError", {
   message: Schema.String,
   reason: Schema.Literals(["non-git", "not-clean"]),
+}) {}
+
+export class DiscardError extends Schema.TaggedErrorClass<DiscardError>()("VcsDiscardError", {
+  message: Schema.String,
+  reason: Schema.Literals(["changed", "failed"]),
 }) {}
 
 export interface Interface {
@@ -285,7 +295,9 @@ export interface Interface {
   readonly status: () => Effect.Effect<FileStatus[]>
   readonly diff: (mode: Mode, options?: DiffOptions) => Effect.Effect<FileDiff[]>
   readonly diffRaw: () => Effect.Effect<string>
+  readonly applied: (input: ApplyInput) => Effect.Effect<boolean>
   readonly apply: (input: ApplyInput) => Effect.Effect<ApplyResult, PatchApplyError>
+  readonly discard: (input: DiscardInput) => Effect.Effect<ApplyResult, DiscardError>
 }
 
 interface State {
@@ -334,6 +346,34 @@ const layer: Layer.Layer<Service, never, Git.Service | EventV2Bridge.Service> = 
         return value
       }),
     )
+
+    const diffRaw = Effect.fn("Vcs.diffRaw")(function* () {
+      const ctx = yield* InstanceState.context
+      if (ctx.project.vcs !== "git") return ""
+      const [hasHead, status] = yield* Effect.all([git.hasHead(ctx.directory), git.status(ctx.directory)], {
+        concurrency: 2,
+      })
+      // Binary hunks keep the patch applyable when transferring changes
+      // between workspaces; without them git emits an inert "Binary files
+      // differ" placeholder that git-apply rejects.
+      const tracked = hasHead ? (yield* git.patchAll(ctx.directory, "HEAD", { binary: true })).text : ""
+      const untracked = yield* Effect.forEach(
+        status.filter((item) => item.code === "??"),
+        (item) => git.patchUntracked(ctx.directory, item.file, { binary: true }).pipe(Effect.map((patch) => patch.text)),
+      )
+      return [tracked, ...untracked].filter(Boolean).join("\n")
+    })
+
+    // A patch that reverses cleanly is already present in the working tree.
+    // Both apply and discard lean on this so a retried transfer converges
+    // instead of failing on exact-string comparisons.
+    const applied = Effect.fn("Vcs.applied")(function* (input: ApplyInput) {
+      const ctx = yield* InstanceState.context
+      if (ctx.project.vcs !== "git") return false
+      if (!input.patch.trim()) return true
+      const check = yield* git.applyPatch(ctx.directory, input.patch, { reverse: true, check: true })
+      return check.exitCode === 0
+    })
 
     return Service.of({
       init: Effect.fn("Vcs.init")(function* () {
@@ -384,19 +424,8 @@ const layer: Layer.Layer<Service, never, Git.Service | EventV2Bridge.Service> = 
         if (!ref) return []
         return yield* diffAgainstRef(git, ctx.directory, ref, options)
       }),
-      diffRaw: Effect.fn("Vcs.diffRaw")(function* () {
-        const ctx = yield* InstanceState.context
-        if (ctx.project.vcs !== "git") return ""
-        const [hasHead, status] = yield* Effect.all([git.hasHead(ctx.directory), git.status(ctx.directory)], {
-          concurrency: 2,
-        })
-        const tracked = hasHead ? (yield* git.patchAll(ctx.directory, "HEAD")).text : ""
-        const untracked = yield* Effect.forEach(
-          status.filter((item) => item.code === "??"),
-          (item) => git.patchUntracked(ctx.directory, item.file).pipe(Effect.map((patch) => patch.text)),
-        )
-        return [tracked, ...untracked].filter(Boolean).join("\n")
-      }),
+      diffRaw,
+      applied,
       apply: Effect.fn("Vcs.apply")(function* (input: ApplyInput) {
         const ctx = yield* InstanceState.context
         if (ctx.project.vcs !== "git") {
@@ -405,14 +434,38 @@ const layer: Layer.Layer<Service, never, Git.Service | EventV2Bridge.Service> = 
             reason: "non-git",
           })
         }
-        const applied = yield* git.applyPatch(ctx.directory, input.patch)
-        if (applied.exitCode !== 0) {
-          return yield* new PatchApplyError({
-            message: "Patch can't be applied",
-            reason: "not-clean",
+        if (!input.patch.trim()) return { applied: true }
+        const result = yield* git.applyPatch(ctx.directory, input.patch)
+        if (result.exitCode === 0) return { applied: true }
+        // A retried transfer may have applied this patch before failing on a
+        // later step; converging here keeps the whole move retry-safe.
+        if (yield* applied(input)) return { applied: true }
+        return yield* new PatchApplyError({
+          message: result.stderr.toString("utf8").trim() || "Patch can't be applied",
+          reason: "not-clean",
+        })
+      }),
+      discard: Effect.fn("Vcs.discard")(function* (input: DiscardInput) {
+        const ctx = yield* InstanceState.context
+        if (ctx.project.vcs !== "git") {
+          return yield* new DiscardError({
+            message: "Changes can't be discarded because the project is not git-based",
+            reason: "failed",
           })
         }
-        return { applied: true }
+        if (!input.patch.trim()) return { applied: true }
+        // Reverse-apply removes exactly the transferred changes (including
+        // files the patch created) and leaves unrelated work untouched.
+        const reversed = yield* git.applyPatch(ctx.directory, input.patch, { reverse: true })
+        if (reversed.exitCode === 0) return { applied: true }
+        // Forward-applying cleanly means the changes are no longer present —
+        // a previous discard already cleared them.
+        const forward = yield* git.applyPatch(ctx.directory, input.patch, { check: true })
+        if (forward.exitCode === 0) return { applied: true }
+        return yield* new DiscardError({
+          message: "Source changes changed after they were transferred",
+          reason: "changed",
+        })
       }),
     })
   }),

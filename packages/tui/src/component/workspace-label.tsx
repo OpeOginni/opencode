@@ -1,11 +1,12 @@
 import { useTheme } from "../context/theme"
 
-export type WorkspaceStatus = "connected" | "connecting" | "disconnected" | "error"
+export type WorkspaceStatus = "connected" | "connecting" | "paused" | "disconnected" | "error"
 
 export function WorkspaceLabel(props: { type: string; name: string; status?: WorkspaceStatus; icon?: boolean }) {
   const { theme } = useTheme()
   const color = () => {
     if (props.status === "connected") return theme.success
+    if (props.status === "paused" || props.status === "connecting") return theme.warning
     if (props.status === "error") return theme.error
     return theme.textMuted
   }

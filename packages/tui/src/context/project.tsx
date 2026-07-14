@@ -4,7 +4,7 @@ import { createStore, reconcile } from "solid-js/store"
 import { createSimpleContext } from "./helper"
 import { useSDK } from "./sdk"
 
-type WorkspaceStatus = "connected" | "connecting" | "disconnected" | "error"
+type WorkspaceStatus = "connected" | "connecting" | "paused" | "disconnected" | "error"
 
 export const { use: useProject, provider: ProjectProvider } = createSimpleContext({
   name: "Project",

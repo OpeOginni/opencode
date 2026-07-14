@@ -55,6 +55,12 @@ export type Patch = {
 export interface PatchOptions {
   readonly context?: number
   readonly maxOutputBytes?: number
+  readonly binary?: boolean
+}
+
+export interface ApplyPatchOptions {
+  readonly reverse?: boolean
+  readonly check?: boolean
 }
 
 export interface Result {
@@ -87,7 +93,7 @@ export interface Interface {
   readonly patchAll: (cwd: string, ref: string, options?: PatchOptions) => Effect.Effect<Patch>
   readonly patchUntracked: (cwd: string, file: string, options?: PatchOptions) => Effect.Effect<Patch>
   readonly statUntracked: (cwd: string, file: string) => Effect.Effect<Stat | undefined>
-  readonly applyPatch: (cwd: string, patch: string) => Effect.Effect<Result>
+  readonly applyPatch: (cwd: string, patch: string, options?: ApplyPatchOptions) => Effect.Effect<Result>
 }
 
 const kind = (code: string): Kind => {
@@ -270,7 +276,17 @@ const layer = Layer.effect(
 
     const patchAll = Effect.fn("Git.patchAll")(function* (cwd: string, ref: string, options?: PatchOptions) {
       const result = yield* run(
-        ["diff", "--patch", "--no-ext-diff", "--no-renames", `--unified=${options?.context ?? 3}`, ref, "--", "."],
+        [
+          "diff",
+          "--patch",
+          "--no-ext-diff",
+          "--no-renames",
+          ...(options?.binary ? ["--binary"] : []),
+          `--unified=${options?.context ?? 3}`,
+          ref,
+          "--",
+          ".",
+        ],
         { cwd, maxOutputBytes: options?.maxOutputBytes },
       )
       return { text: result.text(), truncated: result.truncated } satisfies Patch
@@ -288,6 +304,7 @@ const layer = Layer.effect(
           "--patch",
           "--no-ext-diff",
           "--no-renames",
+          ...(options?.binary ? ["--binary"] : []),
           `--unified=${options?.context ?? 3}`,
           "--",
           "/dev/null",
@@ -319,8 +336,15 @@ const layer = Layer.effect(
       } satisfies Stat
     })
 
-    const applyPatch = Effect.fn("Git.applyPatch")(function* (cwd: string, patch: string) {
-      return yield* run(["apply", "-"], { cwd, stdin: stdin(patch) })
+    const applyPatch = Effect.fn("Git.applyPatch")(function* (
+      cwd: string,
+      patch: string,
+      options?: ApplyPatchOptions,
+    ) {
+      return yield* run(
+        ["apply", ...(options?.reverse ? ["--reverse"] : []), ...(options?.check ? ["--check"] : []), "-"],
+        { cwd, stdin: stdin(patch) },
+      )
     })
 
     return Service.of({

@@ -87,18 +87,74 @@ export function usePromptMove(input: { projectID: () => string | undefined; sess
                 subdirectory: project.instance.directory() !== project.instance.path().worktree,
               })
         }
-        onCurrentChange={(selection) => homeDestination?.setDestination(selection)}
+        onCurrentChange={(selection) => {
+          if (selection.type === "directory" || selection.type === "new") homeDestination?.setDestination(selection)
+        }}
+        workspaceEnabled={Boolean(sessionID)}
+        currentWorkspaceID={session?.workspaceID}
         onSelect={(selection) => {
           const sessionID = input.sessionID()
           if (!sessionID) {
-            homeDestination?.setDestination(selection)
+            if (selection.type === "directory" || selection.type === "new") homeDestination?.setDestination(selection)
             dialog.clear()
+            return
+          }
+          if (selection.type === "remote-list") return
+          if (selection.type === "workspace" || selection.type === "workspace-new") {
+            void moveExistingSessionToWorkspace(sessionID, selection)
             return
           }
           void moveExistingSession(sessionID, selection)
         }}
       />
     ))
+  }
+
+  async function moveExistingSessionToWorkspace(
+    sessionID: string,
+    selection: Extract<MoveSessionSelection, { type: "workspace" | "workspace-new" }>,
+  ) {
+    const session = sync.session.get(sessionID)
+    const status = await sdk.client.vcs
+      .status({ directory: session?.directory, workspace: session?.workspaceID })
+      .catch(() => undefined)
+    const choice = status?.data?.length ? await DialogWorkspaceFileChanges.show(dialog, status.data) : "no"
+    if (!choice) return
+
+    setCreating(true)
+    setProgress(selection.type === "workspace-new" ? `Creating ${selection.workspaceName}` : "Moving session")
+    try {
+      const workspace =
+        selection.type === "workspace-new"
+          ? (
+              await sdk.client.experimental.workspace.create(
+                { type: selection.workspaceType, branch: null },
+                { throwOnError: true },
+              )
+            ).data
+          : project.workspace.get(selection.workspaceID)
+      if (!workspace) throw new Error("Workspace not found")
+      if (!workspace.directory) throw new Error("Workspace did not return a project directory")
+
+      setProgress("Moving session")
+      await sdk.client.experimental.controlPlane.moveSession(
+        {
+          sessionID,
+          destination: { directory: workspace.directory, workspaceID: workspace.id },
+          moveChanges: choice === "yes",
+        },
+        { throwOnError: true },
+      )
+      project.workspace.set(workspace.id)
+      await Promise.all([project.workspace.sync(), sync.session.refresh()])
+      dialog.clear()
+    } catch (error) {
+      toast.error(error)
+      dialog.clear()
+    } finally {
+      setProgress(undefined)
+      setCreating(false)
+    }
   }
 
   function sessionContext(sessionID: string) {
@@ -114,9 +170,16 @@ export function usePromptMove(input: { projectID: () => string | undefined; sess
     return [session?.title, ...messages].filter(Boolean).join("\n") || undefined
   }
 
-  async function moveExistingSession(sessionID: string, selection: MoveSessionSelection) {
+  async function moveExistingSession(
+    sessionID: string,
+    selection: Extract<MoveSessionSelection, { type: "directory" | "new" }>,
+  ) {
     const session = sync.session.get(sessionID)
-    const status = await sdk.client.vcs.status({ directory: session?.directory }).catch(() => undefined)
+    // When the session currently lives on a remote workspace, status must be
+    // queried with that workspace so we can offer to transfer remote dirty files.
+    const status = await sdk.client.vcs
+      .status({ directory: session?.directory, workspace: session?.workspaceID })
+      .catch(() => undefined)
     const choice = status?.data?.length ? await DialogWorkspaceFileChanges.show(dialog, status.data) : "no"
     if (!choice) return
     dialog.clear()

@@ -509,14 +509,6 @@ const scenarios: Scenario[] = [
     }))
     .status(200),
   http.protected
-    .post("/experimental/workspace/warp", "experimental.workspace.warp")
-    .at((ctx) => ({
-      path: "/experimental/workspace/warp",
-      headers: ctx.headers(),
-      body: {},
-    }))
-    .status(400),
-  http.protected
     .post("/experimental/control-plane/move-session", "experimental.controlPlane.moveSession")
     .global()
     .at(() => ({
@@ -602,10 +594,6 @@ const scenarios: Scenario[] = [
     .post("/sync/replay", "sync.replay")
     .at((ctx) => ({ path: "/sync/replay", headers: ctx.headers(), body: { directory: ctx.directory, events: [] } }))
     .status(400),
-  http.protected
-    .post("/sync/steal", "sync.steal.invalid")
-    .at((ctx) => ({ path: "/sync/steal", headers: ctx.headers(), body: {} }))
-    .status(400, undefined, "status"),
   http.protected
     .post("/sync/start", "sync.start")
     .mutating()

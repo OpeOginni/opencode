@@ -149,6 +149,13 @@ export type MoveSessionError = {
   }
 }
 
+export type NotFoundError = {
+  name: "NotFoundError"
+  data: {
+    message: string
+  }
+}
+
 export type SnapshotFileDiff = {
   file?: string
   patch?: string
@@ -845,7 +852,9 @@ export type GlobalEvent = {
           timestamp: number
           sessionID: string
           location: LocationRef
+          source?: LocationRef
           subdirectory?: string
+          transferHash?: string
         }
       }
     | {
@@ -1568,7 +1577,7 @@ export type GlobalEvent = {
         type: "workspace.status"
         properties: {
           workspaceID: string
-          status: "connected" | "connecting" | "disconnected" | "error"
+          status: "connected" | "connecting" | "paused" | "disconnected" | "error"
         }
       }
     | {
@@ -2331,6 +2340,14 @@ export type VcsApplyError = {
   }
 }
 
+export type VcsDiscardError = {
+  name: "VcsDiscardError"
+  data: {
+    message: string
+    reason: "changed" | "failed"
+  }
+}
+
 export type Command = {
   name: string
   description?: string
@@ -2535,13 +2552,6 @@ export type ProviderAuthError1 = {
   }
 }
 
-export type NotFoundError = {
-  name: "NotFoundError"
-  data: {
-    message: string
-  }
-}
-
 export type TextPartInput = {
   id?: string
   type: "text"
@@ -2660,13 +2670,6 @@ export type Workspace = {
 
 export type WorkspaceCreateError = {
   name: "WorkspaceCreateError"
-  data: {
-    message: string
-  }
-}
-
-export type WorkspaceWarpError = {
-  name: "WorkspaceWarpError"
   data: {
     message: string
   }
@@ -3028,6 +3031,7 @@ export type SkillV2Source = SkillV2DirectorySource | SkillV2UrlSource | SkillV2E
 
 export type MoveSessionDestination = {
   directory: string
+  workspaceID?: string
 }
 
 export type ModelRef = {
@@ -3339,7 +3343,9 @@ export type SyncEventSessionNextMoved = {
       timestamp: number
       sessionID: string
       location: LocationRef
+      source?: LocationRef
       subdirectory?: string
+      transferHash?: string
     }
   }
 }
@@ -3851,7 +3857,7 @@ export type PtyTicketConnectToken = {
 
 export type WorkspaceEventConnectionStatus = {
   workspaceID: string
-  status: "connected" | "connecting" | "disconnected" | "error"
+  status: "connected" | "connecting" | "paused" | "disconnected" | "error"
 }
 
 export type LocationInfo = {
@@ -4213,7 +4219,9 @@ export type SessionNextMoved = {
     timestamp: number
     sessionID: string
     location: LocationRef
+    source?: LocationRef
     subdirectory?: string
+    transferHash?: string
   }
 }
 
@@ -6027,7 +6035,7 @@ export type WorkspaceStatus = {
   location?: LocationRef
   data: {
     workspaceID: string
-    status: "connected" | "connecting" | "disconnected" | "error"
+    status: "connected" | "connecting" | "paused" | "disconnected" | "error"
   }
 }
 
@@ -6272,7 +6280,9 @@ export type EventSessionNextMoved = {
     timestamp: number
     sessionID: string
     location: LocationRef
+    source?: LocationRef
     subdirectory?: string
+    transferHash?: string
   }
 }
 
@@ -7010,7 +7020,7 @@ export type EventWorkspaceStatus = {
   type: "workspace.status"
   properties: {
     workspaceID: string
-    status: "connected" | "connecting" | "disconnected" | "error"
+    status: "connected" | "connecting" | "paused" | "disconnected" | "error"
   }
 }
 
@@ -7203,6 +7213,10 @@ export type ExperimentalControlPlaneMoveSessionErrors = {
    * MoveSessionError | InvalidRequestError
    */
   400: MoveSessionError | InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
 }
 
 export type ExperimentalControlPlaneMoveSessionError =
@@ -8277,6 +8291,42 @@ export type VcsApplyResponses = {
 }
 
 export type VcsApplyResponse = VcsApplyResponses[keyof VcsApplyResponses]
+
+export type VcsDiscardData = {
+  body?: {
+    patch: string
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/vcs/discard"
+}
+
+export type VcsDiscardErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * VcsDiscardError
+   */
+  409: VcsDiscardError
+}
+
+export type VcsDiscardError2 = VcsDiscardErrors[keyof VcsDiscardErrors]
+
+export type VcsDiscardResponses = {
+  /**
+   * VCS changes discarded
+   */
+  200: {
+    applied: boolean
+  }
+}
+
+export type VcsDiscardResponse = VcsDiscardResponses[keyof VcsDiscardResponses]
 
 export type CommandListData = {
   body?: never
@@ -10540,38 +10590,6 @@ export type SyncReplayResponses = {
 
 export type SyncReplayResponse = SyncReplayResponses[keyof SyncReplayResponses]
 
-export type SyncStealData = {
-  body?: {
-    sessionID: string
-  }
-  path?: never
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/sync/steal"
-}
-
-export type SyncStealErrors = {
-  /**
-   * BadRequest | InvalidRequestError
-   */
-  400: EffectHttpApiErrorBadRequest | InvalidRequestError
-}
-
-export type SyncStealError = SyncStealErrors[keyof SyncStealErrors]
-
-export type SyncStealResponses = {
-  /**
-   * Session stolen into workspace
-   */
-  200: {
-    sessionID: string
-  }
-}
-
-export type SyncStealResponse = SyncStealResponses[keyof SyncStealResponses]
-
 export type SyncHistoryListData = {
   body?: {
     [key: string]: number
@@ -11023,6 +11041,7 @@ export type ExperimentalWorkspaceAdapterListResponses = {
     type: string
     name: string
     description: string
+    kind?: "local" | "remote"
   }>
 }
 
@@ -11184,43 +11203,6 @@ export type ExperimentalWorkspaceRemoveResponses = {
 
 export type ExperimentalWorkspaceRemoveResponse =
   ExperimentalWorkspaceRemoveResponses[keyof ExperimentalWorkspaceRemoveResponses]
-
-export type ExperimentalWorkspaceWarpData = {
-  body?: {
-    id: string | null
-    sessionID: string
-    copyChanges?: boolean
-  }
-  path?: never
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/experimental/workspace/warp"
-}
-
-export type ExperimentalWorkspaceWarpErrors = {
-  /**
-   * WorkspaceWarpError | VcsApplyError | InvalidRequestError
-   */
-  400: WorkspaceWarpError | VcsApplyError | InvalidRequestError
-  /**
-   * NotFoundError
-   */
-  404: NotFoundError
-}
-
-export type ExperimentalWorkspaceWarpError = ExperimentalWorkspaceWarpErrors[keyof ExperimentalWorkspaceWarpErrors]
-
-export type ExperimentalWorkspaceWarpResponses = {
-  /**
-   * Session warped
-   */
-  204: void
-}
-
-export type ExperimentalWorkspaceWarpResponse =
-  ExperimentalWorkspaceWarpResponses[keyof ExperimentalWorkspaceWarpResponses]
 
 export type V2HealthGetData = {
   body?: never

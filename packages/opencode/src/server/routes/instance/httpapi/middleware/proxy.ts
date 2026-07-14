@@ -14,13 +14,29 @@ function requestBody(request: HttpServerRequest.HttpServerRequest) {
 export function websocket(
   request: HttpServerRequest.HttpServerRequest,
   target: string | URL,
+  extra?: HeadersInit,
 ): Effect.Effect<HttpServerResponse.HttpServerResponse, never, Socket.WebSocketConstructor> {
   return Effect.scoped(
     Effect.gen(function* () {
       const inbound = yield* Effect.orDie(request.upgrade)
-      const outbound = yield* Socket.makeWebSocket(ProxyUtil.websocketTargetURL(target), {
-        protocols: ProxyUtil.websocketProtocols(request.headers),
-      })
+      const protocols = ProxyUtil.websocketProtocols(request.headers)
+      const outbound = extra
+        ? yield* Socket.fromWebSocket(
+            Effect.acquireRelease(
+              Effect.sync(() => {
+                const WebSocket = globalThis.WebSocket as unknown as new (
+                  url: string,
+                  init: { headers: HeadersInit; protocols?: string[] },
+                ) => globalThis.WebSocket
+                return new WebSocket(ProxyUtil.websocketTargetURL(target), {
+                  headers: ProxyUtil.headers({}, extra),
+                  ...(protocols.length ? { protocols } : {}),
+                })
+              }),
+              (socket) => Effect.sync(() => socket.close(1000)),
+            ),
+          )
+        : yield* Socket.makeWebSocket(ProxyUtil.websocketTargetURL(target), { protocols })
       const writeInbound = yield* inbound.writer
       const writeOutbound = yield* outbound.writer
       const closeSocket = (socket: Socket.Socket, write: (event: Socket.CloseEvent) => Effect.Effect<void, unknown>) =>

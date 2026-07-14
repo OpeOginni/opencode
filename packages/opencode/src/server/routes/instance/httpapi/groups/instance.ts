@@ -40,6 +40,14 @@ export class ApiVcsApplyError extends Schema.ErrorClass<ApiVcsApplyError>("VcsAp
   { httpApiStatus: 400 },
 ) {}
 
+export class ApiVcsDiscardError extends Schema.ErrorClass<ApiVcsDiscardError>("VcsDiscardError")(
+  {
+    name: Schema.Literal("VcsDiscardError"),
+    data: Schema.Struct({ message: Schema.String, reason: Schema.Literals(["changed", "failed"]) }),
+  },
+  { httpApiStatus: 409 },
+) {}
+
 export const InstancePaths = {
   dispose: "/instance/dispose",
   path: "/path",
@@ -48,6 +56,7 @@ export const InstancePaths = {
   vcsDiff: "/vcs/diff",
   vcsDiffRaw: "/vcs/diff/raw",
   vcsApply: "/vcs/apply",
+  vcsDiscard: "/vcs/discard",
   command: "/command",
   agent: "/agent",
   skill: "/skill",
@@ -134,6 +143,18 @@ export const InstanceApi = HttpApi.make("instance")
             identifier: "vcs.apply",
             summary: "Apply VCS patch",
             description: "Apply a raw patch to the current working tree.",
+          }),
+        ),
+        HttpApiEndpoint.post("vcsDiscard", InstancePaths.vcsDiscard, {
+          query: WorkspaceRoutingQuery,
+          payload: Vcs.DiscardInput,
+          success: described(Vcs.ApplyResult, "VCS changes discarded"),
+          error: ApiVcsDiscardError,
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "vcs.discard",
+            summary: "Discard transferred VCS changes",
+            description: "Discard source changes only when they still match a previously transferred patch.",
           }),
         ),
         HttpApiEndpoint.get("command", InstancePaths.command, {

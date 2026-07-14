@@ -16,16 +16,24 @@ import { useCommandShortcut } from "../keymap"
 import { useProject } from "../context/project"
 import { Spinner } from "./spinner"
 import { DialogWorkspaceFileChanges } from "./dialog-workspace-file-changes"
-import type { ProjectDirectories } from "@opencode-ai/sdk/v2"
+import type { ExperimentalWorkspaceAdapterListResponse, ProjectDirectories } from "@opencode-ai/sdk/v2"
 import { useRoute } from "../context/route"
 
-export type MoveSessionSelection = { type: "directory"; directory: string; subdirectory: boolean } | { type: "new" }
+export type MoveSessionSelection =
+  | { type: "directory"; directory: string; subdirectory: boolean }
+  | { type: "new" }
+  | { type: "workspace"; workspaceID: string; directory: string }
+  | { type: "workspace-new"; workspaceType: string; workspaceName: string }
+  | { type: "remote-list" }
 type ProjectDirectory = ProjectDirectories[number]
+type WorkspaceAdapter = ExperimentalWorkspaceAdapterListResponse[number]
 
 type DialogMoveSessionProps = {
   projectID: string
   current?: MoveSessionSelection
   onSelect: (selection: MoveSessionSelection) => void
+  workspaceEnabled?: boolean
+  currentWorkspaceID?: string
   onCurrentChange?: (selection: MoveSessionSelection) => void
   initialDirectories?: ProjectDirectory[]
   initialRemoving?: string
@@ -46,6 +54,7 @@ export function DialogMoveSession(props: DialogMoveSessionProps) {
   const [removing, setRemoving] = createSignal(props.initialRemoving)
   const [replacementCurrent, setReplacementCurrent] = createSignal<string>()
   const [loadError, setLoadError] = createSignal<unknown>()
+  const [createStep, setCreateStep] = createSignal<"root" | "remote">("root")
   const deleteHint = useCommandShortcut("dialog.move_session.delete")
   onMount(() => dialog.setSize("xlarge"))
 
@@ -91,6 +100,18 @@ export function DialogMoveSession(props: DialogMoveSessionProps) {
     },
   )
   const directoryData = createMemo(() => directories() ?? props.initialDirectories)
+  const [adapters] = createResource(
+    () => (props.workspaceEnabled ? props.projectID : undefined),
+    async (): Promise<WorkspaceAdapter[]> => {
+      const response = await sdk.client.experimental.workspace.adapter.list({ directory: sdk.directory })
+      if (response.error) throw response.error
+      return response.data.toSorted((a, b) => {
+        if (a.type === "worktree") return -1
+        if (b.type === "worktree") return 1
+        return a.name.localeCompare(b.name)
+      })
+    },
+  )
   // Show the locked error view only when we have nothing to display. A refresh
   // that fails after the list rendered keeps the list and its actions.
   const showError = createMemo(() => Boolean(loadError()) && !directoryData())
@@ -148,39 +169,107 @@ export function DialogMoveSession(props: DialogMoveSessionProps) {
       if (b.location === b.root.directory) return 1
       return a.location.localeCompare(b.location)
     })
-    const titleWidth = Math.max(1, Math.min(116, dimensions().width - 2) - 12)
+    const titleWidth = Math.max(1, dimensions().width - 14)
 
-    return list.map((item) => {
-      const title = abbreviateHome(item.location, paths.home)
-      const suffix =
-        item.location === item.root.directory ? undefined : path.sep + path.relative(item.root.directory, item.location)
-      const visible = Locale.truncateLeft(title, titleWidth)
-      const split = suffix ? Math.max(0, visible.length - suffix.length) : visible.length
-      const deleting = toDelete() === item.location
-      const isRemoving = removing() === item.location
-      return {
-        title,
-        titleView: isRemoving ? (
-          <span style={{ fg: theme.error }}>Deleting {item.location}</span>
-        ) : deleting ? (
-          <span style={{ fg: theme.text }}>Press {deleteHint()} again to confirm</span>
-        ) : suffix ? (
-          <>
-            {visible.slice(0, split)}
-            <span style={{ fg: theme.textMuted }}>{visible.slice(split)}</span>
-          </>
-        ) : undefined,
-        bg: deleting ? theme.error : undefined,
-        value: {
-          type: "directory",
-          directory: item.location,
-          subdirectory: item.location !== item.root.directory,
-        } as const,
-        category: item.root.directory === current ? "Current" : "Other",
-        titleWidth,
-        truncateTitle: "left" as const,
+    const workspaces = projectContext.workspace
+      .list()
+      .filter((workspace) => workspace.id !== props.currentWorkspaceID)
+      .filter((workspace) => ["connected", "paused"].includes(projectContext.workspace.status(workspace.id) ?? ""))
+      .filter((workspace): workspace is typeof workspace & { directory: string } => Boolean(workspace.directory))
+    const workspaceDirectories = new Set(workspaces.map((workspace) => workspace.directory))
+    const local = list
+      .filter((item) => !workspaceDirectories.has(item.location))
+      .map((item) => {
+        const title = abbreviateHome(item.location, paths.home)
+        const suffix =
+          item.location === item.root.directory
+            ? undefined
+            : path.sep + path.relative(item.root.directory, item.location)
+        const visible = Locale.truncateLeft(title, titleWidth)
+        const split = suffix ? Math.max(0, visible.length - suffix.length) : visible.length
+        const deleting = toDelete() === item.location
+        const isRemoving = removing() === item.location
+        return {
+          title,
+          titleView: isRemoving ? (
+            <span style={{ fg: theme.error }}>Deleting {item.location}</span>
+          ) : deleting ? (
+            <span style={{ fg: theme.text }}>Press {deleteHint()} again to confirm</span>
+          ) : suffix ? (
+            <>
+              {visible.slice(0, split)}
+              <span style={{ fg: theme.textMuted }}>{visible.slice(split)}</span>
+            </>
+          ) : undefined,
+          bg: deleting ? theme.error : undefined,
+          value: {
+            type: "directory",
+            directory: item.location,
+            subdirectory: item.location !== item.root.directory,
+          } as const,
+          category: item.root.directory === current ? "Current" : "Other",
+          titleWidth,
+          truncateTitle: "left" as const,
+        }
+      })
+    if (!props.workspaceEnabled) return local
+
+    const existing = workspaces.map((workspace) => ({
+      title: workspace.name,
+      detail: `${workspace.type === "worktree" ? "local" : workspace.type}  ${workspace.directory}`,
+      titleWidth,
+      category: "Workspaces",
+      value: { type: "workspace", workspaceID: workspace.id, directory: workspace.directory } as const,
+    }))
+    const remoteAdapters = (adapters() ?? []).filter(
+      (adapter) => adapter.kind === "remote" || adapter.type !== "worktree",
+    )
+    if (createStep() === "remote") {
+      if (adapters.loading && !adapters()) return [{ title: "Loading remote adapters...", value: undefined }]
+      if (remoteAdapters.length === 0) {
+        return [{ title: "No remote adapters available", value: undefined }]
       }
-    })
+      return remoteAdapters.map((adapter) => ({
+        title: adapter.name,
+        description: adapter.description,
+        category: "Remote adapters",
+        value: {
+          type: "workspace-new",
+          workspaceType: adapter.type,
+          workspaceName: adapter.name,
+        } as const,
+      }))
+    }
+    const create = [
+      ...(adapters() ?? [])
+        .filter((adapter) => adapter.kind === "local" || adapter.type === "worktree")
+        .map((adapter) => ({
+          title: adapter.name,
+          description: adapter.description,
+          category: "Create workspace",
+          value: {
+            type: "workspace-new",
+            workspaceType: adapter.type,
+            workspaceName: adapter.name,
+          } as const,
+        })),
+      ...(remoteAdapters.length
+        ? [
+            {
+              title: "Remote",
+              description: "Choose a remote workspace adapter",
+              category: "Create workspace",
+              value: { type: "remote-list" } as const,
+            },
+          ]
+        : []),
+    ]
+    return [
+      ...local.filter((item) => item.category === "Current"),
+      ...existing,
+      ...local.filter((item) => item.category === "Other"),
+      ...create,
+    ]
   })
 
   const current = createMemo(() => {
@@ -208,7 +297,35 @@ export function DialogMoveSession(props: DialogMoveSessionProps) {
   }
 
   async function remove(option: DialogSelectOption<MoveSessionSelection | undefined>) {
-    if (!option.value || option.value.type !== "directory" || option.value.subdirectory || removing()) return
+    if (!option.value || removing()) return
+    if (option.value.type === "workspace") {
+      if (toDelete() !== option.value.directory) {
+        setToDelete(option.value.directory)
+        return
+      }
+      setToDelete(undefined)
+      setRemoving(option.value.directory)
+      setWorking(true)
+      const result = await sdk.client.experimental.workspace
+        .remove({ id: option.value.workspaceID })
+        .catch((error) => ({ error }))
+      if (result.error) {
+        setRemoving(undefined)
+        setWorking(false)
+        toast.show({
+          variant: "error",
+          title: "Failed to delete workspace",
+          message: errorMessage(result.error),
+        })
+        return
+      }
+      await Promise.all([projectContext.workspace.sync(), refetch()])
+      setRemoving(undefined)
+      setWorking(false)
+      reopen()
+      return
+    }
+    if (option.value.type !== "directory" || option.value.subdirectory) return
     const data = directoryData()
     const selected = option.value
     const root = data?.find((item) => item.directory === selected.directory)
@@ -286,13 +403,13 @@ export function DialogMoveSession(props: DialogMoveSessionProps) {
   return (
     <box minHeight={showError() ? 5 : fullHeight()}>
       <DialogSelect
-        title="Move session"
+        title={createStep() === "remote" ? "Choose remote adapter" : "Move session"}
         titleView={
           <box flexDirection="row" gap={1}>
             <text fg={theme.text} attributes={TextAttributes.BOLD}>
-              Move session
+              {createStep() === "remote" ? "Choose remote adapter" : "Move session"}
             </text>
-            <Show when={working() || directories.loading || loadedProject.loading}>
+            <Show when={working() || directories.loading || loadedProject.loading || adapters.loading}>
               <Spinner />
             </Show>
           </box>
@@ -312,33 +429,45 @@ export function DialogMoveSession(props: DialogMoveSessionProps) {
         locked={showError() || directories.loading || loadedProject.loading || Boolean(removing())}
         current={current()}
         onSelect={(option) => {
-          if (option.value) props.onSelect(option.value)
+          if (!option.value) return
+          if (option.value.type === "remote-list") {
+            setCreateStep("remote")
+            return
+          }
+          props.onSelect(option.value)
         }}
         onMove={() => setToDelete(undefined)}
         actions={
           showError()
             ? []
             : [
-                {
-                  command: "dialog.move_session.new",
-                  title: "new",
-                  onTrigger: () => props.onSelect({ type: "new" }),
-                },
-                {
-                  command: "dialog.move_session.delete",
-                  title: "delete",
-                  disabled: (option) => {
-                    const value = option?.value
-                    if (!value || value.type !== "directory" || value.subdirectory) return true
-                    return !directoryData()?.find((item) => item.directory === value.directory)?.strategy
-                  },
-                  onTrigger: remove,
-                },
-                {
-                  command: "dialog.move_session.refresh",
-                  title: "refresh",
-                  onTrigger: () => void refetch(),
-                },
+                ...(createStep() === "remote"
+                  ? [
+                      {
+                        command: "dialog.move_session.refresh",
+                        title: "back",
+                        onTrigger: () => setCreateStep("root"),
+                      },
+                    ]
+                  : [
+                      {
+                        command: "dialog.move_session.delete",
+                        title: "delete",
+                        disabled: (option: DialogSelectOption<MoveSessionSelection | undefined> | undefined) => {
+                          const value = option?.value
+                          if (!value) return true
+                          if (value.type === "workspace") return false
+                          if (value.type !== "directory" || value.subdirectory) return true
+                          return !directoryData()?.find((item) => item.directory === value.directory)?.strategy
+                        },
+                        onTrigger: remove,
+                      },
+                      {
+                        command: "dialog.move_session.refresh",
+                        title: "refresh",
+                        onTrigger: () => void refetch(),
+                      },
+                    ]),
               ]
         }
       />

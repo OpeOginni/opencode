@@ -25,6 +25,7 @@ export function listAdapters(projectID: ProjectV2.ID): WorkspaceAdapterEntry[] {
     type,
     name: adapter.name,
     description: adapter.description,
+    kind: adapter.kind ?? (type === "worktree" ? "local" : "remote"),
   }))
 }
 

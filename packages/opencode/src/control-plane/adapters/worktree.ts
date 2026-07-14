@@ -26,6 +26,7 @@ const provideContext = <A, E, R>(effect: Effect.Effect<A, E, R>, context: Worksp
   )
 
 export const WorktreeAdapter: WorkspaceAdapter = {
+  kind: "local",
   name: "Worktree",
   description: "Create a git worktree",
   async configure(info, context) {

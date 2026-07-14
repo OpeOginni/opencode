@@ -31,6 +31,7 @@ type RemoteTarget = Extract<Target, { type: "remote" }>
 type RequestPlan = Data.TaggedEnum<{
   InvalidWorkspace: {}
   MissingWorkspace: { readonly workspaceID: WorkspaceV2.ID }
+  UnavailableWorkspace: { readonly workspaceID: WorkspaceV2.ID }
   Local: { readonly directory: string; readonly workspaceID?: WorkspaceV2.ID }
   Remote: {
     readonly request: HttpServerRequest.HttpServerRequest
@@ -127,7 +128,8 @@ function proxyRemote(
     }
     const proxyURL = workspaceProxyURL(target.url, url)
     const headers = request.headers as Record<string, string>
-    if (headers["upgrade"]?.toLowerCase() === "websocket") return yield* HttpApiProxy.websocket(request, proxyURL)
+    if (headers["upgrade"]?.toLowerCase() === "websocket")
+      return yield* HttpApiProxy.websocket(request, proxyURL, target.headers)
     const response = yield* HttpApiProxy.http(client, proxyURL, target.headers, request)
     const sync = Fence.parse(new Headers(response.headers))
     if (sync) {
@@ -151,6 +153,14 @@ function planWorkspaceRequest(
   workspace: Workspace.Info,
 ): Effect.Effect<RequestPlan, never, Workspace.Service> {
   return Effect.gen(function* () {
+    const service = yield* Workspace.Service
+    if (WorkspaceAdapterRuntime.kind(workspace) !== "local" && !(yield* service.isSyncing(workspace.id))) {
+      const ready = yield* service.ensureReady(workspace.id).pipe(
+        Effect.as(true),
+        Effect.catch(() => Effect.succeed(false)),
+      )
+      if (!ready) return RequestPlan.UnavailableWorkspace({ workspaceID: workspace.id })
+    }
     const target = yield* resolveTarget(workspace)
     if (target.type === "remote") return RequestPlan.Remote({ request, workspace, target, url })
     return RequestPlan.Local({ directory: target.directory, workspaceID: workspace.id })
@@ -171,6 +181,12 @@ function planRequest(
     const workspace = yield* resolveWorkspace(workspaceID, envWorkspaceID)
 
     if (workspaceID && workspace === undefined && !envWorkspaceID) {
+      // A session can reference a workspace this server does not track: a
+      // server addressed as a plain remote workspace stores the control
+      // plane's workspace id when the session's moved event replays. Serve
+      // the session from its own directory instead of failing the request.
+      if (session?.workspaceID === workspaceID && session.directory)
+        return RequestPlan.Local({ directory: session.directory })
       return RequestPlan.MissingWorkspace({ workspaceID })
     }
 
@@ -203,6 +219,13 @@ function routeWorkspace<E>(
         ),
       ),
     MissingWorkspace: ({ workspaceID }) => Effect.succeed(missingWorkspaceResponse(workspaceID)),
+    UnavailableWorkspace: ({ workspaceID }) =>
+      Effect.succeed(
+        HttpServerResponse.text(`Workspace unavailable: ${workspaceID}`, {
+          status: 503,
+          contentType: "text/plain; charset=utf-8",
+        }),
+      ),
     Remote: ({ request, workspace, target, url }) => proxyRemote(client, request, workspace, target, url),
     Local: ({ directory, workspaceID }) =>
       effect.pipe(Effect.provideService(WorkspaceRouteContext, WorkspaceRouteContext.of({ directory, workspaceID }))),

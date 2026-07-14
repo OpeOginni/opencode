@@ -1,10 +1,11 @@
 import { MoveSession } from "@opencode-ai/core/control-plane/move-session"
-import { Schema } from "effect"
+import { Schema, Struct } from "effect"
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
 import { described } from "./metadata"
+import { ApiNotFoundError } from "../errors"
 
 const root = "/experimental/control-plane"
-export const MoveSessionPayload = Schema.Struct({ ...MoveSession.Input.fields })
+export const MoveSessionPayload = Schema.Struct(Struct.omit(MoveSession.Input.fields, ["transferHash"]))
 
 export class ApiMoveSessionError extends Schema.ErrorClass<ApiMoveSessionError>("MoveSessionError")(
   {
@@ -22,7 +23,7 @@ export const ControlPlaneApi = HttpApi.make("controlPlane").add(
       HttpApiEndpoint.post("moveSession", `${root}/move-session`, {
         payload: MoveSessionPayload,
         success: described(HttpApiSchema.NoContent, "Session moved"),
-        error: ApiMoveSessionError,
+        error: [ApiMoveSessionError, ApiNotFoundError],
       }).annotateMerge(
         OpenApi.annotations({
           identifier: "experimental.controlPlane.moveSession",
