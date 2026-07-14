@@ -16,6 +16,7 @@ import { useCommandShortcut } from "../keymap"
 import { useProject } from "../context/project"
 import { Spinner } from "./spinner"
 import { DialogWorkspaceFileChanges } from "./dialog-workspace-file-changes"
+import { remoteWorkspaceAdapters } from "./dialog-workspace-create"
 import type { ExperimentalWorkspaceAdapterListResponse, ProjectDirectories } from "@opencode-ai/sdk/v2"
 import { useRoute } from "../context/route"
 
@@ -221,9 +222,7 @@ export function DialogMoveSession(props: DialogMoveSessionProps) {
       category: "Workspaces",
       value: { type: "workspace", workspaceID: workspace.id, directory: workspace.directory } as const,
     }))
-    const remoteAdapters = (adapters() ?? []).filter(
-      (adapter) => adapter.kind === "remote" || adapter.type !== "worktree",
-    )
+    const remoteAdapters = remoteWorkspaceAdapters(adapters() ?? [])
     if (createStep() === "remote") {
       if (adapters.loading && !adapters()) return [{ title: "Loading remote adapters...", value: undefined }]
       if (remoteAdapters.length === 0) {
