@@ -121,7 +121,7 @@ function proxyRemote(
   return Effect.gen(function* () {
     const syncing = yield* Workspace.Service.use((svc) => svc.isSyncing(workspace.id))
     if (!syncing) {
-      return HttpServerResponse.text(`broken sync connection for workspace: ${workspace.id}`, {
+      return HttpServerResponse.text(`broken sync connection for workspace: ${workspace.id} (the sync loop is not running or failed; check workspace connectivity and that experimental workspaces are enabled)`, {
         status: 503,
         contentType: "text/plain; charset=utf-8",
       })
@@ -194,8 +194,13 @@ function planRequest(
       return yield* planWorkspaceRequest(request, url, workspace)
     }
 
+    // A session in a remote workspace has a directory that only exists on the
+    // remote host; serving a control-plane-local route from it would boot a
+    // local instance for a nonexistent path. Use the request's own directory.
+    const sessionDirectory =
+      workspace !== undefined && WorkspaceAdapterRuntime.kind(workspace) !== "local" ? undefined : session?.directory
     return RequestPlan.Local({
-      directory: session?.directory || defaultDirectory(request, url),
+      directory: sessionDirectory || defaultDirectory(request, url),
       workspaceID: envWorkspaceID ?? workspaceID,
     })
   })

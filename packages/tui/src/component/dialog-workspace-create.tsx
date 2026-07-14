@@ -50,6 +50,20 @@ export function recentConnectedWorkspaces<WorkspaceInfo extends { id: string; ti
   return { recent, hasMore: recent.length < workspaces.length }
 }
 
+// Human-readable provenance for a workspace row: the registering adapter's
+// name plus whether it runs locally or remotely (e.g. "Gitterm · remote",
+// "Worktree · local"). Falls back to the raw workspace type when the adapter
+// is not currently registered.
+export function workspaceProvenance(
+  adapters: readonly { type: string; kind?: string | null; name: string }[] | undefined,
+  workspace: { type: string },
+) {
+  const adapter = adapters?.find((item) => item.type === workspace.type)
+  const kind = adapter?.kind ?? (workspace.type === "worktree" ? "local" : "remote")
+  const name = adapter?.name ?? workspace.type
+  return `${name} · ${kind}`
+}
+
 // Remote workspace adapters are those a plugin registered. The built-in
 // "remote" (connect to an existing opencode server) and "worktree" adapters
 // are never offered as remote workspaces.
@@ -179,9 +193,11 @@ export async function confirmWorkspaceFileChanges(input: {
   sourceWorkspaceID?: string
 }) {
   const status = await input.sdk.client.vcs.status({ workspace: input.sourceWorkspaceID }).catch(() => undefined)
-  const fileChangeChoice = status?.data?.length
-    ? await DialogWorkspaceFileChanges.show(input.dialog, status.data)
-    : "no"
+  // A source whose changes cannot be inspected must not silently drop them:
+  // default to copying — an empty patch is a no-op, and an unreachable source
+  // fails the move with a visible error instead.
+  if (!status?.data) return true
+  const fileChangeChoice = status.data.length ? await DialogWorkspaceFileChanges.show(input.dialog, status.data) : "no"
   if (!fileChangeChoice) return
   return fileChangeChoice === "yes"
 }
@@ -259,14 +275,14 @@ export function DialogWorkspaceSelect(props: {
         category: "New workspace",
       },
       {
-        title: "None",
+        title: "Local (main)",
         value: { type: "none" as const },
-        description: "Use the local project",
+        description: "Your main local project",
         category: "Choose workspace",
       },
       ...recent.map((workspace: Workspace) => ({
         title: workspace.name,
-        description: `(${workspace.type}, ${project.workspace.status(workspace.id)})`,
+        description: `${workspaceProvenance(list, workspace)} · ${project.workspace.status(workspace.id)}`,
         value: {
           type: "existing" as const,
           workspaceID: workspace.id,
@@ -316,7 +332,11 @@ export function DialogWorkspaceSelect(props: {
         }
 
         dialog.replace(() => (
-          <DialogExistingWorkspaceSelect omitWorkspaceID={omittedWorkspaceID()} onSelect={props.onSelect} />
+          <DialogExistingWorkspaceSelect
+            adapters={adapters()}
+            omitWorkspaceID={omittedWorkspaceID()}
+            onSelect={props.onSelect}
+          />
         ))
       }}
     />
@@ -324,6 +344,7 @@ export function DialogWorkspaceSelect(props: {
 }
 
 function DialogExistingWorkspaceSelect(props: {
+  adapters?: Adapter[]
   omitWorkspaceID?: string
   onSelect: (selection: WorkspaceSelection) => Promise<void> | void
 }) {
@@ -336,7 +357,7 @@ function DialogExistingWorkspaceSelect(props: {
       .filter((workspace) => workspace.id !== props.omitWorkspaceID)
       .map((workspace: Workspace) => ({
         title: workspace.name,
-        description: `(${workspace.type})`,
+        description: workspaceProvenance(props.adapters, workspace),
         value: { workspace },
       })),
   )

@@ -514,9 +514,11 @@ const layer = Layer.effect(
           setStatus(space.id, "disconnected")
         }
 
-        // Back off reconnect attempts up to 2 minutes while the workspace
-        // stays unavailable.
-        yield* Effect.sleep(`${Math.min(120_000, 1_000 * 2 ** attempt)} millis`)
+        // Back off reconnect attempts while the workspace stays unavailable.
+        // Cap low: a freshly provisioned sandbox needs ~30s before its server
+        // listens, and a large cap leaves the status stuck on "connecting"
+        // long after the workspace came up.
+        yield* Effect.sleep(`${Math.min(15_000, 1_000 * 2 ** attempt)} millis`)
         attempt += 1
       }
     })
@@ -978,24 +980,36 @@ const layer = Layer.effect(
         // Resolve the destination before transferring anything. Adapter
         // ensureReady + target URL are enough for move; do not block on
         // experimental SSE connectivity — /sync/replay is plain HTTP.
-        const destination = input.workspaceID ? yield* prepareMove(input.workspaceID) : undefined
-        const destinationTarget = destination ? yield* WorkspaceAdapterRuntime.target(destination) : undefined
-        if (destination && destinationTarget?.type === "remote")
-          yield* waitForRemoteTarget(destination.id, destinationTarget)
-
-        const captured = input.copyChanges
-          ? yield* runInWorkspace<string | null, never, never>({
-              workspaceID: current?.workspaceID ?? undefined,
-              directory: current?.directory,
-              local: () => vcs.diffRaw(),
-              remote: ({ target }) =>
-                HttpClientRequest.get(route(target.url, "/vcs/diff/raw"), {
-                  headers: new Headers(target.headers),
-                }),
-              fallback: null,
-              response: "text",
-            }).pipe(Effect.provide(AppNodeBuilderV1.build(InstanceStore.node)))
-          : ""
+        // Destination readiness and source change capture touch different
+        // ends of the move, so they run concurrently.
+        const [prepared, captured] = yield* Effect.all(
+          [
+            Effect.gen(function* () {
+              const destination = input.workspaceID ? yield* prepareMove(input.workspaceID) : undefined
+              const destinationTarget = destination
+                ? yield* WorkspaceAdapterRuntime.target(destination)
+                : undefined
+              if (destination && destinationTarget?.type === "remote")
+                yield* waitForRemoteTarget(destination.id, destinationTarget)
+              return { destination, destinationTarget }
+            }),
+            input.copyChanges
+              ? runInWorkspace<string | null, never, never>({
+                  workspaceID: current?.workspaceID ?? undefined,
+                  directory: current?.directory,
+                  local: () => vcs.diffRaw(),
+                  remote: ({ target }) =>
+                    HttpClientRequest.get(route(target.url, "/vcs/diff/raw"), {
+                      headers: new Headers(target.headers),
+                    }),
+                  fallback: null,
+                  response: "text",
+                }).pipe(Effect.provide(AppNodeBuilderV1.build(InstanceStore.node)))
+              : Effect.succeed(""),
+          ],
+          { concurrency: 2 },
+        )
+        const { destination, destinationTarget } = prepared
         if (captured === null) {
           return yield* new ChangeTransferError({
             message:
@@ -1190,7 +1204,25 @@ const layer = Layer.effect(
           .orderBy(asc(EventTable.seq))
           .all()
           .pipe(Effect.orDie)
-        const batches = [...Iterable.chunksOf(rows, 10)]
+        // Each batch is a sequential round trip (replay order matters), so
+        // chunk by payload size rather than a small fixed count — most
+        // sessions then replay in a single request.
+        const batches: (typeof rows)[] = []
+        {
+          let batch: typeof rows = []
+          let bytes = 0
+          for (const row of rows) {
+            const size = JSON.stringify(row).length
+            if (batch.length > 0 && (bytes + size > 512_000 || batch.length >= 100)) {
+              batches.push(batch)
+              batch = []
+              bytes = 0
+            }
+            batch.push(row)
+            bytes += size
+          }
+          if (batch.length > 0) batches.push(batch)
+        }
 
         yield* Effect.forEach(
           batches,
@@ -1288,6 +1320,19 @@ const layer = Layer.effect(
 
         yield* events.claim(input.sessionID, workspaceID)
         yield* discardSource()
+        // The destination just served the whole transfer, so it is
+        // demonstrably reachable. Restart its sync loop so the connection
+        // status settles now instead of waiting out a reconnect backoff
+        // started while the workspace was still booting.
+        yield* stopSync(workspaceID)
+        yield* startSync(space).pipe(
+          Effect.catch((error) =>
+            Effect.logWarning("session move destination sync restart failed", {
+              workspaceID,
+              error: errorData(error),
+            }),
+          ),
+        )
         yield* Effect.logInfo("session move complete", { sessionID: input.sessionID, workspaceID })
       })
     })

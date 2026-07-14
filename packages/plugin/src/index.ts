@@ -75,6 +75,7 @@ export type PluginInput = {
   worktree: string
   experimental_workspace: {
     register(type: string, adapter: WorkspaceAdapter): void
+    remove?(workspaceID: string): Promise<void>
   }
   serverUrl: URL
   $: BunShell

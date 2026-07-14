@@ -8,6 +8,7 @@ import type {
 } from "@opencode-ai/plugin"
 import { Config } from "@/config/config"
 import { createOpencodeClient } from "@opencode-ai/sdk"
+import { createOpencodeClient as createOpencodeClientV2 } from "@opencode-ai/sdk/v2"
 import { ServerAuth } from "@/server/auth"
 import { CodexAuthPlugin } from "./openai/codex"
 import { Session } from "@/session/session"
@@ -139,12 +140,16 @@ const layer = Layer.effect(
         const { Server } = yield* Effect.promise(() => import("../server/server"))
 
         const serverUrl = Server.url
-        const client = createOpencodeClient({
+        const clientConfig = {
           baseUrl: serverUrl?.toString() ?? "http://localhost:4096",
           directory: ctx.directory,
           headers: ServerAuth.headers(),
-          ...(serverUrl ? {} : { fetch: async (...args) => Server.Default().app.fetch(...args) }),
-        })
+          ...(serverUrl
+            ? {}
+            : { fetch: (async (request: Request) => Server.Default().app.fetch(request)) as typeof fetch }),
+        }
+        const client = createOpencodeClient(clientConfig)
+        const clientV2 = createOpencodeClientV2(clientConfig)
         const cfg = yield* config.get()
         const input: PluginInput = {
           client,
@@ -154,6 +159,16 @@ const layer = Layer.effect(
           experimental_workspace: {
             register(type: string, adapter: PluginWorkspaceAdapter) {
               registerAdapter(ctx.project.id, type, adapter as WorkspaceAdapter)
+            },
+            // Removes the workspace record and tears down its backing
+            // resource through the adapter's remove(). Lets adapters that
+            // treat workspaces as disposable (e.g. one sandbox per session)
+            // clean up listings without hand-rolling HTTP against the server.
+            async remove(workspaceID: string) {
+              const result = await clientV2.experimental.workspace.remove({ id: workspaceID })
+              if (result.error) {
+                throw new Error(`Failed to remove workspace ${workspaceID}: ${errorMessage(result.error)}`)
+              }
             },
           },
           get serverUrl(): URL {
