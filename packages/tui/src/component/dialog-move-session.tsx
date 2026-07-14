@@ -170,7 +170,10 @@ export function DialogMoveSession(props: DialogMoveSessionProps) {
       if (b.location === b.root.directory) return 1
       return a.location.localeCompare(b.location)
     })
-    const titleWidth = Math.max(1, dimensions().width - 14)
+    // The dialog is xlarge (116 columns, terminal-capped); right-aligned
+    // details padded against the raw terminal width land past the dialog's
+    // clip edge and vanish on wide terminals.
+    const titleWidth = Math.max(1, Math.min(116, dimensions().width - 2) - 14)
 
     const workspaces = projectContext.workspace
       .list()

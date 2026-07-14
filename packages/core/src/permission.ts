@@ -1,14 +1,16 @@
 export * as PermissionV2 from "./permission"
 
 import { makeLocationNode } from "./effect/app-node"
-import { Context, Deferred, Effect as EffectRuntime, Layer, Schema, Stream } from "effect"
+import { and, eq, like } from "drizzle-orm"
+import { Context, Deferred, Effect as EffectRuntime, Layer, Schema } from "effect"
 import { Permission } from "@opencode-ai/schema/permission"
+import { Database } from "./database/database"
 import { EventV2 } from "./event"
+import { EventTable } from "./event/sql"
 import { FSUtil } from "./fs-util"
 import { Location } from "./location"
 import { AgentV2 } from "./agent"
 import { SessionV2 } from "./session"
-import { SessionEvent } from "./session/event"
 import { SessionStore } from "./session/store"
 import { Wildcard } from "./util/wildcard"
 import { PermissionSaved } from "./permission/saved"
@@ -116,6 +118,7 @@ const layer = Layer.effect(
   Service,
   EffectRuntime.gen(function* () {
     const events = yield* EventV2.Service
+    const { db } = yield* Database.Service
     const fs = yield* FSUtil.Service
     const location = yield* Location.Service
     const agents = yield* AgentV2.Service
@@ -134,11 +137,12 @@ const layer = Layer.effect(
       if (input.action !== "external_directory") return undefined
       const directory = input.resources[0]?.replace(/\/\*$/, "")
       if (!directory) return undefined
-      const moved = yield* events.durable({ aggregateID: input.sessionID }).pipe(
-        Stream.filter((event) => event.type === SessionEvent.Moved.type),
-        Stream.runCollect,
-        EffectRuntime.catchCause(() => EffectRuntime.succeed([] as EventV2.Payload[])),
-      )
+      const moved = yield* db
+        .select({ data: EventTable.data })
+        .from(EventTable)
+        .where(and(eq(EventTable.aggregate_id, input.sessionID), like(EventTable.type, "session.next.moved%")))
+        .all()
+        .pipe(EffectRuntime.catchCause(() => EffectRuntime.succeed([])))
       for (const event of moved) {
         const root = (event.data as { source?: { directory?: string } }).source?.directory
         if (!root || root === location.directory) continue
@@ -347,5 +351,5 @@ export const locationLayer = layer.pipe(Layer.provideMerge(AgentV2.locationLayer
 export const node = makeLocationNode({
   service: Service,
   layer,
-  deps: [EventV2.node, FSUtil.node, Location.node, AgentV2.node, SessionStore.node, PermissionSaved.node],
+  deps: [Database.node, EventV2.node, FSUtil.node, Location.node, AgentV2.node, SessionStore.node, PermissionSaved.node],
 })
