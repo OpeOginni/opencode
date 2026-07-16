@@ -23,6 +23,9 @@ const skipInstall = process.argv.includes("--skip-install")
 const sourcemapsFlag = process.argv.includes("--sourcemaps")
 const plugin = createSolidTransformPlugin()
 const skipEmbedWebUi = process.argv.includes("--skip-embed-web-ui")
+const workspaceImageFlag = process.argv.includes("--workspace-image")
+const workspaceVersion = process.argv.find((arg) => arg.startsWith("--workspace-version="))?.slice(20)
+const version = workspaceVersion ?? Script.version
 
 const createEmbeddedWebUIBundle = async () => {
   console.log(`Building Web UI to embed in the binary`)
@@ -113,26 +116,33 @@ const allTargets: {
   },
 ]
 
-const targets = singleFlag
-  ? allTargets.filter((item) => {
-      if (item.os !== process.platform || item.arch !== process.arch) {
-        return false
-      }
+const targets = workspaceImageFlag
+  ? allTargets.filter(
+      (item) =>
+        item.os === "linux" &&
+        item.abi === "musl" &&
+        ((item.arch === "arm64" && item.avx2 !== false) || (item.arch === "x64" && item.avx2 === false)),
+    )
+  : singleFlag
+    ? allTargets.filter((item) => {
+        if (item.os !== process.platform || item.arch !== process.arch) {
+          return false
+        }
 
-      // When building for the current platform, prefer a single native binary by default.
-      // Baseline binaries require additional Bun artifacts and can be flaky to download.
-      if (item.avx2 === false) {
-        return baselineFlag
-      }
+        // When building for the current platform, prefer a single native binary by default.
+        // Baseline binaries require additional Bun artifacts and can be flaky to download.
+        if (item.avx2 === false) {
+          return baselineFlag
+        }
 
-      // also skip abi-specific builds for the same reason
-      if (item.abi !== undefined) {
-        return false
-      }
+        // also skip abi-specific builds for the same reason
+        if (item.abi !== undefined) {
+          return false
+        }
 
-      return true
-    })
-  : allTargets
+        return true
+      })
+    : allTargets
 
 await $`rm -rf dist`
 
@@ -181,14 +191,17 @@ for (const item of targets) {
       autoloadPackageJson: true,
       target: name.replace(pkg.name, "bun") as any,
       outfile: `dist/${name}/bin/opencode`,
-      execArgv: [`--user-agent=opencode/${Script.version}`, "--use-system-ca", "--"],
+      execArgv: [`--user-agent=opencode/${version}`, "--use-system-ca", "--"],
       windows: {},
     },
     files: embeddedFileMap ? { "opencode-web-ui.gen.ts": embeddedFileMap } : {},
     entrypoints: ["./src/index.ts", parserWorker, workerPath, ...(embeddedFileMap ? ["opencode-web-ui.gen.ts"] : [])],
     define: {
       FFF_LIBC: JSON.stringify(item.abi === "musl" ? "musl" : "gnu"),
-      OPENCODE_VERSION: `'${Script.version}'`,
+      OPENCODE_VERSION: `'${version}'`,
+      // Workspace builds exist to serve/connect remote workspaces; the sync
+      // loop they depend on must not require users to export the flag.
+      ...(workspaceVersion ? { OPENCODE_WORKSPACE_BUILD: "'true'" } : {}),
       OPENCODE_MODELS_DEV: generated.modelsData,
       OTUI_TREE_SITTER_WORKER_PATH: bunfsRoot + workerRelativePath,
       OPENCODE_WORKER_PATH: workerPath,
@@ -216,7 +229,7 @@ for (const item of targets) {
     JSON.stringify(
       {
         name,
-        version: Script.version,
+        version,
         preferUnplugged: true,
         os: [item.os],
         cpu: [item.arch],
@@ -226,7 +239,7 @@ for (const item of targets) {
       2,
     ),
   )
-  binaries[name] = Script.version
+  binaries[name] = version
 }
 
 if (Script.release) {
