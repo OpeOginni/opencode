@@ -8,7 +8,6 @@ import { createMemo, createSignal, onMount } from "solid-js"
 import { errorMessage } from "../util/error"
 import { useSDK } from "../context/sdk"
 import { useToast } from "../ui/toast"
-import { DialogAlert } from "../ui/dialog-alert"
 import { DialogWorkspaceFileChanges } from "./dialog-workspace-file-changes"
 
 type Adapter = ExperimentalWorkspaceAdapterListResponse[number]
@@ -29,7 +28,11 @@ export type WorkspaceSelection =
       workspaceName: string
     }
 
-type WorkspaceSelectValue = WorkspaceSelection | { type: "existing-list" }
+type WorkspaceSelectValue =
+  | WorkspaceSelection
+  | { type: "existing-list" }
+  | { type: "remote-list" }
+  | { type: "remote-empty" }
 type ExistingWorkspaceSelectValue = { workspace: Workspace }
 
 export function recentConnectedWorkspaces<WorkspaceInfo extends { id: string; timeUsed: number | string }>(input: {
@@ -38,11 +41,38 @@ export function recentConnectedWorkspaces<WorkspaceInfo extends { id: string; ti
   limit?: number
   omitWorkspaceID?: string
 }) {
-  const allWorkspaces = input.workspaces.filter((workspace) => input.status(workspace.id) === "connected")
+  const allWorkspaces = input.workspaces.filter((workspace) =>
+    ["connected", "paused"].includes(input.status(workspace.id) ?? ""),
+  )
   const workspaces = allWorkspaces.toSorted((a, b) => Number(b.timeUsed) - Number(a.timeUsed))
   const recent = workspaces.slice(0, input.limit ?? 3)
 
   return { recent, hasMore: recent.length < workspaces.length }
+}
+
+// Human-readable provenance for a workspace row: the registering adapter's
+// name plus whether it runs locally or remotely (e.g. "Gitterm · remote",
+// "Worktree · local"). Falls back to the raw workspace type when the adapter
+// is not currently registered.
+export function workspaceProvenance(
+  adapters: readonly { type: string; kind?: string | null; name: string }[] | undefined,
+  workspace: { type: string },
+) {
+  const adapter = adapters?.find((item) => item.type === workspace.type)
+  const kind = adapter?.kind ?? (workspace.type === "worktree" ? "local" : "remote")
+  const name = adapter?.name ?? workspace.type
+  return `${name} · ${kind}`
+}
+
+// Remote workspace adapters are those a plugin registered. The built-in
+// "remote" (connect to an existing opencode server) and "worktree" adapters
+// are never offered as remote workspaces.
+export function remoteWorkspaceAdapters<T extends { type: string; kind?: string | null; name: string }>(
+  adapters: readonly T[],
+): T[] {
+  return adapters
+    .filter((adapter) => adapter.kind === "remote" && adapter.type !== "remote" && adapter.type !== "worktree")
+    .toSorted((a, b) => a.name.localeCompare(b.name))
 }
 
 export function warpReminderText(dir: string) {
@@ -54,7 +84,10 @@ async function loadWorkspaceAdapters(input: {
   sync: ReturnType<typeof useSync>
   toast: ReturnType<typeof useToast>
 }) {
-  const dir = input.sync.path.directory || input.sdk.directory
+  // sync.path can hold a REMOTE workspace's directory after a move; adapter
+  // listing is a control-plane call and must use a directory that exists on
+  // this machine.
+  const dir = input.sdk.directory || input.sync.path.directory
   try {
     const response = await input.sdk.client.experimental.workspace.adapter.list({ directory: dir })
     if (response.error) throw response.error
@@ -85,7 +118,7 @@ export async function openWorkspaceSelect(input: {
   input.dialog.replace(() => <DialogWorkspaceSelect adapters={adapters} onSelect={input.onSelect} />)
 }
 
-export async function warpWorkspaceSession(input: {
+export async function moveWorkspaceSession(input: {
   dialog: ReturnType<typeof useDialog>
   sdk: ReturnType<typeof useSDK>
   sync: ReturnType<typeof useSync>
@@ -99,31 +132,26 @@ export async function warpWorkspaceSession(input: {
 }): Promise<boolean> {
   let result
   try {
-    result = await input.sdk.client.experimental.workspace.warp({
-      id: input.workspaceID,
+    const directory = input.workspaceID
+      ? input.project.workspace.get(input.workspaceID)?.directory
+      : input.project.instance.directory() || input.sync.path.directory
+    if (!directory) throw new Error("Workspace did not return a project directory")
+    result = await input.sdk.client.experimental.controlPlane.moveSession({
       sessionID: input.sessionID,
-      copyChanges: input.copyChanges,
+      destination: { directory, ...(input.workspaceID ? { workspaceID: input.workspaceID } : {}) },
+      moveChanges: input.copyChanges,
     })
   } catch (err) {
     input.toast.show({
-      title: "Failed to warp session",
+      title: "Failed to move session",
       message: errorMessage(err),
       variant: "error",
     })
     return false
   }
   if (!result?.data) {
-    if (result?.error && "name" in result.error && result.error.name === "VcsApplyError") {
-      await DialogAlert.show(
-        input.dialog,
-        "Unable to Warp Session",
-        "Unable to apply file changes to this workspace. It has existing changes that conflict or is based off a different branch. Session has not been warped.",
-      )
-      return false
-    }
-
     input.toast.show({
-      title: "Failed to warp session",
+      title: "Failed to move session",
       message: errorMessage(result?.error ?? "no response"),
       variant: "error",
     })
@@ -168,9 +196,11 @@ export async function confirmWorkspaceFileChanges(input: {
   sourceWorkspaceID?: string
 }) {
   const status = await input.sdk.client.vcs.status({ workspace: input.sourceWorkspaceID }).catch(() => undefined)
-  const fileChangeChoice = status?.data?.length
-    ? await DialogWorkspaceFileChanges.show(input.dialog, status.data)
-    : "no"
+  // A source whose changes cannot be inspected must not silently drop them:
+  // default to copying — an empty patch is a no-op, and an unreachable source
+  // fails the move with a visible error instead.
+  if (!status?.data) return true
+  const fileChangeChoice = status.data.length ? await DialogWorkspaceFileChanges.show(input.dialog, status.data) : "no"
   if (!fileChangeChoice) return
   return fileChangeChoice === "yes"
 }
@@ -186,6 +216,7 @@ export function DialogWorkspaceSelect(props: {
   const sdk = useSDK()
   const toast = useToast()
   const [adapters, setAdapters] = createSignal<Adapter[] | undefined>(props.adapters)
+  const [createStep, setCreateStep] = createSignal<"root" | "remote">("root")
   const omittedWorkspaceID = createMemo(() => (route.data.type === "session" ? project.workspace.current() : undefined))
 
   onMount(() => {
@@ -201,27 +232,60 @@ export function DialogWorkspaceSelect(props: {
   const options = createMemo<DialogSelectOption<WorkspaceSelectValue>[]>(() => {
     const list = adapters()
     if (!list) return []
+    const remote = remoteWorkspaceAdapters(list)
+    if (createStep() === "remote") {
+      if (remote.length === 0) {
+        return [
+          {
+            title: "No remote adapters",
+            value: { type: "remote-empty" as const },
+            description: "You have no registered remote workspace adapters",
+            category: "Remote adapters",
+            disabled: true,
+          },
+        ]
+      }
+      return remote.map((adapter) => ({
+        title: adapter.name,
+        value: { type: "new" as const, workspaceType: adapter.type, workspaceName: adapter.name },
+        description: adapter.description,
+        category: "Remote adapters",
+      }))
+    }
+    const local = list
+      .filter((adapter) => adapter.kind === "local" || adapter.type === "worktree")
+      .toSorted((a, b) => {
+        if (a.type === "worktree") return -1
+        if (b.type === "worktree") return 1
+        return a.name.localeCompare(b.name)
+      })
     const { recent, hasMore } = recentConnectedWorkspaces({
       workspaces: project.workspace.list(),
       status: project.workspace.status,
       omitWorkspaceID: omittedWorkspaceID(),
     })
     return [
-      ...list.map((adapter) => ({
+      ...local.map((adapter) => ({
         title: adapter.name,
         value: { type: "new" as const, workspaceType: adapter.type, workspaceName: adapter.name },
         description: adapter.description,
         category: "New workspace",
       })),
       {
-        title: "None",
+        title: "Remote",
+        value: { type: "remote-list" as const },
+        description: "Choose a remote workspace adapter",
+        category: "New workspace",
+      },
+      {
+        title: "Local (main)",
         value: { type: "none" as const },
-        description: "Use the local project",
+        description: "Your main local project",
         category: "Choose workspace",
       },
       ...recent.map((workspace: Workspace) => ({
         title: workspace.name,
-        description: `(${workspace.type})`,
+        description: `${workspaceProvenance(list, workspace)} · ${project.workspace.status(workspace.id)}`,
         value: {
           type: "existing" as const,
           workspaceID: workspace.id,
@@ -246,12 +310,17 @@ export function DialogWorkspaceSelect(props: {
   if (!adapters()) return null
   return (
     <DialogSelect<WorkspaceSelectValue>
-      title="Warp"
+      title={createStep() === "remote" ? "Choose remote adapter" : "Move session"}
       skipFilter={true}
       renderFilter={false}
       options={options()}
       onSelect={(option) => {
         if (!option.value) return
+        if (option.value.type === "remote-empty") return
+        if (option.value.type === "remote-list") {
+          setCreateStep("remote")
+          return
+        }
         if (option.value.type === "none") {
           void props.onSelect(option.value)
           return
@@ -266,7 +335,11 @@ export function DialogWorkspaceSelect(props: {
         }
 
         dialog.replace(() => (
-          <DialogExistingWorkspaceSelect omitWorkspaceID={omittedWorkspaceID()} onSelect={props.onSelect} />
+          <DialogExistingWorkspaceSelect
+            adapters={adapters()}
+            omitWorkspaceID={omittedWorkspaceID()}
+            onSelect={props.onSelect}
+          />
         ))
       }}
     />
@@ -274,6 +347,7 @@ export function DialogWorkspaceSelect(props: {
 }
 
 function DialogExistingWorkspaceSelect(props: {
+  adapters?: Adapter[]
   omitWorkspaceID?: string
   onSelect: (selection: WorkspaceSelection) => Promise<void> | void
 }) {
@@ -282,11 +356,11 @@ function DialogExistingWorkspaceSelect(props: {
   const options = createMemo<DialogSelectOption<ExistingWorkspaceSelectValue>[]>(() =>
     project.workspace
       .list()
-      .filter((workspace) => project.workspace.status(workspace.id) === "connected")
+      .filter((workspace) => ["connected", "paused"].includes(project.workspace.status(workspace.id) ?? ""))
       .filter((workspace) => workspace.id !== props.omitWorkspaceID)
       .map((workspace: Workspace) => ({
         title: workspace.name,
-        description: `(${workspace.type})`,
+        description: workspaceProvenance(props.adapters, workspace),
         value: { workspace },
       })),
   )

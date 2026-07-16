@@ -1,8 +1,10 @@
 import type { ProjectV2 } from "@opencode-ai/core/project"
 import type { WorkspaceAdapter, WorkspaceAdapterEntry } from "../types"
+import { RemoteAdapter } from "./remote"
 import { WorktreeAdapter } from "./worktree"
 
 const BUILTIN: Record<string, WorkspaceAdapter> = {
+  remote: RemoteAdapter,
   worktree: WorktreeAdapter,
 }
 
@@ -23,6 +25,7 @@ export function listAdapters(projectID: ProjectV2.ID): WorkspaceAdapterEntry[] {
     type,
     name: adapter.name,
     description: adapter.description,
+    kind: adapter.kind ?? (type === "worktree" ? "local" : "remote"),
   }))
 }
 

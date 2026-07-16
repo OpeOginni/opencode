@@ -1,7 +1,9 @@
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { test, expect } from "bun:test"
 import os from "os"
-import { Cause, Deferred, Effect, Exit, Fiber, Layer } from "effect"
+import { Cause, DateTime, Deferred, Effect, Exit, Fiber, Layer } from "effect"
+import { AbsolutePath } from "@opencode-ai/core/schema"
+import { SessionEvent } from "@opencode-ai/core/session/event"
 import { EventV2Bridge } from "../../src/event-v2-bridge"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { Permission } from "../../src/permission"
@@ -1169,6 +1171,135 @@ it.instance(
       const exit = yield* Fiber.await(fiber)
       expect(Exit.isFailure(exit)).toBe(true)
       if (Exit.isFailure(exit)) expect(Cause.squash(exit.cause)).toBeInstanceOf(PermissionV1.RejectedError)
+    }),
+  { git: true },
+)
+
+// After a cross-machine move, models keep reusing absolute paths from the
+// session's previous location. external_directory asks for a former root
+// that no longer exists must be answered with corrective feedback instead
+// of prompting the user (see staleMovedRoot in src/permission/index.ts).
+
+const publishMoved = (sessionID: SessionID, source: string, destination: string) =>
+  Effect.gen(function* () {
+    const events = yield* EventV2Bridge.Service
+    yield* events.publish(SessionEvent.Moved, {
+      sessionID,
+      source: { directory: AbsolutePath.make(source) },
+      location: { directory: AbsolutePath.make(destination) },
+      timestamp: yield* DateTime.now,
+    })
+  })
+
+it.instance(
+  "ask - corrects external_directory asks for a vanished former session root",
+  () =>
+    Effect.gen(function* () {
+      const test = yield* TestInstance
+      const sessionID = SessionID.make("session_moved_stale")
+      const staleRoot = "/gitterm-e2e-nonexistent/tui-invaders"
+      yield* publishMoved(sessionID, staleRoot, test.directory)
+
+      const err = yield* fail(
+        ask({
+          sessionID,
+          permission: "external_directory",
+          patterns: [`${staleRoot}/*`],
+          metadata: { filepath: `${staleRoot}/README.md`, parentDir: staleRoot },
+          always: [`${staleRoot}/*`],
+          ruleset: [],
+        }),
+      )
+      expect(err).toBeInstanceOf(PermissionV1.CorrectedError)
+      expect((err as PermissionV1.CorrectedError).feedback).toContain(staleRoot)
+      expect((err as PermissionV1.CorrectedError).feedback).toContain(test.directory)
+      expect(yield* list()).toHaveLength(0)
+    }),
+  { git: true },
+)
+
+it.instance(
+  "ask - corrects paths nested below a vanished former session root",
+  () =>
+    Effect.gen(function* () {
+      const test = yield* TestInstance
+      const sessionID = SessionID.make("session_moved_nested")
+      const staleRoot = "/gitterm-e2e-nonexistent/tui-invaders"
+      yield* publishMoved(sessionID, staleRoot, test.directory)
+
+      const err = yield* fail(
+        ask({
+          sessionID,
+          permission: "external_directory",
+          patterns: [`${staleRoot}/src/game/*`],
+          metadata: { filepath: `${staleRoot}/src/game/main.ts`, parentDir: `${staleRoot}/src/game` },
+          always: [`${staleRoot}/src/game/*`],
+          ruleset: [],
+        }),
+      )
+      expect(err).toBeInstanceOf(PermissionV1.CorrectedError)
+    }),
+  { git: true },
+)
+
+it.instance(
+  "ask - still prompts for a former session root that exists on this machine",
+  () =>
+    Effect.gen(function* () {
+      const test = yield* TestInstance
+      const sessionID = SessionID.make("session_moved_local")
+      const existingRoot = yield* tmpdirScoped()
+      yield* publishMoved(sessionID, existingRoot, test.directory)
+
+      const fiber = yield* ask({
+        sessionID,
+        permission: "external_directory",
+        patterns: [`${existingRoot}/*`],
+        metadata: { filepath: `${existingRoot}/README.md`, parentDir: existingRoot },
+        always: [`${existingRoot}/*`],
+        ruleset: [],
+      }).pipe(Effect.forkScoped)
+
+      expect(yield* waitForPending(1)).toHaveLength(1)
+      yield* rejectAll()
+      yield* Fiber.await(fiber)
+    }),
+  { git: true },
+)
+
+it.instance(
+  "ask - ignores move history of other permissions and sessions",
+  () =>
+    Effect.gen(function* () {
+      const test = yield* TestInstance
+      const sessionID = SessionID.make("session_moved_other")
+      const staleRoot = "/gitterm-e2e-nonexistent/tui-invaders"
+      yield* publishMoved(SessionID.make("session_someone_else"), staleRoot, test.directory)
+
+      // Another session's move history must not correct this session's ask.
+      const fiber = yield* ask({
+        sessionID,
+        permission: "external_directory",
+        patterns: [`${staleRoot}/*`],
+        metadata: { filepath: `${staleRoot}/README.md`, parentDir: staleRoot },
+        always: [`${staleRoot}/*`],
+        ruleset: [],
+      }).pipe(Effect.forkScoped)
+
+      expect(yield* waitForPending(1)).toHaveLength(1)
+      yield* rejectAll()
+      yield* Fiber.await(fiber)
+
+      // Non-external permissions never consult move history.
+      const bash = yield* ask({
+        sessionID,
+        permission: "bash",
+        patterns: [`cat ${staleRoot}/README.md`],
+        metadata: {},
+        always: [],
+        ruleset: [{ permission: "bash", pattern: "*", action: "allow" }],
+      })
+      expect(bash).toBeUndefined()
     }),
   { git: true },
 )

@@ -237,6 +237,16 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "NotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundError"
+                }
+              }
+            }
           }
         },
         "description": "Move a session to another project directory, optionally transferring local changes.",
@@ -2655,6 +2665,94 @@
           {
             "lang": "js",
             "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.vcs.apply({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/vcs/discard": {
+      "post": {
+        "tags": ["instance"],
+        "operationId": "vcs.discard",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "VCS changes discarded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "applied": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["applied"],
+                  "additionalProperties": false,
+                  "description": "VCS changes discarded"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "VcsDiscardError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VcsDiscardError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Discard source changes only when they still match a previously transferred patch.",
+        "summary": "Discard transferred VCS changes",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "patch": {
+                    "type": "string"
+                  }
+                },
+                "required": ["patch"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.vcs.discard({\n  ...\n})"
           }
         ]
       }
@@ -8222,93 +8320,6 @@
         ]
       }
     },
-    "/sync/steal": {
-      "post": {
-        "tags": ["sync"],
-        "operationId": "sync.steal",
-        "parameters": [
-          {
-            "name": "directory",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "required": false
-          },
-          {
-            "name": "workspace",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "required": false
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Session stolen into workspace",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "sessionID": {
-                      "type": "string",
-                      "pattern": "^ses"
-                    }
-                  },
-                  "required": ["sessionID"],
-                  "additionalProperties": false,
-                  "description": "Session stolen into workspace"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "BadRequest | InvalidRequestError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/effect_HttpApiError_BadRequest"
-                    },
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestError"
-                    }
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "description": "Update a session to belong to the current workspace through the sync event system.",
-        "summary": "Steal session into workspace",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "sessionID": {
-                    "type": "string",
-                    "pattern": "^ses"
-                  }
-                },
-                "required": ["sessionID"],
-                "additionalProperties": false
-              }
-            }
-          }
-        },
-        "x-codeSamples": [
-          {
-            "lang": "js",
-            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.sync.steal({\n  ...\n})"
-          }
-        ]
-      }
-    },
     "/sync/history": {
       "post": {
         "tags": ["sync"],
@@ -9315,6 +9326,10 @@
                       },
                       "description": {
                         "type": "string"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": ["local", "remote"]
                       }
                     },
                     "required": ["type", "name", "description"],
@@ -9675,104 +9690,6 @@
           {
             "lang": "js",
             "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.experimental.workspace.remove({\n  ...\n})"
-          }
-        ]
-      }
-    },
-    "/experimental/workspace/warp": {
-      "post": {
-        "tags": ["workspace"],
-        "operationId": "experimental.workspace.warp",
-        "parameters": [
-          {
-            "name": "directory",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "required": false
-          },
-          {
-            "name": "workspace",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "required": false
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Session warped"
-          },
-          "400": {
-            "description": "WorkspaceWarpError | VcsApplyError | InvalidRequestError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/WorkspaceWarpError"
-                    },
-                    {
-                      "$ref": "#/components/schemas/VcsApplyError"
-                    },
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestError"
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "NotFoundError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NotFoundError"
-                }
-              }
-            }
-          }
-        },
-        "description": "Move a session's sync history into the target workspace, or detach it to the local project.",
-        "summary": "Warp session into workspace",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "anyOf": [
-                      {
-                        "type": "string",
-                        "pattern": "^wrk"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "sessionID": {
-                    "type": "string",
-                    "pattern": "^ses"
-                  },
-                  "copyChanges": {
-                    "type": "boolean"
-                  }
-                },
-                "required": ["id", "sessionID"],
-                "additionalProperties": false
-              }
-            }
-          }
-        },
-        "x-codeSamples": [
-          {
-            "lang": "js",
-            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.experimental.workspace.warp({\n  ...\n})"
           }
         ]
       }
@@ -15693,6 +15610,25 @@
         "required": ["name", "data"],
         "additionalProperties": false
       },
+      "NotFoundError": {
+        "type": "object",
+        "required": ["name", "data"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "enum": ["NotFoundError"]
+          },
+          "data": {
+            "type": "object",
+            "required": ["message"],
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
       "SnapshotFileDiff": {
         "type": "object",
         "properties": {
@@ -17803,7 +17739,13 @@
                       "location": {
                         "$ref": "#/components/schemas/LocationRef"
                       },
+                      "source": {
+                        "$ref": "#/components/schemas/LocationRef"
+                      },
                       "subdirectory": {
+                        "type": "string"
+                      },
+                      "transferHash": {
                         "type": "string"
                       }
                     },
@@ -20314,7 +20256,7 @@
                       },
                       "status": {
                         "type": "string",
-                        "enum": ["connected", "connecting", "disconnected", "error"]
+                        "enum": ["connected", "connecting", "paused", "disconnected", "error"]
                       }
                     },
                     "required": ["workspaceID", "status"],
@@ -22452,6 +22394,31 @@
         "required": ["name", "data"],
         "additionalProperties": false
       },
+      "VcsDiscardError": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "enum": ["VcsDiscardError"]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string",
+                "enum": ["changed", "failed"]
+              }
+            },
+            "required": ["message", "reason"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["name", "data"],
+        "additionalProperties": false
+      },
       "Command": {
         "type": "object",
         "properties": {
@@ -23043,25 +23010,6 @@
         "required": ["name", "data"],
         "additionalProperties": false
       },
-      "NotFoundError": {
-        "type": "object",
-        "required": ["name", "data"],
-        "properties": {
-          "name": {
-            "type": "string",
-            "enum": ["NotFoundError"]
-          },
-          "data": {
-            "type": "object",
-            "required": ["message"],
-            "properties": {
-              "message": {
-                "type": "string"
-              }
-            }
-          }
-        }
-      },
       "TextPartInput": {
         "type": "object",
         "properties": {
@@ -23423,27 +23371,6 @@
           "name": {
             "type": "string",
             "enum": ["WorkspaceCreateError"]
-          },
-          "data": {
-            "type": "object",
-            "properties": {
-              "message": {
-                "type": "string"
-              }
-            },
-            "required": ["message"],
-            "additionalProperties": false
-          }
-        },
-        "required": ["name", "data"],
-        "additionalProperties": false
-      },
-      "WorkspaceWarpError": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "enum": ["WorkspaceWarpError"]
           },
           "data": {
             "type": "object",
@@ -24502,6 +24429,10 @@
         "properties": {
           "directory": {
             "type": "string"
+          },
+          "workspaceID": {
+            "type": "string",
+            "pattern": "^wrk"
           }
         },
         "required": ["directory"],
@@ -25403,7 +25334,13 @@
                   "location": {
                     "$ref": "#/components/schemas/LocationRef"
                   },
+                  "source": {
+                    "$ref": "#/components/schemas/LocationRef"
+                  },
                   "subdirectory": {
+                    "type": "string"
+                  },
+                  "transferHash": {
                     "type": "string"
                   }
                 },
@@ -27088,7 +27025,7 @@
           },
           "status": {
             "type": "string",
-            "enum": ["connected", "connecting", "disconnected", "error"]
+            "enum": ["connected", "connecting", "paused", "disconnected", "error"]
           }
         },
         "required": ["workspaceID", "status"],
@@ -28116,7 +28053,13 @@
               "location": {
                 "$ref": "#/components/schemas/LocationRef"
               },
+              "source": {
+                "$ref": "#/components/schemas/LocationRef"
+              },
               "subdirectory": {
+                "type": "string"
+              },
+              "transferHash": {
                 "type": "string"
               }
             },
@@ -33491,7 +33434,7 @@
               },
               "status": {
                 "type": "string",
-                "enum": ["connected", "connecting", "disconnected", "error"]
+                "enum": ["connected", "connecting", "paused", "disconnected", "error"]
               }
             },
             "required": ["workspaceID", "status"],
@@ -34194,7 +34137,13 @@
               "location": {
                 "$ref": "#/components/schemas/LocationRef"
               },
+              "source": {
+                "$ref": "#/components/schemas/LocationRef"
+              },
               "subdirectory": {
+                "type": "string"
+              },
+              "transferHash": {
                 "type": "string"
               }
             },
@@ -36559,7 +36508,7 @@
               },
               "status": {
                 "type": "string",
-                "enum": ["connected", "connecting", "disconnected", "error"]
+                "enum": ["connected", "connecting", "paused", "disconnected", "error"]
               }
             },
             "required": ["workspaceID", "status"],

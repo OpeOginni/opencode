@@ -209,9 +209,13 @@ const echoWebSocket = (request: HttpServerRequest.HttpServerRequest) =>
     const write = yield* socket.writer
     yield* socket
       .runRaw((message) => write(`echo:${String(message)}`), {
-        onOpen: write(`protocol:${request.headers["sec-websocket-protocol"] ?? "none"}`).pipe(
-          Effect.catch(() => Effect.void),
-        ),
+        onOpen: Effect.all(
+          [
+            write(`protocol:${request.headers["sec-websocket-protocol"] ?? "none"}`),
+            write(`authorization:${request.headers.authorization ?? "none"}`),
+          ],
+          { concurrency: 1, discard: true },
+        ).pipe(Effect.catch(() => Effect.void)),
       })
       .pipe(Effect.catch(() => Effect.void))
     return HttpServerResponse.empty()
@@ -228,6 +232,11 @@ const ProbeApi = HttpApi.make("workspace-routing-probe").add(
       HttpApiEndpoint.get("get", "/probe", { query: WorkspaceRoutingQuery, success: ProbeResult }),
       HttpApiEndpoint.patch("patch", "/probe", { query: WorkspaceRoutingQuery, success: Schema.Boolean }),
       HttpApiEndpoint.get("session", "/session", { query: WorkspaceRoutingQuery, success: ProbeResult }),
+      HttpApiEndpoint.get("sessionScoped", "/session/:id/probe", {
+        params: { id: Schema.String },
+        query: WorkspaceRoutingQuery,
+        success: ProbeResult,
+      }),
       HttpApiEndpoint.get("workspace", WorkspacePaths.list, {
         query: WorkspaceRoutingQuery,
         success: ProbeResult,
@@ -246,6 +255,7 @@ const probeHandlers = HttpApiBuilder.group(ProbeApi, "probe", (handlers) =>
     .handle("get", () => routeContextResponse)
     .handle("patch", () => Effect.succeed(false))
     .handle("session", () => routeContextResponse)
+    .handle("sessionScoped", () => routeContextResponse)
     .handle("workspace", () => routeContextResponse),
 )
 
@@ -258,6 +268,87 @@ const serveProbe = HttpApiBuilder.layer(ProbeApi).pipe(
 )
 
 describe("HttpApi workspace routing middleware", () => {
+  it.live("activates and reconnects a paused remote workspace before proxying", () =>
+    Effect.gen(function* () {
+      const dir = yield* tmpdirScoped({ git: true })
+      const project = yield* Project.use.fromDirectory(dir)
+      let status = "paused" as "paused" | "connected"
+      let activations = 0
+
+      const remoteUrl = yield* startRemoteWorkspaceHttpServer(() => HttpServerResponse.json({ resumed: true }))
+      const type = "remote-paused-target"
+      registerAdapter(project.project.id, type, {
+        name: "Paused Remote Test",
+        description: "Resume a paused remote workspace",
+        configure: (info) => ({ ...info, name: "paused-remote", directory: "/workspace/repo" }),
+        async create() {},
+        async remove() {},
+        status: () => status,
+        async ensureReady() {
+          activations += 1
+          await Bun.sleep(20)
+          status = "connected"
+        },
+        target: () => ({ type: "remote", url: `${remoteUrl}/base` }),
+      })
+      const workspace = yield* Workspace.Service.use((workspace) =>
+        workspace.create({ type, branch: "main", projectID: project.project.id }),
+      )
+      yield* Effect.addFinalizer(() => Workspace.use.remove(workspace.id).pipe(Effect.ignore))
+
+      expect((yield* Workspace.use.status()).find((item) => item.workspaceID === workspace.id)?.status).toBe("paused")
+
+      yield* serveProbe
+      const responses = yield* Effect.all(
+        [HttpClient.get(`/probe?workspace=${workspace.id}`), HttpClient.get(`/probe?workspace=${workspace.id}`)],
+        { concurrency: "unbounded" },
+      ).pipe(Effect.timeout("2 seconds"))
+
+      expect(responses.map((response) => response.status)).toEqual([200, 200])
+      expect(yield* responses[0].json).toEqual({ resumed: true })
+      expect(activations).toBe(1)
+    }),
+  )
+
+  it.live("creates and routes a built-in remote workspace from generic target metadata", () =>
+    Effect.gen(function* () {
+      const dir = yield* tmpdirScoped({ git: true })
+      const project = yield* Project.use.fromDirectory(dir)
+      let forwarded: ProxiedRequest | undefined
+
+      const remoteUrl = yield* startRemoteWorkspaceHttpServer((request) => {
+        forwarded = request
+        return HttpServerResponse.json({ proxied: true })
+      })
+      const workspace = yield* Workspace.Service.use((workspace) =>
+        workspace.create({
+          type: "remote",
+          branch: "main",
+          projectID: project.project.id,
+          extra: {
+            url: `${remoteUrl}/base`,
+            headers: { "x-target-auth": "remote-token" },
+            directory: "/workspace/repo",
+          },
+        }),
+      )
+      yield* Effect.addFinalizer(() => Workspace.use.remove(workspace.id).pipe(Effect.ignore))
+
+      expect(workspace.type).toBe("remote")
+      expect(workspace.branch).toBe("main")
+      expect(workspace.directory).toBe("/workspace/repo")
+
+      yield* serveProbe
+
+      const response = yield* HttpClient.get(`/probe?workspace=${workspace.id}`).pipe(Effect.timeout("2 seconds"))
+
+      expect(response.status).toBe(200)
+      expect(yield* response.json).toEqual({ proxied: true })
+      expect(forwarded ? requestURL(forwarded).pathname : undefined).toBe("/base/probe")
+      expect(forwarded?.headers["x-target-auth"]).toBe("remote-token")
+    }),
+  )
+
   it.live("proxies remote workspace HTTP requests through the selected workspace target", () =>
     Effect.gen(function* () {
       const dir = yield* tmpdirScoped({ git: true })
@@ -296,7 +387,9 @@ describe("HttpApi workspace routing middleware", () => {
       yield* serveProbe
 
       const body = '{"title":"Remote workspace request"}'
-      const response = yield* HttpClientRequest.patch(`/probe?workspace=${workspace.id}&keep=yes`).pipe(
+      const response = yield* HttpClientRequest.patch(
+        `/probe?workspace=${workspace.id}&keep=yes&directory=${encodeURIComponent("/secret/path")}`,
+      ).pipe(
         HttpClientRequest.setHeaders({
           "x-opencode-directory": "/secret/path",
           "x-opencode-workspace": "internal",
@@ -314,10 +407,12 @@ describe("HttpApi workspace routing middleware", () => {
       expect(yield* response.json).toEqual({ proxied: true, path: "/base/probe", keep: "yes", workspace: null })
       const forwardedURL = forwarded ? requestURL(forwarded) : undefined
       // These assertions are the routing contract: append the original path to
-      // the remote base URL, preserve normal query params, and remove workspace.
+      // the remote base URL, preserve normal query params, and remove workspace
+      // and directory — both name control-plane state the remote cannot resolve.
       expect(forwardedURL?.pathname).toBe("/base/probe")
       expect(forwardedURL?.searchParams.get("keep")).toBe("yes")
       expect(forwardedURL?.searchParams.get("workspace")).toBeNull()
+      expect(forwardedURL?.searchParams.get("directory")).toBeNull()
       expect(forwarded?.method).toBe("PATCH")
       expect(forwarded?.body).toBe(body)
       expect(forwarded?.headers["content-type"]).toBe("application/json")
@@ -347,7 +442,7 @@ describe("HttpApi workspace routing middleware", () => {
 
       const workspace = Workspace.Service.of({
         create: () => Effect.die("unused"),
-        sessionWarp: () => Effect.die("unused"),
+        moveSession: () => Effect.die("unused"),
         list: () => Effect.die("unused"),
         syncList: () => Effect.die("unused"),
         get: (id) =>
@@ -367,6 +462,7 @@ describe("HttpApi workspace routing middleware", () => {
           ),
         remove: () => Effect.die("unused"),
         status: () => Effect.die("unused"),
+        ensureReady: () => Effect.die("unused"),
         isSyncing: () => Effect.succeed(true),
         waitForSync: (id, state) => Ref.set(waited, { workspaceID: id, state }),
         startWorkspaceSyncing: () => Effect.die("unused"),
@@ -405,7 +501,7 @@ describe("HttpApi workspace routing middleware", () => {
       const response = yield* HttpClient.get(`/probe?workspace=${workspaceID}`)
 
       expect(response.status).toBe(503)
-      expect(yield* response.text).toBe(`broken sync connection for workspace: ${workspaceID}`)
+      expect(yield* response.text).toContain(`broken sync connection for workspace: ${workspaceID}`)
     }),
   )
 
@@ -419,6 +515,7 @@ describe("HttpApi workspace routing middleware", () => {
         projectID: project.project.id,
         type: "remote-websocket-target",
         url: `${remoteUrl}/base`,
+        headers: { authorization: "Basic remote-secret" },
       })
 
       // The client connects to the local test server. The middleware should
@@ -437,6 +534,7 @@ describe("HttpApi workspace routing middleware", () => {
       const write = yield* socket.writer
 
       expect(yield* Queue.take(messages)).toBe("protocol:chat")
+      expect(yield* Queue.take(messages)).toBe("authorization:Basic remote-secret")
       yield* write("hello")
       expect(yield* Queue.take(messages)).toBe("echo:hello")
     }),
@@ -453,6 +551,34 @@ describe("HttpApi workspace routing middleware", () => {
 
       expect(response.status).toBe(500)
       expect(yield* response.text).toBe(`Workspace not found: ${workspaceID}`)
+    }),
+  )
+
+  it.live("serves sessions referencing an untracked workspace from their own directory", () =>
+    Effect.gen(function* () {
+      // A plain remote server stores the control plane's workspace id when a
+      // moved session replays; it has no workspace row for it. Session-scoped
+      // requests must fall back to the session directory instead of 500ing.
+      const dir = yield* tmpdirScoped({ git: true })
+      const workspaceID = WorkspaceV2.ID.ascending("wrk_untracked")
+      const sessionID = "ses_untracked_workspace"
+
+      yield* HttpApiBuilder.layer(ProbeApi).pipe(
+        Layer.provide(probeHandlers),
+        Layer.provide(workspaceRoutingTestLayer),
+        Layer.provide(
+          Layer.mock(Session.Service)({
+            get: () => Effect.succeed({ id: sessionID, directory: dir, workspaceID } as Session.Info),
+          }),
+        ),
+        HttpRouter.serve,
+        Layer.build,
+      )
+
+      const response = yield* HttpClient.get(`/session/${sessionID}/probe`)
+
+      expect(response.status).toBe(200)
+      expect(yield* response.json).toEqual({ directory: dir, workspaceID: null })
     }),
   )
 
@@ -507,6 +633,8 @@ describe("HttpApi workspace routing middleware", () => {
       const dir = yield* tmpdirScoped()
       const queryDir = path.join(dir, "query-target")
       const headerDir = path.join(dir, "header-target")
+      yield* Effect.promise(() => mkdir(queryDir, { recursive: true }))
+      yield* Effect.promise(() => mkdir(headerDir, { recursive: true }))
       yield* serveProbe
 
       // Without a selected workspace, the middleware falls back to request
@@ -521,6 +649,22 @@ describe("HttpApi workspace routing middleware", () => {
       expect(yield* queryResponse.json).toEqual({ directory: queryDir, workspaceID: null })
       expect(headerResponse.status).toBe(200)
       expect(yield* headerResponse.json).toEqual({ directory: headerDir, workspaceID: null })
+    }),
+  )
+
+  it.live("falls back to the server directory when the requested directory does not exist locally", () =>
+    Effect.gen(function* () {
+      yield* serveProbe
+
+      // A directory hint that only exists on a remote workspace host (e.g. a
+      // sandbox path echoed back by the client after a move) cannot boot a
+      // local instance; serve from the server's own directory instead.
+      const response = yield* HttpClient.get(
+        `/probe?directory=${encodeURIComponent("/gitterm-e2e-nonexistent/tui-invaders")}`,
+      )
+
+      expect(response.status).toBe(200)
+      expect(yield* response.json).toEqual({ directory: process.cwd(), workspaceID: null })
     }),
   )
 

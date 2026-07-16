@@ -22,6 +22,7 @@ import { disposeAllInstances, provideTmpdirInstance, requireInstance, TestInstan
 import { testEffect } from "../lib/effect"
 import { registerAdapter } from "../../src/control-plane/adapters"
 import { WorkspaceV2 } from "@opencode-ai/core/workspace"
+import { InstanceRef } from "../../src/effect/instance-ref"
 import { WorkspaceTable } from "@opencode-ai/core/control-plane/workspace.sql"
 import type { Target, WorkspaceAdapter, WorkspaceInfo } from "../../src/control-plane/types"
 import * as Workspace from "../../src/control-plane/workspace"
@@ -168,7 +169,11 @@ function eventuallyEffect(effect: Effect.Effect<void>, timeout = 1500) {
 function recordedAdapter(input: {
   target: (info: WorkspaceInfo) => Target | Promise<Target>
   configure?: (info: WorkspaceInfo) => WorkspaceInfo | Promise<WorkspaceInfo>
-  create?: (info: WorkspaceInfo, env: Record<string, string | undefined>, from?: WorkspaceInfo) => Promise<void>
+  create?: (
+    info: WorkspaceInfo,
+    env: Record<string, string | undefined>,
+    from?: WorkspaceInfo,
+  ) => Promise<WorkspaceInfo | void>
   list?: () => Omit<WorkspaceInfo, "id">[] | Promise<Omit<WorkspaceInfo, "id">[]>
   remove?: (info: WorkspaceInfo) => Promise<void>
 }): RecordedAdapter {
@@ -195,7 +200,7 @@ function recordedAdapter(input: {
           env: { ...env },
           from: from ? structuredClone(from) : undefined,
         })
-        await input.create?.(info, env, from)
+        return await input.create?.(info, env, from)
       },
       ...(input.list
         ? {
@@ -492,8 +497,139 @@ describe("workspace CRUD", () => {
         expect(recorded.calls.create[0].env.OTEL_RESOURCE_ATTRIBUTES).toBe("service.name=opencode-test")
         expect((yield* workspace.status()).find((item) => item.workspaceID === workspaceID)?.status).toBe("connected")
 
+        yield* workspace.ensureReady(workspaceID)
+        yield* workspace.ensureReady(workspaceID)
+        expect((yield* workspace.status()).find((item) => item.workspaceID === workspaceID)?.status).toBe("connected")
+
         yield* workspace.remove(workspaceID)
         expect((yield* workspace.status()).find((item) => item.workspaceID === workspaceID)?.status).toBeUndefined()
+      }),
+    { git: true },
+  )
+
+  it.instance(
+    "create persists finalized adapter metadata",
+    () =>
+      Effect.gen(function* () {
+        const instance = yield* requireInstance
+        const workspace = yield* Workspace.Service
+        const workspaceID = WorkspaceV2.ID.ascending("wrk_create_finalized")
+        const type = unique("create-finalized")
+        const targetDir = path.join(instance.directory, "created-finalized")
+        registerAdapter(
+          instance.project.id,
+          type,
+          recordedAdapter({
+            configure(info) {
+              return { ...info, name: "Provisioning" }
+            },
+            async create(info) {
+              await fs.mkdir(targetDir, { recursive: true })
+              return {
+                ...info,
+                id: WorkspaceV2.ID.ascending("wrk_adapter_must_not_replace_id"),
+                type: "adapter-must-not-replace-type",
+                projectID: ProjectV2.ID.make("adapter-must-not-replace-project"),
+                name: "Provisioned",
+                directory: targetDir,
+                extra: { externalID: "sandbox-123" },
+              }
+            },
+            target() {
+              return { type: "local", directory: targetDir }
+            },
+          }).adapter,
+        )
+
+        const info = yield* workspace.create({
+          id: workspaceID,
+          type,
+          branch: "main",
+          projectID: instance.project.id,
+        })
+
+        expect(info).toMatchObject({
+          id: workspaceID,
+          type,
+          projectID: instance.project.id,
+          name: "Provisioned",
+          directory: targetDir,
+          extra: { externalID: "sandbox-123" },
+        })
+        expect(yield* workspace.get(workspaceID)).toEqual(info)
+      }),
+    { git: true },
+  )
+
+  it.instance(
+    "create strips non-JSON extra values and keeps the workspace",
+    () =>
+      Effect.gen(function* () {
+        const instance = yield* requireInstance
+        const workspace = yield* Workspace.Service
+        const type = unique("create-json-extra")
+        const targetDir = path.join(instance.directory, "created-json-extra")
+        const recorded = recordedAdapter({
+          async create(info) {
+            await fs.mkdir(targetDir, { recursive: true })
+            return {
+              ...info,
+              name: "Provisioned",
+              directory: targetDir,
+              extra: {
+                workspaceID: "sandbox-123",
+                checkoutRef: undefined,
+              } as unknown as WorkspaceInfo["extra"],
+            }
+          },
+          target() {
+            return { type: "local", directory: targetDir }
+          },
+        })
+        registerAdapter(instance.project.id, type, recorded.adapter)
+
+        const info = yield* workspace.create({ type, branch: null, projectID: instance.project.id, extra: null })
+
+        expect(info.extra).toEqual({ workspaceID: "sandbox-123" })
+        expect(yield* workspace.get(info.id)).toEqual(info)
+        expect(recorded.calls.remove).toHaveLength(0)
+        yield* workspace.remove(info.id)
+      }),
+    { git: true },
+  )
+
+  it.instance(
+    "create removes provisioned resources when the response cannot be encoded",
+    () =>
+      Effect.gen(function* () {
+        const instance = yield* requireInstance
+        const workspace = yield* Workspace.Service
+        const type = unique("create-encode-failure")
+        const targetDir = path.join(instance.directory, "created-encode-failure")
+        const recorded = recordedAdapter({
+          async create(info) {
+            await fs.mkdir(targetDir, { recursive: true })
+            return {
+              ...info,
+              // Force a post-create encode failure after adapter provision.
+              name: 123 as unknown as string,
+              directory: targetDir,
+              extra: { workspaceID: "sandbox-encode" },
+            }
+          },
+          target() {
+            return { type: "local", directory: targetDir }
+          },
+        })
+        registerAdapter(instance.project.id, type, recorded.adapter)
+
+        expectExitContains(
+          yield* Effect.exit(workspace.create({ type, branch: null, projectID: instance.project.id, extra: null })),
+          "Expected string",
+        )
+        expect(yield* workspace.list(instance.project)).toEqual([])
+        expect(recorded.calls.remove).toHaveLength(1)
+        expect(recorded.calls.remove[0]?.extra).toEqual({ workspaceID: "sandbox-encode" })
       }),
     { git: true },
   )
@@ -528,7 +664,7 @@ describe("workspace CRUD", () => {
   )
 
   it.instance(
-    "create leaves the inserted row when adapter create fails",
+    "create does not persist a workspace when adapter create fails",
     () =>
       Effect.gen(function* () {
         const instance = yield* requireInstance
@@ -551,11 +687,8 @@ describe("workspace CRUD", () => {
           "create exploded",
         )
 
-        const rows = yield* workspace.list(instance.project)
-        expect(rows).toHaveLength(1)
-        expect(rows[0]).toMatchObject({ type, branch: "branch", extra: { x: 1 } })
+        expect(yield* workspace.list(instance.project)).toEqual([])
         expect(recorded.calls.target).toHaveLength(0)
-        yield* workspace.remove(rows[0].id)
       }),
     { git: true },
   )
@@ -737,16 +870,71 @@ describe("workspace CRUD", () => {
 
             const info = yield* workspace.create({ type, branch: null, projectID: instance.project.id, extra: null })
 
-            expect(
-              calls.map((call) => `${call.method} ${call.url.pathname}${call.url.search}${call.url.hash}`),
-            ).toEqual(["GET /base/global/event", "POST /base/sync/history"])
+            yield* eventuallyEffect(
+              Effect.sync(() => {
+                expect(
+                  calls.map((call) => `${call.method} ${call.url.pathname}${call.url.search}${call.url.hash}`),
+                ).toEqual(["GET /base/global/event", "POST /base/sync/history"])
+              }),
+            )
             expect(calls[1].json).toEqual({})
-            expect((yield* workspace.status()).find((item) => item.workspaceID === info.id)?.status).toBe("connected")
+            expect((yield* workspace.status()).find((item) => item.workspaceID === info.id)?.status).toBe(
+              "disconnected",
+            )
             expect(yield* workspace.isSyncing(info.id)).toBe(true)
 
             yield* workspace.remove(info.id)
             expect(yield* workspace.isSyncing(info.id)).toBe(false)
             expect((yield* workspace.status()).find((item) => item.workspaceID === info.id)?.status).toBeUndefined()
+          }),
+        { git: true },
+      )
+    })
+  })
+
+  it.live("remote create does not terminate when the remote is not ready yet", () => {
+    const calls: FetchCall[] = []
+    return Effect.gen(function* () {
+      yield* HttpServer.serveEffect()(
+        Effect.gen(function* () {
+          const req = yield* HttpServerRequest.HttpServerRequest
+          const bodyText = yield* req.text
+          const call = {
+            url: new URL(req.url, "http://localhost"),
+            method: req.method,
+            headers: new Headers(req.headers),
+            bodyText,
+            json: bodyText ? JSON.parse(bodyText) : undefined,
+          }
+          calls.push(call)
+          // Fail SSE so the remote never settles during create.
+          if (call.url.pathname === "/base/global/event") return HttpServerResponse.text("down", { status: 503 })
+          if (call.url.pathname === "/base/sync/history") return yield* HttpServerResponse.json([])
+          return HttpServerResponse.text("unexpected", { status: 500 })
+        }),
+      )
+      const url = yield* serverUrl()
+      yield* provideTmpdirInstance(
+        (dir) =>
+          Effect.gen(function* () {
+            const workspace = yield* Workspace.Service
+            const instance = yield* requireInstance
+            const type = unique("remote-create-unready")
+            const recorded = remoteAdapter(`${url}/base`, { directory: dir })
+            registerAdapter(instance.project.id, type, recorded.adapter)
+
+            const info = yield* workspace.create({ type, branch: null, projectID: instance.project.id, extra: null })
+
+            expect(yield* workspace.get(info.id)).toEqual(info)
+            expect(recorded.calls.remove).toHaveLength(0)
+            yield* eventuallyEffect(
+              Effect.gen(function* () {
+                expect((yield* workspace.status()).find((item) => item.workspaceID === info.id)?.status).toBe("error")
+              }),
+            )
+
+            yield* workspace.remove(info.id)
+            expect(recorded.calls.remove).toHaveLength(1)
           }),
         { git: true },
       )
@@ -801,9 +989,11 @@ describe("workspace CRUD", () => {
   )
 
   it.instance(
-    "remove still deletes the row when the adapter cannot remove resources",
+    "remove deletes the row even when the adapter cannot remove resources",
     () =>
       Effect.gen(function* () {
+        // Dead sandboxes make adapter remove fail forever; the record must
+        // still be deletable. Live resources are re-registered by list sync.
         const instance = yield* requireInstance
         const workspace = yield* Workspace.Service
         const type = unique("remove-throws")
@@ -822,32 +1012,34 @@ describe("workspace CRUD", () => {
         )
         yield* insertWorkspace(info)
 
-        expect(yield* workspace.remove(info.id)).toEqual(info)
+        const removed = yield* workspace.remove(info.id)
+
+        expect(removed).toEqual({ ...info, timeUsed: expect.any(Number) })
         expect(yield* workspace.get(info.id)).toBeUndefined()
       }),
     { git: true },
   )
 
   it.instance(
-    "sessionWarp moves a session into a local workspace and claims ownership",
+    "moveSession moves a session into a local workspace and claims ownership",
     () => {
       return Effect.gen(function* () {
         const { directory: dir } = yield* TestInstance
         const instance = yield* requireInstance
         const workspace = yield* Workspace.Service
         const sessionSvc = yield* SessionNs.Service
-        const previousType = unique("warp-prev-local")
-        const targetType = unique("warp-target-local")
+        const previousType = unique("move-prev-local")
+        const targetType = unique("move-target-local")
         const previous = workspaceInfo(instance.project.id, previousType)
         const target = workspaceInfo(instance.project.id, targetType)
         yield* insertWorkspace(previous)
         yield* insertWorkspace(target)
-        registerAdapter(instance.project.id, previousType, localAdapter(path.join(dir, "warp-prev-local")).adapter)
-        registerAdapter(instance.project.id, targetType, localAdapter(path.join(dir, "warp-target-local")).adapter)
+        registerAdapter(instance.project.id, previousType, localAdapter(path.join(dir, "move-prev-local")).adapter)
+        registerAdapter(instance.project.id, targetType, localAdapter(path.join(dir, "move-target-local")).adapter)
         const session = yield* sessionSvc.create({})
         yield* attachSessionToWorkspace(session.id, previous.id)
 
-        yield* workspace.sessionWarp({ workspaceID: target.id, sessionID: session.id })
+        yield* workspace.moveSession({ workspaceID: target.id, sessionID: session.id })
 
         const { db } = yield* Database.Service
         expect(
@@ -865,17 +1057,17 @@ describe("workspace CRUD", () => {
   )
 
   it.instance(
-    "sessionWarp applies source workspace patch to local target workspace",
+    "moveSession applies source workspace patch to local target workspace",
     () => {
       return Effect.gen(function* () {
         const { directory: dir } = yield* TestInstance
         const instance = yield* requireInstance
         const workspace = yield* Workspace.Service
         const sessionSvc = yield* SessionNs.Service
-        const previousType = unique("warp-patch-prev-local")
-        const targetType = unique("warp-patch-target-local")
-        const previousDir = path.join(dir, "warp-patch-prev-local")
-        const targetDir = path.join(dir, "warp-patch-target-local")
+        const previousType = unique("move-patch-prev-local")
+        const targetType = unique("move-patch-target-local")
+        const previousDir = path.join(dir, "move-patch-prev-local")
+        const targetDir = path.join(dir, "move-patch-target-local")
         yield* Effect.promise(() => initGitRepo(previousDir))
         yield* Effect.promise(() => initGitRepo(targetDir))
         yield* Effect.promise(() => fs.writeFile(path.join(previousDir, "tracked.txt"), "changed\n"))
@@ -890,31 +1082,101 @@ describe("workspace CRUD", () => {
         const session = yield* sessionSvc.create({})
         yield* attachSessionToWorkspace(session.id, previous.id)
 
-        yield* workspace.sessionWarp({ workspaceID: target.id, sessionID: session.id, copyChanges: true })
+        yield* workspace.moveSession({ workspaceID: target.id, sessionID: session.id, copyChanges: true })
 
         expect(yield* Effect.promise(() => fs.readFile(path.join(targetDir, "tracked.txt"), "utf8"))).toBe("changed\n")
         expect(yield* Effect.promise(() => fs.readFile(path.join(targetDir, "new.txt"), "utf8"))).toBe("new\n")
+        expect(yield* Effect.promise(() => fs.readFile(path.join(previousDir, "tracked.txt"), "utf8"))).toBe("base\n")
+        expect(
+          yield* Effect.promise(() =>
+            fs.stat(path.join(previousDir, "new.txt")).then(
+              () => true,
+              () => false,
+            ),
+          ),
+        ).toBe(false)
+
+        yield* workspace.moveSession({ workspaceID: previous.id, sessionID: session.id, copyChanges: true })
+
+        expect(yield* Effect.promise(() => fs.readFile(path.join(previousDir, "tracked.txt"), "utf8"))).toBe(
+          "changed\n",
+        )
+        expect(yield* Effect.promise(() => fs.readFile(path.join(previousDir, "new.txt"), "utf8"))).toBe("new\n")
+        expect(yield* Effect.promise(() => fs.readFile(path.join(targetDir, "tracked.txt"), "utf8"))).toBe("base\n")
+        expect(
+          yield* Effect.promise(() =>
+            fs.stat(path.join(targetDir, "new.txt")).then(
+              () => true,
+              () => false,
+            ),
+          ),
+        ).toBe(false)
       })
     },
     { git: true },
   )
 
   it.instance(
-    "sessionWarp detaches a session to the local project and claims project ownership",
+    "moveSession captures a local source patch without an ambient InstanceRef",
+    () =>
+      Effect.gen(function* () {
+        const { directory: dir } = yield* TestInstance
+        const instance = yield* requireInstance
+        const workspace = yield* Workspace.Service
+        const sessionSvc = yield* SessionNs.Service
+        const targetType = unique("move-local-source-target")
+        const targetDir = path.join(dir, "move-local-source-target")
+        yield* Effect.promise(() => initGitRepo(targetDir))
+        yield* Effect.promise(() => fs.writeFile(path.join(dir, "move-source-new.txt"), "new\n"))
+
+        const target = workspaceInfo(instance.project.id, targetType, { directory: targetDir })
+        yield* insertWorkspace(target)
+        registerAdapter(instance.project.id, targetType, localAdapter(targetDir, { createDir: false }).adapter)
+        const session = yield* sessionSvc.create({})
+
+        yield* workspace
+          .moveSession({ workspaceID: target.id, sessionID: session.id, copyChanges: true })
+          .pipe(Effect.provideService(InstanceRef, undefined))
+
+        expect(yield* Effect.promise(() => fs.readFile(path.join(targetDir, "move-source-new.txt"), "utf8"))).toBe(
+          "new\n",
+        )
+      }),
+    { git: true },
+  )
+
+  it.instance(
+    "moveSession detaches a session to the local project and claims project ownership",
     () => {
       return Effect.gen(function* () {
         const { directory: dir } = yield* TestInstance
         const instance = yield* requireInstance
         const workspace = yield* Workspace.Service
         const sessionSvc = yield* SessionNs.Service
-        const previousType = unique("warp-detach-local")
+        const previousType = unique("move-detach-local")
+        const previousDirectory = path.join(dir, "move-detach-local")
         const previous = workspaceInfo(instance.project.id, previousType)
         yield* insertWorkspace(previous)
-        registerAdapter(instance.project.id, previousType, localAdapter(path.join(dir, "warp-detach-local")).adapter)
+        yield* Effect.promise(() => initGitRepo(previousDirectory))
+        yield* Effect.promise(() => fs.writeFile(path.join(previousDirectory, "move-back.txt"), "moved\n"))
+        registerAdapter(
+          instance.project.id,
+          previousType,
+          localAdapter(previousDirectory, { createDir: false }).adapter,
+        )
         const session = yield* sessionSvc.create({})
         yield* attachSessionToWorkspace(session.id, previous.id)
 
-        yield* workspace.sessionWarp({ workspaceID: null, sessionID: session.id })
+        yield* workspace
+          .moveSession({
+            workspaceID: null,
+            destinationDirectory: dir,
+            sessionID: session.id,
+            copyChanges: true,
+          })
+          .pipe(Effect.provideService(InstanceRef, undefined))
+
+        expect(yield* Effect.promise(() => fs.readFile(path.join(dir, "move-back.txt"), "utf8"))).toBe("moved\n")
 
         const { db } = yield* Database.Service
         expect(
@@ -933,14 +1195,14 @@ describe("workspace CRUD", () => {
 
   const itCrossInstance = process.platform === "win32" ? it.instance.skip : it.instance
   itCrossInstance(
-    "sessionWarp detaches to the source project when invoked from a workspace instance",
+    "moveSession detaches to the source project when invoked from a workspace instance",
     () =>
       Effect.gen(function* () {
         const instance = yield* requireInstance
         const projectID = instance.project.id
         const workspace = yield* Workspace.Service
         const sessionSvc = yield* SessionNs.Service
-        const previousType = unique("warp-detach-workspace-instance")
+        const previousType = unique("move-detach-workspace-instance")
         const previous = workspaceInfo(projectID, previousType)
         yield* insertWorkspace(previous)
         const session = yield* sessionSvc.create({})
@@ -952,7 +1214,11 @@ describe("workspace CRUD", () => {
               registerAdapter(projectID, previousType, localAdapter(workspaceDir, { createDir: false }).adapter)
               const workspaceCtx = yield* requireInstance
               expect(workspaceCtx.project.id).not.toBe(projectID)
-              yield* workspace.sessionWarp({ workspaceID: null, sessionID: session.id })
+              yield* workspace.moveSession({
+                workspaceID: null,
+                destinationDirectory: instance.directory,
+                sessionID: session.id,
+              })
               return workspaceCtx.project.id
             }),
           { git: true },
@@ -973,11 +1239,13 @@ describe("workspace CRUD", () => {
     { git: true },
   )
 
-  it.live("sessionWarp syncs previous remote history, replays it, steals, and claims the sequence", () => {
+  it.live("moveSession replays remote history and the canonical moved event before claiming the sequence", () => {
     const calls: FetchCall[] = []
     let historySessionID: SessionID | undefined
     let historySession: SessionNs.Info | undefined
     let historyNextSeq = 0
+    let sourceDirty = true
+    let failFinalReplay = true
     return Effect.gen(function* () {
       yield* HttpServer.serveEffect()(
         Effect.gen(function* () {
@@ -991,10 +1259,10 @@ describe("workspace CRUD", () => {
             json: bodyText ? JSON.parse(bodyText) : undefined,
           }
           calls.push(call)
-          if (call.url.pathname === "/warp-source/sync/history") {
+          if (call.url.pathname === "/move-source/sync/history") {
             return yield* HttpServerResponse.json([
               {
-                id: `evt_${unique("warp-source-history")}`,
+                id: `evt_${unique("move-source-history")}`,
                 aggregate_id: historySessionID!,
                 seq: historyNextSeq,
                 type: "session.updated.1",
@@ -1002,12 +1270,30 @@ describe("workspace CRUD", () => {
               },
             ])
           }
-          if (call.url.pathname === "/warp-source/vcs/diff/raw") return HttpServerResponse.text("remote patch")
-          if (call.url.pathname === "/warp-target/sync/replay")
+          if (call.url.pathname === "/move-source/sync/replay")
             return yield* HttpServerResponse.json({ sessionID: "ok" })
-          if (call.url.pathname === "/warp-target/sync/steal")
+          if (call.url.pathname === `/move-source/session/${historySessionID}/abort`) return HttpServerResponse.empty()
+          if (call.url.pathname === "/move-source/vcs/diff/raw")
+            return HttpServerResponse.text(sourceDirty ? "remote patch" : "")
+          if (call.url.pathname === "/move-source/vcs/discard") {
+            sourceDirty = false
+            return yield* HttpServerResponse.json({ applied: true })
+          }
+          if (
+            call.url.pathname === "/move-target/sync/replay" &&
+            (call.json as { events?: { type?: string }[] } | undefined)?.events?.some(
+              (event) => event.type === "session.next.moved.1",
+            ) &&
+            failFinalReplay
+          ) {
+            failFinalReplay = false
+            return HttpServerResponse.text("retry final replay", { status: 503 })
+          }
+          if (call.url.pathname === "/move-target/sync/replay")
             return yield* HttpServerResponse.json({ sessionID: "ok" })
-          if (call.url.pathname === "/warp-target/vcs/apply") return yield* HttpServerResponse.json({ applied: true })
+          if (call.url.pathname === "/move-target/global/health")
+            return yield* HttpServerResponse.json({ healthy: true })
+          if (call.url.pathname === "/move-target/vcs/apply") return yield* HttpServerResponse.json({ applied: true })
           return HttpServerResponse.text("unexpected", { status: 500 })
         }),
       )
@@ -1018,33 +1304,67 @@ describe("workspace CRUD", () => {
             const workspace = yield* Workspace.Service
             const sessionSvc = yield* SessionNs.Service
             const instance = yield* requireInstance
-            const previousType = unique("warp-remote-source")
-            const targetType = unique("warp-remote-target")
+            const previousType = unique("move-remote-source")
+            const targetType = unique("move-remote-target")
             const previous = workspaceInfo(instance.project.id, previousType)
-            const target = workspaceInfo(instance.project.id, targetType, { directory: "remote-target-dir" })
+            const target = workspaceInfo(instance.project.id, targetType, { directory: "/remote-target-dir" })
             yield* insertWorkspace(previous)
             yield* insertWorkspace(target)
-            registerAdapter(instance.project.id, previousType, remoteAdapter(`${url}/warp-source`).adapter)
-            registerAdapter(instance.project.id, targetType, remoteAdapter(`${url}/warp-target`).adapter)
+            registerAdapter(instance.project.id, previousType, remoteAdapter(`${url}/move-source`).adapter)
+            registerAdapter(instance.project.id, targetType, remoteAdapter(`${url}/move-target`).adapter)
             const session = yield* sessionSvc.create({})
             yield* attachSessionToWorkspace(session.id, previous.id)
             historySessionID = session.id
             historySession = { ...session, workspaceID: previous.id, title: "from source history" }
             historyNextSeq = ((yield* sessionSequence(session.id)) ?? -1) + 1
 
-            yield* workspace.sessionWarp({ workspaceID: target.id, sessionID: session.id, copyChanges: true })
+            expectExitContains(
+              yield* Effect.exit(
+                workspace.moveSession({
+                  workspaceID: target.id,
+                  destinationDirectory: "/remote-target-dir",
+                  sessionID: session.id,
+                  copyChanges: true,
+                }),
+              ),
+              "retry final replay",
+            )
+            // The committed move appends two events: the canonical moved
+            // event plus the synthetic directory-change notice for the model.
+            const committedSequence = yield* sessionSequence(session.id)
+            expect(committedSequence).toBe(historyNextSeq + 2)
+            expect((yield* sessionSvc.get(session.id)).workspaceID).toBe(target.id)
+            expect(sourceDirty).toBe(true)
 
-            expect(calls.map((call) => `${call.method} ${call.url.pathname}`)).toEqual([
-              "POST /warp-source/sync/history",
-              "GET /warp-source/vcs/diff/raw",
-              "POST /warp-target/vcs/apply",
-              "POST /warp-target/sync/replay",
-              "POST /warp-target/sync/steal",
-            ])
-            expect(calls[0].json).toEqual({ [session.id]: historyNextSeq - 1 })
-            expect(calls[2].json).toEqual({ patch: "remote patch" })
-            expect(calls[3].json).toMatchObject({
-              directory: "remote-target-dir",
+            yield* workspace.moveSession({
+              workspaceID: target.id,
+              destinationDirectory: "/remote-target-dir",
+              sessionID: session.id,
+              copyChanges: true,
+            })
+
+            const requests = calls.map((call) => `${call.method} ${call.url.pathname}`)
+            for (const request of [
+              "POST /move-source/sync/history",
+              "POST /move-source/sync/replay",
+              `POST /move-source/session/${session.id}/abort`,
+              "GET /move-source/global/event",
+              "GET /move-source/vcs/diff/raw",
+              "GET /move-target/global/event",
+              "POST /move-target/vcs/apply",
+              "POST /move-target/sync/replay",
+              "POST /move-source/vcs/discard",
+            ]) {
+              expect(requests).toContain(request)
+            }
+            expect(calls.find((call) => call.url.pathname === "/move-source/sync/history")?.json).toEqual({
+              [session.id]: historyNextSeq - 1,
+            })
+            expect(calls.find((call) => call.url.pathname === "/move-target/vcs/apply")?.json).toEqual({
+              patch: "remote patch",
+            })
+            expect(calls.find((call) => call.url.pathname === "/move-target/sync/replay")?.json).toMatchObject({
+              directory: "/remote-target-dir",
               events: [
                 {
                   aggregateID: session.id,
@@ -1058,9 +1378,18 @@ describe("workspace CRUD", () => {
                 },
               ],
             })
-            expect(calls[4].json).toEqual({ sessionID: session.id })
+            const replay = calls.filter((call) => call.url.pathname === "/move-target/sync/replay")
+            expect(
+              replay.some((call) =>
+                (call.json as { events?: { type?: string }[] } | undefined)?.events?.some(
+                  (event) => event.type === "session.next.moved.1",
+                ),
+              ),
+            ).toBe(true)
             expect((yield* sessionSvc.get(session.id)).title).toBe("from source history")
             expect(yield* sessionSequenceOwner(session.id)).toBe(target.id)
+            expect(yield* sessionSequence(session.id)).toBe(committedSequence)
+            expect(sourceDirty).toBe(false)
           }),
         { git: true },
       )

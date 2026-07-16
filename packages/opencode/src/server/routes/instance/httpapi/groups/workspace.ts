@@ -2,8 +2,6 @@ import { Workspace } from "@/control-plane/workspace"
 import { WorkspaceAdapterEntry } from "@/control-plane/types"
 import { Schema, Struct } from "effect"
 import { HttpApi, HttpApiEndpoint, HttpApiError, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
-import { ApiVcsApplyError } from "./instance"
-import { ApiNotFoundError } from "../errors"
 import { Authorization } from "../middleware/authorization"
 import { InstanceContextMiddleware } from "../middleware/instance-context"
 import { WorkspaceRoutingMiddleware, WorkspaceRoutingQuery } from "../middleware/workspace-routing"
@@ -11,22 +9,6 @@ import { described } from "./metadata"
 
 const root = "/experimental/workspace"
 export const CreatePayload = Schema.Struct(Struct.omit(Workspace.CreateInput.fields, ["projectID"]))
-export const WarpPayload = Schema.Struct({
-  id: Schema.NullOr(Workspace.Info.fields.id),
-  sessionID: Workspace.SessionWarpInput.fields.sessionID,
-  copyChanges: Workspace.SessionWarpInput.fields.copyChanges,
-})
-
-export class ApiWorkspaceWarpError extends Schema.ErrorClass<ApiWorkspaceWarpError>("WorkspaceWarpError")(
-  {
-    name: Schema.Literal("WorkspaceWarpError"),
-    data: Schema.Struct({
-      message: Schema.String,
-    }),
-  },
-  { httpApiStatus: 400 },
-) {}
-
 export class ApiWorkspaceCreateError extends Schema.ErrorClass<ApiWorkspaceCreateError>("WorkspaceCreateError")(
   {
     name: Schema.Literal("WorkspaceCreateError"),
@@ -43,7 +25,6 @@ export const WorkspacePaths = {
   syncList: `${root}/sync-list`,
   status: `${root}/status`,
   remove: `${root}/:id`,
-  warp: `${root}/warp`,
 } as const
 
 export const WorkspaceApi = HttpApi.make("workspace")
@@ -112,18 +93,6 @@ export const WorkspaceApi = HttpApi.make("workspace")
             identifier: "experimental.workspace.remove",
             summary: "Remove workspace",
             description: "Remove an existing workspace.",
-          }),
-        ),
-        HttpApiEndpoint.post("warp", WorkspacePaths.warp, {
-          query: WorkspaceRoutingQuery,
-          payload: WarpPayload,
-          success: described(HttpApiSchema.NoContent, "Session warped"),
-          error: [ApiWorkspaceWarpError, ApiVcsApplyError, ApiNotFoundError],
-        }).annotateMerge(
-          OpenApi.annotations({
-            identifier: "experimental.workspace.warp",
-            summary: "Warp session into workspace",
-            description: "Move a session's sync history into the target workspace, or detach it to the local project.",
           }),
         ),
       )

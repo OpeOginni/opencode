@@ -2,7 +2,12 @@ import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { ConfigPermissionV1 } from "@opencode-ai/core/v1/config/permission"
 import { InstanceState } from "@/effect/instance-state"
 import { Wildcard } from "@opencode-ai/core/util/wildcard"
+import { FSUtil } from "@opencode-ai/core/fs-util"
+import { Database } from "@opencode-ai/core/database/database"
+import { EventTable } from "@opencode-ai/core/event/sql"
+import { and, eq, like } from "drizzle-orm"
 import { Deferred, Effect, Layer, Context } from "effect"
+import fs from "fs"
 import os from "os"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { EventV2Bridge } from "@/event-v2-bridge"
@@ -23,6 +28,7 @@ interface PendingEntry {
 interface State {
   pending: Map<PermissionV1.ID, PendingEntry>
   approved: PermissionV1.Rule[]
+  directory: string
 }
 
 export function evaluate(permission: string, pattern: string, ...rulesets: PermissionV1.Ruleset[]): PermissionV1.Rule {
@@ -43,12 +49,13 @@ const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const events = yield* EventV2Bridge.Service
+    const { db } = yield* Database.Service
     const state = yield* InstanceState.make<State>(
       Effect.fn("Permission.state")(function* (ctx) {
-        void ctx
-        const state = {
+        const state: State = {
           pending: new Map<PermissionV1.ID, PendingEntry>(),
           approved: [],
+          directory: ctx.directory,
         }
 
         yield* Effect.addFinalizer(() =>
@@ -64,9 +71,55 @@ const layer = Layer.effect(
       }),
     )
 
+    // A session that moved between machines leaves absolute paths from its
+    // previous location baked into the model's context, and models keep
+    // reusing them despite reminders. Those paths cannot resolve here, and
+    // merely probing them can stall the process (macOS automounts /home, so
+    // stats on a remote sandbox's /home/... path can block for seconds).
+    // Answer such asks with corrective feedback instead of prompting the
+    // user for a directory that cannot work.
+    const staleMovedRoot = Effect.fnUntraced(function* (
+      request: Omit<PermissionV1.AskInput, "ruleset">,
+      directory: string,
+    ) {
+      if (request.permission !== "external_directory") return undefined
+      const metadata = request.metadata as { parentDir?: unknown } | undefined
+      const target =
+        typeof metadata?.parentDir === "string" ? metadata.parentDir : request.patterns[0]?.replace(/\/\*$/, "")
+      if (!target) return undefined
+      const moved = yield* db
+        .select({ data: EventTable.data })
+        .from(EventTable)
+        .where(and(eq(EventTable.aggregate_id, request.sessionID), like(EventTable.type, "session.next.moved%")))
+        .all()
+        .pipe(Effect.catchCause(() => Effect.succeed([])))
+      for (const event of moved) {
+        const root = (event.data as { source?: { directory?: string } }).source?.directory
+        if (!root || root === directory) continue
+        if (target !== root && !FSUtil.contains(root, target)) continue
+        // A former root that still exists here (e.g. a worktree move on the
+        // same machine) is a legitimate target; let the normal flow decide.
+        const exists = yield* Effect.promise(() =>
+          fs.promises.access(root).then(
+            () => true,
+            () => false,
+          ),
+        )
+        if (exists) continue
+        return root
+      }
+      return undefined
+    })
+
     const ask = Effect.fn("Permission.ask")(function* (input: PermissionV1.AskInput) {
-      const { approved, pending } = yield* InstanceState.get(state)
+      const { approved, pending, directory } = yield* InstanceState.get(state)
       const { ruleset, ...request } = input
+      const stale = yield* staleMovedRoot(request, directory)
+      if (stale) {
+        return yield* new PermissionV1.CorrectedError({
+          feedback: `${request.patterns[0] ?? stale} is under ${stale}, a previous location of this session. The session has moved and that path does not exist here. The project now lives at ${directory} — re-resolve your paths against the current working directory.`,
+        })
+      }
       let needsAsk = false
 
       for (const pattern of request.patterns) {
@@ -218,6 +271,6 @@ export function visibleTools<T>(tools: Record<string, T>, ruleset: PermissionV1.
   return Object.fromEntries(Object.entries(tools).filter(([name]) => !hidden.has(name)))
 }
 
-export const node = LayerNode.make({ service: Service, layer: layer, deps: [EventV2Bridge.node] })
+export const node = LayerNode.make({ service: Service, layer: layer, deps: [EventV2Bridge.node, Database.node] })
 
 export * as Permission from "."

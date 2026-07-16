@@ -58,8 +58,6 @@ import type {
   ExperimentalWorkspaceStatusResponses,
   ExperimentalWorkspaceSyncListErrors,
   ExperimentalWorkspaceSyncListResponses,
-  ExperimentalWorkspaceWarpErrors,
-  ExperimentalWorkspaceWarpResponses,
   FileListErrors,
   FileListResponses,
   FilePartInput,
@@ -230,8 +228,6 @@ import type {
   SyncReplayResponses,
   SyncStartErrors,
   SyncStartResponses,
-  SyncStealErrors,
-  SyncStealResponses,
   TextPartInput,
   ToolIdsErrors,
   ToolIdsResponses,
@@ -391,6 +387,8 @@ import type {
   VcsDiffRawErrors,
   VcsDiffRawResponses,
   VcsDiffResponses,
+  VcsDiscardErrors,
+  VcsDiscardResponses,
   VcsGetErrors,
   VcsGetResponses,
   VcsStatusErrors,
@@ -1186,51 +1184,6 @@ export class Workspace extends HeyApiClient {
       url: "/experimental/workspace/{id}",
       ...options,
       ...params,
-    })
-  }
-
-  /**
-   * Warp session into workspace
-   *
-   * Move a session's sync history into the target workspace, or detach it to the local project.
-   */
-  public warp<ThrowOnError extends boolean = false>(
-    parameters?: {
-      directory?: string
-      workspace?: string
-      id?: string | null
-      sessionID?: string
-      copyChanges?: boolean
-    },
-    options?: Options<never, ThrowOnError>,
-  ) {
-    const params = buildClientParams(
-      [parameters],
-      [
-        {
-          args: [
-            { in: "query", key: "directory" },
-            { in: "query", key: "workspace" },
-            { in: "body", key: "id" },
-            { in: "body", key: "sessionID" },
-            { in: "body", key: "copyChanges" },
-          ],
-        },
-      ],
-    )
-    return (options?.client ?? this.client).post<
-      ExperimentalWorkspaceWarpResponses,
-      ExperimentalWorkspaceWarpErrors,
-      ThrowOnError
-    >({
-      url: "/experimental/workspace/warp",
-      ...options,
-      ...params,
-      headers: {
-        "Content-Type": "application/json",
-        ...options?.headers,
-        ...params.headers,
-      },
     })
   }
 
@@ -2140,6 +2093,43 @@ export class Vcs extends HeyApiClient {
     )
     return (options?.client ?? this.client).post<VcsApplyResponses, VcsApplyErrors, ThrowOnError>({
       url: "/vcs/apply",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Discard transferred VCS changes
+   *
+   * Discard source changes only when they still match a previously transferred patch.
+   */
+  public discard<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      patch?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "patch" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<VcsDiscardResponses, VcsDiscardErrors, ThrowOnError>({
+      url: "/vcs/discard",
       ...options,
       ...params,
       headers: {
@@ -4521,43 +4511,6 @@ export class Sync extends HeyApiClient {
     )
     return (options?.client ?? this.client).post<SyncReplayResponses, SyncReplayErrors, ThrowOnError>({
       url: "/sync/replay",
-      ...options,
-      ...params,
-      headers: {
-        "Content-Type": "application/json",
-        ...options?.headers,
-        ...params.headers,
-      },
-    })
-  }
-
-  /**
-   * Steal session into workspace
-   *
-   * Update a session to belong to the current workspace through the sync event system.
-   */
-  public steal<ThrowOnError extends boolean = false>(
-    parameters?: {
-      directory?: string
-      workspace?: string
-      sessionID?: string
-    },
-    options?: Options<never, ThrowOnError>,
-  ) {
-    const params = buildClientParams(
-      [parameters],
-      [
-        {
-          args: [
-            { in: "query", key: "directory" },
-            { in: "query", key: "workspace" },
-            { in: "body", key: "sessionID" },
-          ],
-        },
-      ],
-    )
-    return (options?.client ?? this.client).post<SyncStealResponses, SyncStealErrors, ThrowOnError>({
-      url: "/sync/steal",
       ...options,
       ...params,
       headers: {

@@ -1,4 +1,4 @@
-import type { Workspace } from "@opencode-ai/sdk/v2"
+import type { ExperimentalWorkspaceAdapterListResponse, Workspace } from "@opencode-ai/sdk/v2"
 import { useDialog } from "../ui/dialog"
 import { DialogSelect, type DialogSelectOption } from "../ui/dialog-select"
 import { useProject } from "../context/project"
@@ -10,8 +10,9 @@ import { createStore } from "solid-js/store"
 import { errorMessage } from "../util/error"
 import { useSDK } from "../context/sdk"
 import { useToast } from "../ui/toast"
+import { workspaceProvenance } from "./dialog-workspace-create"
 
-type WorkspaceOption = { workspace: Workspace }
+type WorkspaceOption = { workspace?: Workspace }
 
 export function DialogWorkspaceList() {
   const dialog = useDialog()
@@ -24,14 +25,26 @@ export function DialogWorkspaceList() {
   const [deleting, setDeleting] = createSignal<string>()
   const [removing, setRemoving] = createSignal<string>()
   const [expanded, setExpanded] = createStore<Record<string, boolean>>({})
+  const [adapters, setAdapters] = createSignal<ExperimentalWorkspaceAdapterListResponse>()
 
   const current = createMemo(() => {
     if (route.data.type === "session") return sync.session.get(route.data.sessionID)?.workspaceID
     return project.workspace.current()
   })
 
-  const options = createMemo<DialogSelectOption<WorkspaceOption>[]>(() =>
-    project.workspace
+  // The "Main" row is the LOCAL project; instance/path context can point at a
+  // remote workspace's directory after a move, so prefer the SDK's directory.
+  const mainDirectory = createMemo(() => sdk.directory || project.instance.directory() || sync.path.directory)
+
+  const options = createMemo<DialogSelectOption<WorkspaceOption>[]>(() => [
+    {
+      title: "Main",
+      value: {},
+      footer: "local · main",
+      details: expanded["main"] && mainDirectory() ? [mainDirectory()!] : undefined,
+      gutter: () => <text fg={theme.success}>●</text>,
+    },
+    ...project.workspace
       .list()
       .toSorted((a, b) => a.name.localeCompare(b.name))
       .map((workspace) => {
@@ -44,15 +57,15 @@ export function DialogWorkspaceList() {
                 ? `Delete ${workspace.name}? Press delete again`
                 : workspace.name,
           value: { workspace },
-          footer: workspace.type,
+          footer: workspaceProvenance(adapters(), workspace),
           details: expanded[workspace.id] && workspace.directory ? [workspace.directory] : undefined,
           gutter: () => <text fg={status === "connected" ? theme.success : theme.error}>●</text>,
         }
       }),
-  )
+  ])
 
-  function showDetails(workspace: Workspace) {
-    setExpanded(workspace.id, (open) => !open)
+  function showDetails(workspace?: Workspace) {
+    setExpanded(workspace?.id ?? "main", (open) => !open)
   }
 
   async function remove(workspace: Workspace) {
@@ -90,6 +103,12 @@ export function DialogWorkspaceList() {
     dialog.setSize("large")
     void sdk.client.experimental.workspace.syncList().catch(() => undefined)
     void project.workspace.sync()
+    void sdk.client.experimental.workspace.adapter
+      .list({ directory: mainDirectory() })
+      .then((response) => {
+        if (response.data) setAdapters(response.data)
+      })
+      .catch(() => undefined)
   })
 
   return (
@@ -104,7 +123,10 @@ export function DialogWorkspaceList() {
         {
           command: "session.delete",
           title: "delete",
-          onTrigger: (option) => void remove(option.value.workspace),
+          onTrigger: (option) => {
+            if (!option.value.workspace) return
+            void remove(option.value.workspace)
+          },
         },
       ]}
     />

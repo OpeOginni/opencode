@@ -34,5 +34,10 @@ export function workspaceProxyURL(target: string | URL, requestURL: URL) {
   proxyURL.search = requestURL.search
   proxyURL.hash = requestURL.hash
   proxyURL.searchParams.delete("workspace")
+  // The directory param names a path on this host; forwarding it makes the
+  // remote resolve a directory that does not exist there and serve an empty
+  // instance. Drop it like the x-opencode-directory header so the remote
+  // falls back to its own default instance.
+  proxyURL.searchParams.delete("directory")
   return proxyURL
 }

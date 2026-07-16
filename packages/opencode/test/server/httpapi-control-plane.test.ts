@@ -41,6 +41,7 @@ const apiLayer = HttpRouter.serve(
   Layer.provide(Layer.mock(Installation.Service)({})),
   Layer.provide(
     Layer.mock(MoveSession.Service)({
+      atDestination: () => Effect.succeed(false),
       moveSession: (value) => Ref.set(called, value),
     }),
   ),

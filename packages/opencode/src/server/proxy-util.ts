@@ -22,6 +22,10 @@ export function headers(input: Request | HeadersInit | Record<string, string>, e
   const raw = input instanceof Request ? input.headers : input
   const out = new Headers(raw instanceof Headers ? raw : Object.entries(raw as Record<string, string>))
   sanitize(out)
+  // Drop client Authorization before applying workspace target credentials.
+  // Otherwise the host session Authorization would overwrite remote Basic auth
+  // and Gitterm/OpenCode remote would return 401/CF HTML error pages.
+  out.delete("authorization")
   if (!extra) return out
   for (const [key, value] of new Headers(extra).entries()) {
     out.set(key, value)

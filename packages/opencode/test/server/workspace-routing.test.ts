@@ -80,6 +80,13 @@ describe("workspaceProxyURL", () => {
     expect(result.searchParams.get("keep")).toBe("yes")
   })
 
+  test("removes directory so the remote resolves its own instance", () => {
+    const url = new URL("http://localhost/vcs/diff/raw?workspace=ws_123&directory=%2FUsers%2Fme%2Frepo&keep=yes")
+    const result = workspaceProxyURL("http://remote:8080/base", url)
+    expect(result.searchParams.get("directory")).toBeNull()
+    expect(result.searchParams.get("keep")).toBe("yes")
+  })
+
   test("preserves hash from request", () => {
     const url = new URL("http://localhost/page#section")
     const result = workspaceProxyURL("http://remote:8080", url)

@@ -79,7 +79,9 @@ export const Moved = Event.define({
   schema: {
     ...Base,
     location: Location.Ref,
+    source: Location.Ref.pipe(optional),
     subdirectory: RelativePath.pipe(optional),
+    transferHash: Schema.String.pipe(optional),
   },
 })
 export type Moved = typeof Moved.Type

@@ -1,9 +1,13 @@
 export * as PermissionV2 from "./permission"
 
 import { makeLocationNode } from "./effect/app-node"
+import { and, eq, like } from "drizzle-orm"
 import { Context, Deferred, Effect as EffectRuntime, Layer, Schema } from "effect"
 import { Permission } from "@opencode-ai/schema/permission"
+import { Database } from "./database/database"
 import { EventV2 } from "./event"
+import { EventTable } from "./event/sql"
+import { FSUtil } from "./fs-util"
 import { Location } from "./location"
 import { AgentV2 } from "./agent"
 import { SessionV2 } from "./session"
@@ -61,7 +65,11 @@ export class DeclinedError extends Schema.TaggedErrorClass<DeclinedError>()("Per
 
 export class CorrectedError extends Schema.TaggedErrorClass<CorrectedError>()("PermissionV2.CorrectedError", {
   feedback: Schema.String,
-}) {}
+}) {
+  override get message() {
+    return `This tool call was not permitted. Feedback: ${this.feedback}`
+  }
+}
 
 export class BlockedError extends Schema.TaggedErrorClass<BlockedError>()("PermissionV2.BlockedError", {
   rules: Permission.Ruleset,
@@ -110,11 +118,42 @@ const layer = Layer.effect(
   Service,
   EffectRuntime.gen(function* () {
     const events = yield* EventV2.Service
+    const { db } = yield* Database.Service
+    const fs = yield* FSUtil.Service
     const location = yield* Location.Service
     const agents = yield* AgentV2.Service
     const sessions = yield* SessionStore.Service
     const saved = yield* PermissionSaved.Service
     const pending = new Map<ID, Pending>()
+
+    // A session that moved between machines leaves absolute paths from its
+    // previous location baked into the model's context, and models keep
+    // reusing them despite reminders. Those paths cannot resolve here, and
+    // merely probing them can stall the process (macOS automounts /home, so
+    // sync stats on a remote sandbox's /home/... path block for seconds).
+    // Answer such asks with corrective feedback instead of prompting the
+    // user for a directory that cannot work.
+    const staleMovedRoot = EffectRuntime.fnUntraced(function* (input: AssertInput) {
+      if (input.action !== "external_directory") return undefined
+      const directory = input.resources[0]?.replace(/\/\*$/, "")
+      if (!directory) return undefined
+      const moved = yield* db
+        .select({ data: EventTable.data })
+        .from(EventTable)
+        .where(and(eq(EventTable.aggregate_id, input.sessionID), like(EventTable.type, "session.next.moved%")))
+        .all()
+        .pipe(EffectRuntime.catchCause(() => EffectRuntime.succeed([])))
+      for (const event of moved) {
+        const root = (event.data as { source?: { directory?: string } }).source?.directory
+        if (!root || root === location.directory) continue
+        if (directory !== root && !FSUtil.contains(root, directory)) continue
+        // A former root that still exists here (e.g. a worktree move on the
+        // same machine) is a legitimate target; let the normal flow decide.
+        if (yield* fs.existsSafe(root)) continue
+        return root
+      }
+      return undefined
+    })
 
     yield* EffectRuntime.addFinalizer(() =>
       EffectRuntime.forEach(pending.values(), (item) => Deferred.fail(item.deferred, new DeclinedError()), {
@@ -197,6 +236,12 @@ const layer = Layer.effect(
     const assert = EffectRuntime.fn("PermissionV2.assert")((input: AssertInput) =>
       EffectRuntime.uninterruptibleMask((restore) =>
         EffectRuntime.gen(function* () {
+          const stale = yield* staleMovedRoot(input)
+          if (stale) {
+            return yield* new CorrectedError({
+              feedback: `${input.resources[0]} is under ${stale}, a previous location of this session. The session has moved and that path does not exist here. The project now lives at ${location.directory} — re-resolve your paths against the current working directory.`,
+            })
+          }
           const result = yield* evaluateInput(input)
           if (result.effect === "deny") {
             return yield* new BlockedError({
@@ -306,5 +351,5 @@ export const locationLayer = layer.pipe(Layer.provideMerge(AgentV2.locationLayer
 export const node = makeLocationNode({
   service: Service,
   layer,
-  deps: [EventV2.node, Location.node, AgentV2.node, SessionStore.node, PermissionSaved.node],
+  deps: [Database.node, EventV2.node, FSUtil.node, Location.node, AgentV2.node, SessionStore.node, PermissionSaved.node],
 })

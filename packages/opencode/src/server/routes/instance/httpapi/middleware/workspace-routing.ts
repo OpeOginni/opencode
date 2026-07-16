@@ -9,6 +9,8 @@ import { getWorkspaceRouteSessionID, isLocalWorkspaceRoute, workspaceProxyURL } 
 import { NotFoundError } from "@/storage/storage"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { Context, Data, Effect, Layer, Option, Schema } from "effect"
+import fs from "fs"
+import path from "path"
 import { HttpClient, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { HttpApiMiddleware } from "effect/unstable/httpapi"
 import * as Socket from "effect/unstable/socket/Socket"
@@ -31,6 +33,7 @@ type RemoteTarget = Extract<Target, { type: "remote" }>
 type RequestPlan = Data.TaggedEnum<{
   InvalidWorkspace: {}
   MissingWorkspace: { readonly workspaceID: WorkspaceV2.ID }
+  UnavailableWorkspace: { readonly workspaceID: WorkspaceV2.ID }
   Local: { readonly directory: string; readonly workspaceID?: WorkspaceV2.ID }
   Remote: {
     readonly request: HttpServerRequest.HttpServerRequest
@@ -83,8 +86,31 @@ function selectedV2WorkspaceID(
   return workspaceID.value
 }
 
-function defaultDirectory(request: HttpServerRequest.HttpServerRequest, url: URL): string {
-  return url.searchParams.get("directory") || request.headers["x-opencode-directory"] || process.cwd()
+// A locally-planned request can carry a directory that only exists on a
+// remote workspace host (a session's pre-move directory, or path/project
+// data synced back from a remote instance and echoed by the client).
+// Booting a local instance for it fails every time, so decoded directory
+// sources are only used when they exist here. The x-opencode-directory
+// header is exempt: it arrives URI-encoded and is decoded downstream.
+// Synchronous on purpose: this runs for WebSocket upgrades too, where an
+// async hop in request planning stalls the upgrade window.
+function firstExistingDirectory(candidates: (string | null | undefined)[]): string | undefined {
+  for (const candidate of candidates) {
+    if (!candidate) continue
+    // Only vet absolute paths; anything else is an opaque value that
+    // downstream middleware decodes and resolves with its own fallbacks.
+    if (!path.isAbsolute(candidate)) return candidate
+    if (fs.existsSync(candidate)) return candidate
+  }
+  return undefined
+}
+
+function defaultDirectory(
+  request: HttpServerRequest.HttpServerRequest,
+  url: URL,
+  checked?: string,
+): string {
+  return checked || request.headers["x-opencode-directory"] || process.cwd()
 }
 
 function shouldStayOnControlPlane(request: HttpServerRequest.HttpServerRequest, url: URL): boolean {
@@ -120,14 +146,15 @@ function proxyRemote(
   return Effect.gen(function* () {
     const syncing = yield* Workspace.Service.use((svc) => svc.isSyncing(workspace.id))
     if (!syncing) {
-      return HttpServerResponse.text(`broken sync connection for workspace: ${workspace.id}`, {
+      return HttpServerResponse.text(`broken sync connection for workspace: ${workspace.id} (the sync loop is not running or failed; check workspace connectivity and that experimental workspaces are enabled)`, {
         status: 503,
         contentType: "text/plain; charset=utf-8",
       })
     }
     const proxyURL = workspaceProxyURL(target.url, url)
     const headers = request.headers as Record<string, string>
-    if (headers["upgrade"]?.toLowerCase() === "websocket") return yield* HttpApiProxy.websocket(request, proxyURL)
+    if (headers["upgrade"]?.toLowerCase() === "websocket")
+      return yield* HttpApiProxy.websocket(request, proxyURL, target.headers)
     const response = yield* HttpApiProxy.http(client, proxyURL, target.headers, request)
     const sync = Fence.parse(new Headers(response.headers))
     if (sync) {
@@ -151,6 +178,14 @@ function planWorkspaceRequest(
   workspace: Workspace.Info,
 ): Effect.Effect<RequestPlan, never, Workspace.Service> {
   return Effect.gen(function* () {
+    const service = yield* Workspace.Service
+    if (WorkspaceAdapterRuntime.kind(workspace) !== "local" && !(yield* service.isSyncing(workspace.id))) {
+      const ready = yield* service.ensureReady(workspace.id).pipe(
+        Effect.as(true),
+        Effect.catch(() => Effect.succeed(false)),
+      )
+      if (!ready) return RequestPlan.UnavailableWorkspace({ workspaceID: workspace.id })
+    }
     const target = yield* resolveTarget(workspace)
     if (target.type === "remote") return RequestPlan.Remote({ request, workspace, target, url })
     return RequestPlan.Local({ directory: target.directory, workspaceID: workspace.id })
@@ -171,6 +206,14 @@ function planRequest(
     const workspace = yield* resolveWorkspace(workspaceID, envWorkspaceID)
 
     if (workspaceID && workspace === undefined && !envWorkspaceID) {
+      // A session can reference a workspace this server does not track: a
+      // server addressed as a plain remote workspace stores the control
+      // plane's workspace id when the session's moved event replays. Serve
+      // the session from its own directory instead of failing the request.
+      if (session?.workspaceID === workspaceID && session.directory) {
+        const checked = firstExistingDirectory([session.directory, url.searchParams.get("directory")])
+        return RequestPlan.Local({ directory: defaultDirectory(request, url, checked) })
+      }
       return RequestPlan.MissingWorkspace({ workspaceID })
     }
 
@@ -178,8 +221,14 @@ function planRequest(
       return yield* planWorkspaceRequest(request, url, workspace)
     }
 
+    // A session in a remote workspace has a directory that only exists on the
+    // remote host; serving a control-plane-local route from it would boot a
+    // local instance for a nonexistent path. Use the request's own directory.
+    const sessionDirectory =
+      workspace !== undefined && WorkspaceAdapterRuntime.kind(workspace) !== "local" ? undefined : session?.directory
+    const checked = firstExistingDirectory([sessionDirectory, url.searchParams.get("directory")])
     return RequestPlan.Local({
-      directory: session?.directory || defaultDirectory(request, url),
+      directory: defaultDirectory(request, url, checked),
       workspaceID: envWorkspaceID ?? workspaceID,
     })
   })
@@ -203,6 +252,13 @@ function routeWorkspace<E>(
         ),
       ),
     MissingWorkspace: ({ workspaceID }) => Effect.succeed(missingWorkspaceResponse(workspaceID)),
+    UnavailableWorkspace: ({ workspaceID }) =>
+      Effect.succeed(
+        HttpServerResponse.text(`Workspace unavailable: ${workspaceID}`, {
+          status: 503,
+          contentType: "text/plain; charset=utf-8",
+        }),
+      ),
     Remote: ({ request, workspace, target, url }) => proxyRemote(client, request, workspace, target, url),
     Local: ({ directory, workspaceID }) =>
       effect.pipe(Effect.provideService(WorkspaceRouteContext, WorkspaceRouteContext.of({ directory, workspaceID }))),

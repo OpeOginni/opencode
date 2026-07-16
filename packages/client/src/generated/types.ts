@@ -720,7 +720,9 @@ export type SessionsHistoryOutput = {
           readonly timestamp: number
           readonly sessionID: string
           readonly location: { readonly directory: string; readonly workspaceID?: string }
+          readonly source?: { readonly directory: string; readonly workspaceID?: string }
           readonly subdirectory?: string
+          readonly transferHash?: string
         }
       }
     | {
@@ -1178,7 +1180,9 @@ export type SessionsEventsOutput =
         readonly timestamp: number
         readonly sessionID: string
         readonly location: { readonly directory: string; readonly workspaceID?: string }
+        readonly source?: { readonly directory: string; readonly workspaceID?: string }
         readonly subdirectory?: string
+        readonly transferHash?: string
       }
     }
   | {

@@ -190,6 +190,7 @@ describe("workspace HttpApi", () => {
         type: "worktree",
         name: "Worktree",
         description: "Create a git worktree",
+        kind: "local",
       })
 
       expect(workspaces.status).toBe(200)
@@ -217,12 +218,15 @@ describe("workspace HttpApi", () => {
       expect(workspace).toMatchObject({ type: "local-test", name: "local-test" })
 
       const session = yield* Session.use.create({}).pipe(provideInstance(dir))
-      const warped = yield* request(WorkspacePaths.warp, dir, {
+      const moved = yield* request("/experimental/control-plane/move-session", dir, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ id: workspace.id, sessionID: session.id }),
+        body: JSON.stringify({
+          sessionID: session.id,
+          destination: { directory: workspace.directory, workspaceID: workspace.id },
+        }),
       })
-      expect(warped.status).toBe(204)
+      expect(moved.status).toBe(204)
 
       const removed = yield* request(WorkspacePaths.remove.replace(":id", workspace.id), dir, { method: "DELETE" })
       expect(removed.status).toBe(200)
@@ -258,16 +262,19 @@ describe("workspace HttpApi", () => {
     }),
   )
 
-  it.live("returns a declared not found error when warping into a missing workspace", () =>
+  it.live("returns a declared not found error when moving into a missing workspace", () =>
     Effect.gen(function* () {
       const dir = yield* tmpdirScoped({ git: true })
       const session = yield* Session.use.create({}).pipe(provideInstance(dir))
-      const workspaceID = WorkspaceV2.ID.ascending("wrk_missing_warp")
+      const workspaceID = WorkspaceV2.ID.ascending("wrk_missing_move")
 
-      const response = yield* request(WorkspacePaths.warp, dir, {
+      const response = yield* request("/experimental/control-plane/move-session", dir, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ id: workspaceID, sessionID: session.id }),
+        body: JSON.stringify({
+          sessionID: session.id,
+          destination: { directory: dir, workspaceID },
+        }),
       })
 
       expect(response.status).toBe(404)
@@ -464,12 +471,15 @@ describe("workspace HttpApi", () => {
       const workspace = (yield* created.json) as Workspace.Info
       const sessionResponse = yield* requestDefault("/session", dir, { method: "POST" })
       const session = (yield* sessionResponse.json) as Session.Info
-      const warped = yield* requestDefault(WorkspacePaths.warp, dir, {
+      const moved = yield* requestDefault("/experimental/control-plane/move-session", dir, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ id: workspace.id, sessionID: session.id }),
+        body: JSON.stringify({
+          sessionID: session.id,
+          destination: { directory: workspace.directory, workspaceID: workspace.id },
+        }),
       })
-      expect(warped.status).toBe(204)
+      expect(moved.status).toBe(204)
 
       try {
         const response = yield* requestDefault(`http://localhost/session/${session.id}/message`, dir, {

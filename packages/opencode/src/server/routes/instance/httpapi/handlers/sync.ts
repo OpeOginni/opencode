@@ -1,6 +1,5 @@
 import { Workspace } from "@/control-plane/workspace"
 import * as InstanceState from "@/effect/instance-state"
-import { Session } from "@/session/session"
 import { Database } from "@opencode-ai/core/database/database"
 import { EventV2 } from "@opencode-ai/core/event"
 import { EventV2Bridge } from "@/event-v2-bridge"
@@ -14,12 +13,11 @@ import { or } from "drizzle-orm"
 import { Effect, Scope } from "effect"
 import { HttpApiBuilder, HttpApiError } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
-import { HistoryPayload, ReplayPayload, SessionPayload } from "../groups/sync"
+import { HistoryPayload, ReplayPayload } from "../groups/sync"
 
 export const syncHandlers = HttpApiBuilder.group(InstanceHttpApi, "sync", (handlers) =>
   Effect.gen(function* () {
     const workspace = yield* Workspace.Service
-    const session = yield* Session.Service
     const scope = yield* Scope.Scope
     const events = yield* EventV2Bridge.Service
     const { db } = yield* Database.Service
@@ -58,17 +56,6 @@ export const syncHandlers = HttpApiBuilder.group(InstanceHttpApi, "sync", (handl
       return { sessionID: source }
     })
 
-    const steal = Effect.fn("SyncHttpApi.steal")(function* (ctx: { payload: typeof SessionPayload.Type }) {
-      const workspaceID = yield* InstanceState.workspaceID
-      if (!workspaceID) return yield* new HttpApiError.BadRequest({})
-
-      yield* session.setWorkspace({ sessionID: ctx.payload.sessionID, workspaceID })
-
-      yield* Effect.logInfo("sync session stolen", { sessionID: ctx.payload.sessionID, workspaceID })
-
-      return { sessionID: ctx.payload.sessionID }
-    })
-
     const history = Effect.fn("SyncHttpApi.history")(function* (ctx: { payload: typeof HistoryPayload.Type }) {
       const exclude = Object.entries(ctx.payload)
       return yield* db
@@ -84,6 +71,6 @@ export const syncHandlers = HttpApiBuilder.group(InstanceHttpApi, "sync", (handl
         .pipe(Effect.orDie)
     })
 
-    return handlers.handle("start", start).handle("replay", replay).handle("steal", steal).handle("history", history)
+    return handlers.handle("start", start).handle("replay", replay).handle("history", history)
   }),
 )

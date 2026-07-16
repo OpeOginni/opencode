@@ -1044,13 +1044,16 @@ sessionID -&gt; { directory, workspaceID? }</code></pre>
                 <td>Update workspace metadata or lifecycle state.</td>
               </tr>
               <tr class="question-row">
-                <td class="operation"><code>workspace.warp</code></td>
+                <td class="operation"><code>controlPlane.moveSession</code></td>
                 <td class="body">
-                  <code>{ workspaceID?: WorkspaceID sessionID: SessionID copyChanges: boolean }</code>
+                  <code
+                    >{ sessionID: SessionID destination: { directory: string workspaceID?: WorkspaceID } moveChanges?:
+                    boolean }</code
+                  >
                 </td>
                 <td><span class="context-tag server">server</span></td>
-                <td class="route"><code>POST /api/workspace/warp</code></td>
-                <td>Move a session into or out of a workspace. Needs team discussion.</td>
+                <td class="route"><code>POST /experimental/control-plane/move-session</code></td>
+                <td>Move a session between local directories and adapter-backed workspaces.</td>
               </tr>
             </tbody>
           </table>
