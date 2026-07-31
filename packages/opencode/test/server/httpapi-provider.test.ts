@@ -52,6 +52,11 @@ function providerByID(input: unknown, key: "all" | "providers", id: string) {
   return providerList(input, key).find((provider) => isRecord(provider) && provider.id === id)
 }
 
+function connectedProviders(input: unknown) {
+  if (!isRecord(input) || !Array.isArray(input.connected)) return []
+  return input.connected.filter((provider): provider is string => typeof provider === "string")
+}
+
 function hasNonZeroModelCost(input: unknown, key: "all" | "providers", id: string) {
   const provider = providerByID(input, key, id)
   if (!isRecord(provider) || !isRecord(provider.models)) return false
@@ -376,6 +381,29 @@ describe("provider HttpApi", () => {
       expect(hasNonZeroModelCost(configBody, "providers", "google")).toBe(true)
     }),
     { ...projectOptions, init: writeFunctionOptionsPlugin },
+  )
+
+  it.instance(
+    "reports credentials added after provider state initializes as connected",
+    Effect.gen(function* () {
+      const directory = (yield* TestInstance).directory
+      const headers = { "x-opencode-directory": directory }
+      const initial = yield* request("/provider", { headers })
+      expect(initial.status).toBe(200)
+      expect(connectedProviders(yield* initial.json)).not.toContain("github-copilot")
+
+      yield* setEnvScoped(
+        "OPENCODE_AUTH_CONTENT",
+        JSON.stringify({
+          "github-copilot": { type: "oauth", refresh: "dummy", access: "dummy", expires: 0 },
+        }),
+      )
+      const updated = yield* request("/provider", { headers })
+
+      expect(updated.status).toBe(200)
+      expect(connectedProviders(yield* updated.json)).toContain("github-copilot")
+    }),
+    projectOptions,
   )
 
   it.instance(
