@@ -218,7 +218,7 @@ export function PromptInputV2(props: PromptInputV2Props) {
             />
             <Show when={view.agent} keyed>
               {(control) => (
-                <div class="hidden min-w-0 @2xl:contents">
+                <div class="hidden @2xl:contents">
                   <PromptInputV2ConfiguredSelect
                     title={i18n.t("ui.promptInput.chooseAgent")}
                     keybind={["Mod", "."]}
@@ -247,7 +247,7 @@ export function PromptInputV2(props: PromptInputV2Props) {
             <Show when={(props.variantControlVisible ?? true) && view.variant} keyed>
               {(control) => (
                 <Show when={control.options().length > 1}>
-                  <div class="hidden min-w-0 @2xl:contents">
+                  <div class="hidden @2xl:contents">
                     <PromptInputV2ConfiguredSelect
                       title={i18n.t("ui.promptInput.chooseVariant")}
                       keybind={["Shift", "Mod", "D"]}
@@ -595,7 +595,7 @@ export function PromptInputV2Select(props: {
           as={ButtonV2}
           variant="ghost-muted"
           size="normal"
-          class={`w-full min-w-0 max-w-full justify-start ![font-weight:440] ${props.class ?? ""}`}
+          class={`w-full justify-start ![font-weight:440] ${props.class ?? ""}`}
           aria-label={props.title}
         >
           {props.currentIcon}
