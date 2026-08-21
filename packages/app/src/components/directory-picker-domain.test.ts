@@ -15,6 +15,7 @@ import {
   treePathWithin,
   currentPickerSuggestions,
   createDirectorySearch,
+  createPriorityTaskQueue,
   displayPickerPath,
   pickerParent,
   pickerRoot,
@@ -132,12 +133,13 @@ test("scopes file autocomplete to the current browser root", () => {
 test("resolves directory autocomplete from the current browser root", async () => {
   const directories: string[] = []
   const sdk = {
-    client: {
-      find: {
-        files: (input: { directory: string }) => {
-          directories.push(input.directory)
+    api: {
+      file: {
+        find: (input: { location?: { directory?: string } }) => {
+          directories.push(input.location?.directory ?? "")
           return Promise.resolve({ data: [] })
         },
+        list: () => Promise.resolve({ data: [] }),
       },
     },
   } as unknown as Parameters<typeof createDirectorySearch>[0]["sdk"]
@@ -149,6 +151,90 @@ test("resolves directory autocomplete from the current browser root", async () =
   await search("components")
 
   expect(directories).toEqual(["/repo", "/repo/src"])
+})
+
+test("keeps indexed directory results for servers that support empty search", async () => {
+  const sdk = {
+    api: {
+      file: {
+        find: () => Promise.resolve({ data: [{ path: "projects/", type: "directory" }] }),
+        list: () => Promise.reject(new Error("listing should not run when search returns results")),
+      },
+    },
+  } as unknown as Parameters<typeof createDirectorySearch>[0]["sdk"]
+  const search = createDirectorySearch({ sdk, home: () => "/home/luke", base: () => "/home/luke" })
+
+  expect(await search("")).toEqual(["/home/luke/projects"])
+})
+
+test("lists the default directory when empty search is unsupported", async () => {
+  const calls: string[] = []
+  const directories = Array.from({ length: 60 }, (_, index) => ({
+    path: `project-${index}/`,
+    type: "directory" as const,
+  }))
+  const sdk = {
+    api: {
+      file: {
+        find: () => Promise.resolve({ data: [] }),
+        list: (input: { location?: { directory?: string } }) => {
+          calls.push(input.location?.directory ?? "")
+          return Promise.resolve({
+            data: [...directories, { path: "README.md", type: "file" }],
+          })
+        },
+      },
+    },
+  } as unknown as Parameters<typeof createDirectorySearch>[0]["sdk"]
+  const search = createDirectorySearch({ sdk, home: () => "/home/luke", base: () => "/home/luke" })
+
+  const results = await search("")
+  expect(results).toHaveLength(60)
+  expect(results.at(-1)).toBe("/home/luke/project-59")
+  expect(calls).toEqual(["/home/luke"])
+})
+
+test("matches the default directory listing when typed search is unsupported", async () => {
+  const sdk = {
+    api: {
+      file: {
+        find: () => Promise.resolve({ data: [] }),
+        list: () =>
+          Promise.resolve({
+            data: [
+              { path: "Documents/", type: "directory" },
+              { path: "Downloads/", type: "directory" },
+            ],
+          }),
+      },
+    },
+  } as unknown as Parameters<typeof createDirectorySearch>[0]["sdk"]
+  const search = createDirectorySearch({ sdk, home: () => "/home/luke", base: () => "/home/luke" })
+
+  expect(await search("documents")).toEqual(["/home/luke/Documents"])
+})
+
+test("searches from an absolute root without a default base", async () => {
+  const directories: string[] = []
+  const sdk = {
+    api: {
+      file: {
+        list: (input: { location?: { directory?: string } }) => {
+          directories.push(input.location?.directory ?? "")
+          return Promise.resolve({
+            data: [
+              { path: "Users/", type: "directory" },
+              { path: "tmp/", type: "directory" },
+            ],
+          })
+        },
+      },
+    },
+  } as unknown as Parameters<typeof createDirectorySearch>[0]["sdk"]
+  const search = createDirectorySearch({ sdk, home: () => "", base: () => undefined })
+
+  expect(await search("/")).toEqual(["/Users", "/tmp"])
+  expect(directories).toEqual(["/"])
 })
 
 test("identifies the next directory level to preload", () => {
@@ -166,6 +252,41 @@ test("advances preloading once for every expanded directory", () => {
   expect(advanceTreePreload(advanced, "")).toBeTrue()
   expect(advanceTreePreload(advanced, "")).toBeFalse()
   expect(advanceTreePreload(advanced, "repos/")).toBeTrue()
+})
+
+test("limits background tasks and prioritizes newly requested work", async () => {
+  const queue = createPriorityTaskQueue<void>(2)
+  const first = Promise.withResolvers<void>()
+  const second = Promise.withResolvers<void>()
+  const started: string[] = []
+  let active = 0
+  let maximum = 0
+  const task = (name: string, blocker?: Promise<void>) => async () => {
+    started.push(name)
+    active++
+    maximum = Math.max(maximum, active)
+    await blocker
+    active--
+  }
+
+  const running = [
+    queue.schedule("first", "background", task("first", first.promise)),
+    queue.schedule("second", "background", task("second", second.promise)),
+    queue.schedule("preload", "background", task("preload")),
+    queue.schedule("opened", "user", task("opened")),
+  ]
+  await Promise.resolve()
+  expect(started).toEqual(["first", "second"])
+
+  first.resolve()
+  await running[0]
+  await Promise.resolve()
+  expect(started).toEqual(["first", "second", "opened"])
+
+  second.resolve()
+  await Promise.all(running)
+  expect(started).toEqual(["first", "second", "opened", "preload"])
+  expect(maximum).toBe(2)
 })
 
 test("clamps bridged tree wheel scrolling", () => {

@@ -58,6 +58,7 @@ function azureAuthPlugin(input: {
   prompts: NonNullable<Hooks["auth"]>["methods"][number]["prompts"]
   providerOptions?: (resourceName: string) => Record<string, string>
 }): Hooks {
+  const tokenProvider = azureCliTokenProvider()
   return {
     auth: {
       provider: input.provider,
@@ -66,8 +67,6 @@ function azureAuthPlugin(input: {
         if (auth.type !== "oauth") return {}
 
         const resourceName = process.env[input.resourceEnv] || auth.accountId
-        const tokenProvider = azureCliTokenProvider()
-
         return {
           ...((resourceName && input.providerOptions?.(resourceName)) ?? {}),
           apiKey: OAUTH_DUMMY_KEY,
@@ -110,13 +109,16 @@ function azureAuthPlugin(input: {
             url: "https://learn.microsoft.com/azure/developer/ai/keyless-connections",
             instructions: input.oauthInstructions,
             method: "auto" as const,
-            callback: async () => ({
-              type: "success" as const,
-              access: OAUTH_DUMMY_KEY,
-              refresh: OAUTH_DUMMY_KEY,
-              expires: Date.now() + 365 * 24 * 60 * 60 * 1000,
-              accountId: inputs?.resourceName || process.env[input.resourceEnv],
-            }),
+            callback: async () => {
+              await tokenProvider()
+              return {
+                type: "success" as const,
+                access: OAUTH_DUMMY_KEY,
+                refresh: OAUTH_DUMMY_KEY,
+                expires: Date.now() + 365 * 24 * 60 * 60 * 1000,
+                accountId: inputs?.resourceName || process.env[input.resourceEnv],
+              }
+            },
           }),
         },
       ],
@@ -129,10 +131,7 @@ function azureCliTokenProvider() {
   return async () => {
     if (cached && cached.expires - Date.now() > AZURE_TOKEN_REFRESH_BUFFER) return cached.token
 
-    const proc = Bun.spawn(["az", "account", "get-access-token", "--resource", AZURE_SCOPE, "--output", "json"], {
-      stdout: "pipe",
-      stderr: "pipe",
-    })
+    const proc = spawnAzureCliTokenCommand()
     const [stdout, stderr, exitCode] = await Promise.all([
       new Response(proc.stdout).text(),
       new Response(proc.stderr).text(),
@@ -156,5 +155,18 @@ function azureCliTokenProvider() {
             : Date.now() + 30 * 60 * 1000,
     }
     return cached.token
+  }
+}
+
+function spawnAzureCliTokenCommand() {
+  try {
+    return Bun.spawn(["az", "account", "get-access-token", "--resource", AZURE_SCOPE, "--output", "json"], {
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+  } catch (error) {
+    throw new Error("Azure CLI is required for Microsoft Entra ID OAuth. Install `az`, run `az login`, and try again.", {
+      cause: error,
+    })
   }
 }
