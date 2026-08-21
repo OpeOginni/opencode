@@ -36,6 +36,52 @@ describe("normalizeAgentList", () => {
       },
     ])
   })
+
+  test("tolerates agents whose request omits settings", () => {
+    const result = normalizeAgentList([
+      {
+        id: "build",
+        name: "Build",
+        mode: "primary",
+        hidden: false,
+        request: { headers: {}, body: {} },
+        permissions: [{ action: "read", resource: "*", effect: "allow" }],
+      },
+    ] as unknown as AgentListOutput["data"])
+
+    expect(result).toMatchObject([
+      {
+        name: "build",
+        temperature: undefined,
+        topP: undefined,
+        options: {},
+      },
+    ])
+  })
+
+  test("tolerates agents missing request and permissions in a mixed list", () => {
+    const result = normalizeAgentList([
+      {
+        id: "build",
+        name: "Build",
+        mode: "primary",
+        hidden: false,
+        request: { settings: { temperature: 0.2 }, headers: {}, body: {} },
+        permissions: [],
+      },
+      {
+        id: "plan",
+        name: "Plan",
+        mode: "primary",
+        hidden: false,
+      },
+    ] as unknown as AgentListOutput["data"])
+
+    expect(result).toMatchObject([
+      { name: "build", temperature: 0.2 },
+      { name: "plan", temperature: undefined, permission: [], options: {} },
+    ])
+  })
 })
 
 describe("normalizeProviderList", () => {
