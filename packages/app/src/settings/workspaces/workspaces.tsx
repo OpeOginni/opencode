@@ -1,5 +1,5 @@
 import type { Component } from "solid-js"
-import { For, Show, batch, createMemo } from "solid-js"
+import { For, Show, createMemo } from "solid-js"
 import { createStore } from "solid-js/store"
 import type { SessionInfo } from "@opencode-ai/client/promise"
 import { useQuery } from "@tanstack/solid-query"
@@ -93,15 +93,12 @@ export const SettingsWorkspaces: Component<{ activeDirectory?: string }> = (prop
       activeDirectory: props.activeDirectory,
     }
   }
-  // Fetch sessions per workspace directory instead of paging through every
-  // session on the server; batch the store writes so thousands of remember
-  // calls don't each re-run the store's sorted-session memo and block the UI.
+  // Fetch sessions per workspace directory instead of paging through every session on the server.
   const loadSessions = async (directories: readonly string[], context = captureDeleteContext()) => {
     const fetched = await Promise.all(
       directories.map((directory) => listAllSessions(context.sdk.api.session, { order: "desc", directory })),
     )
     const sessions = fetched.flat()
-    batch(() => sessions.forEach(context.data.session.remember))
     return mergeWorkspaceSessionInventory(sessions, context.data.session.list())
   }
   const workspaceDirectories = createMemo(() => workspaces().map((workspace) => workspace.directory))
@@ -112,7 +109,7 @@ export const SettingsWorkspaces: Component<{ activeDirectory?: string }> = (prop
       "settings-workspace-sessions",
       workspaceDirectories().map((directory) => String(pathKey(directory))),
     ] as const,
-    queryFn: () => loadSessions(workspaceDirectories()).then(() => Date.now()),
+    queryFn: () => loadSessions(workspaceDirectories()),
     enabled: workspaceDirectories().length > 0,
     refetchOnMount: "always",
   }))
@@ -121,7 +118,7 @@ export const SettingsWorkspaces: Component<{ activeDirectory?: string }> = (prop
       new Map(
         workspaces().map((workspace) => [
           pathKey(workspace.directory),
-          sessionQuery.isSuccess ? sessionsForWorkspace(data.session.list(), workspace.directory) : [],
+          sessionQuery.data ? sessionsForWorkspace(sessionQuery.data, workspace.directory) : [],
         ]),
       ),
   )
