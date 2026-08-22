@@ -7,9 +7,6 @@ export const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
 
 export function normalizeAgentList(input: AgentListOutput["data"] | Agent[]): Agent[] {
   if (input.every((agent) => !("request" in agent))) return input as Agent[]
-  // Responses are not validated at the client layer, so an older or third-party
-  // server may send agents whose request lacks settings; runs inside reactive
-  // computations during bootstrap, where a throw takes down the whole app.
   return (input as AgentListOutput["data"]).map((agent) => {
     const settings = agent.request?.settings ?? {}
     return {
