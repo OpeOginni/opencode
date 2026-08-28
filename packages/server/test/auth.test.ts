@@ -7,3 +7,9 @@ test("accepts only the fixed opencode username", () => {
   expect(ServerAuth.authorized({ username: "opencode", password: Redacted.make("secret") }, config)).toBe(true)
   expect(ServerAuth.authorized({ username: "custom", password: Redacted.make("secret") }, config)).toBe(false)
 })
+
+test("accepts a configured username", () => {
+  const config = { password: Option.some("secret"), username: "custom" }
+  expect(ServerAuth.authorized({ username: "custom", password: Redacted.make("secret") }, config)).toBe(true)
+  expect(ServerAuth.authorized({ username: "opencode", password: Redacted.make("secret") }, config)).toBe(false)
+})

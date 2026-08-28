@@ -13,8 +13,8 @@ export type Info = {
 }
 
 export class Config extends Context.Service<Config, Info>()("@opencode/ServerAuthConfig") {
-  static configLayer(input: Pick<Info, "password">) {
-    return Layer.succeed(this, this.of({ ...input, username: "opencode" }))
+  static configLayer(input: Pick<Info, "password"> & Partial<Pick<Info, "username">>) {
+    return Layer.succeed(this, this.of({ ...input, username: input.username ?? "opencode" }))
   }
 
   static get layer() {

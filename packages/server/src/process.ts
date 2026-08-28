@@ -62,7 +62,7 @@ export const start = Effect.fn("ServerProcess.start")(function* <E, R>(
   // Request fibers may continue inbound trace context, but must not inherit the server startup parent.
   yield* bound.http
     .serve(
-      dispatch(password, status, application, options.app?.version ?? "unknown").pipe(
+      dispatch(password, options.username, status, application, options.app?.version ?? "unknown").pipe(
         HttpMiddleware.cors({ allowedOrigins: isAllowedCorsOrigin, maxAge: 86_400 }),
       ),
       errorResponseLogger,
@@ -168,11 +168,12 @@ function addressInUse(error: unknown) {
 
 function dispatch(
   password: string,
+  username: string | undefined,
   status: Status.Interface,
   application: Ref.Ref<Option.Option<App>>,
   version: string,
 ): App {
-  const auth = ServerAuth.Config.of({ password: Option.some(password), username: "opencode" })
+  const auth = ServerAuth.Config.of({ password: Option.some(password), username: username ?? "opencode" })
   return Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest
     const url = new URL(request.url, "http://localhost")

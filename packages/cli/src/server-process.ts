@@ -77,6 +77,7 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
             ? Redacted.value(environmentPassword)
             : randomBytes(32).toString("base64url")
       if (!password) return yield* Effect.fail(new Error("Missing server password"))
+      const username = Env.username
       const instanceID = randomUUID()
       const transform = yield* WebUi.handler()
       const server = yield* start(
@@ -88,6 +89,7 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
           },
           hostname,
           port,
+          username,
           password,
           pty: { handoff },
           simulation: truthy(process.env.OPENCODE_SIMULATE),

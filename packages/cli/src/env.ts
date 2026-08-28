@@ -12,6 +12,8 @@ export const password = Config.redacted("OPENCODE_PASSWORD").pipe(
   Config.withDefault(undefined),
 )
 
+export const username = process.env.OPENCODE_SERVER_USERNAME ?? "opencode"
+
 export function session() {
   return Object.fromEntries(
     Object.entries(process.env).filter(

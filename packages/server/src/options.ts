@@ -13,6 +13,7 @@ export const ServerOptions = Schema.Struct({
   ),
   hostname: Schema.optional(Schema.String),
   port: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(65_535))),
+  username: Schema.optional(Schema.String),
   password: Schema.optional(Schema.String),
   simulation: Schema.optional(Schema.Boolean),
   database: Schema.optional(Database.Options),
