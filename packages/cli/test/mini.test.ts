@@ -117,8 +117,16 @@ describe("mini command", () => {
     const result = await cli(["--help"])
 
     expect(result.exitCode).toBe(0)
+    expect(result.stdout).toContain("--fork")
     expect(result.stdout).toContain("mini       Start the minimal interactive interface")
     expect(result.stdout).toContain("run        Run OpenCode with a message")
+  })
+
+  test("requires a session target when forking from the full TUI", async () => {
+    const result = await cli(["--fork"])
+
+    expect(result.exitCode).toBe(1)
+    expect(result.stdout).toContain("--fork requires --continue or --session")
   })
 
   test("exposes run without legacy interactive, attach, or command modes", async () => {

@@ -365,7 +365,7 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
                                         <ToastProvider>
                                           <RouteProvider
                                             initialRoute={
-                                              input.args.continue
+                                              input.args.continue && !input.args.sessionID
                                                 ? {
                                                     type: "session",
                                                     sessionID: "dummy",
@@ -630,7 +630,7 @@ function App(props: { pair?: DialogPairCredentials }) {
 
   let continued = false
   createEffect(() => {
-    if (continued || !args.continue) return
+    if (continued || !args.continue || args.sessionID) return
     continued = true
     const location = data.location.default()
     void client.api.session
