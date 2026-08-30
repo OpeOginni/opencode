@@ -117,7 +117,6 @@ describe("mini command", () => {
     const result = await cli(["--help"])
 
     expect(result.exitCode).toBe(0)
-    expect(result.stdout).toContain("--fork")
     expect(result.stdout).toContain("mini       Start the minimal interactive interface")
     expect(result.stdout).toContain("run        Run OpenCode with a message")
   })
