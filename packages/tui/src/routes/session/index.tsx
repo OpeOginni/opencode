@@ -558,6 +558,7 @@ export function Session(props: {
     if (!local.agent.current() || !local.model.current()) return
     if (!args.prompt || route.prompt?.text !== args.prompt || current.current.text !== args.prompt) return
     sent = true
+    args.consumePrompt()
     current.submit()
   })
   const dialog = useDialog()

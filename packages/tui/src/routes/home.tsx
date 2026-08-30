@@ -69,6 +69,7 @@ export function Home() {
     if (!args.prompt) return
     if (r.current.text !== args.prompt) return
     sent = true
+    args.consumePrompt()
     r.submit()
   })
 
