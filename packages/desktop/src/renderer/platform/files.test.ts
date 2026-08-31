@@ -1,18 +1,12 @@
 import { describe, expect, test } from "bun:test"
 import { createDesktopFiles } from "./files"
 
-function fileApi(
-  events: string[],
-  onOpen?: (options?: { multiple?: boolean; title?: string; defaultPath?: string; extensions?: string[] }) => void,
-) {
+type PickerOptions = { multiple?: boolean; title?: string; defaultPath?: string; extensions?: string[] }
+
+function fileApi(events: string[], onOpen?: (options?: PickerOptions) => void) {
   return {
     openDirectoryPicker: async () => null,
-    openFilePicker: async (options?: {
-      multiple?: boolean
-      title?: string
-      defaultPath?: string
-      extensions?: string[]
-    }) => {
+    openFilePicker: async (options?: PickerOptions) => {
       onOpen?.(options)
       return {
         token: "selection",
