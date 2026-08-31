@@ -688,6 +688,7 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
     updateConfig: updateConfigMutation.mutateAsync,
     project: projectApi,
     session,
+    indexSession,
     homeSessions,
     mcp: {
       toggle: async (directory: string, name: string) => {

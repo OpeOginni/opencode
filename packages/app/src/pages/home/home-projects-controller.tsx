@@ -94,6 +94,8 @@ export function createHomeProjectsController(home: HomeController) {
                 type: "session.updated",
                 properties: { sessionID: result.data.id, info: result.data },
               })
+              ctx.sync.session.remember(result.data)
+              ctx.sync.indexSession(result.data)
               home.project.openProjectSession(conn, project.worktree, result.data.id)
             },
           )
