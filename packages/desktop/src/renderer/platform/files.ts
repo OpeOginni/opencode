@@ -26,14 +26,14 @@ export function createDesktopFiles(api: DesktopFileAPI, os: DesktopOS, acceptedE
   ) => {
     return api.openDirectoryPicker({
       multiple: options?.multiple ?? false,
-      title: options?.title,
+      ...(options?.title === undefined ? {} : { title: options.title }),
     })
   }
   const openAttachmentPickerDialog: NonNullable<Platform["openAttachmentPickerDialog"]> = async (options, onFile) => {
     const result = await api.openFilePicker({
       multiple: options?.multiple ?? false,
-      title: options?.title,
-      defaultPath: options?.defaultPath,
+      ...(options?.title === undefined ? {} : { title: options.title }),
+      ...(options?.defaultPath === undefined ? {} : { defaultPath: options.defaultPath }),
       extensions: options?.extensions ?? acceptedExtensions,
     })
     if (!result) return
@@ -53,7 +53,10 @@ export function createDesktopFiles(api: DesktopFileAPI, os: DesktopOS, acceptedE
     openAttachmentPickerDialog,
     getPathForFile: (file: File) => attachmentPaths.get(file) ?? api.getPathForFile(file),
     async saveFilePickerDialog(options?: { title?: string; defaultPath?: string }) {
-      return api.saveFilePicker({ title: options?.title, defaultPath: options?.defaultPath })
+      return api.saveFilePicker({
+        ...(options?.title === undefined ? {} : { title: options.title }),
+        ...(options?.defaultPath === undefined ? {} : { defaultPath: options.defaultPath }),
+      })
     },
     openExternal: (url: string) => api.openExternal(url),
     openLocalFile: (url: string) => api.openLocalFile(url),
