@@ -40,6 +40,7 @@ export type HomeProjectsViewProps = {
   canDefaultServer: Accessor<boolean>
   defaultServerKey: Accessor<ServerConnection.Key | null | undefined>
   canRevealProject: (server: ServerConnection.Any) => boolean
+  canImportSession: boolean
   unseenCount: (server: ServerConnection.Any, project: LocalProject) => number
   onWheel: (event: WheelEvent) => void
   onChooseProject: (server: ServerConnection.Any) => void
@@ -53,6 +54,7 @@ export type HomeProjectsViewProps = {
   onAddProjects: (server: ServerConnection.Any, directories: string[]) => void
   onOpenProjectNewSession: (server: ServerConnection.Any, directory: string) => void
   onEditProject: (server: ServerConnection.Any, project: LocalProject) => void
+  onImportSession: (server: ServerConnection.Any, project: LocalProject) => void
   onRevealProject: (server: ServerConnection.Any, project: LocalProject) => void
   onClearNotifications: (server: ServerConnection.Any, project: LocalProject) => void
   onCloseProject: (server: ServerConnection.Any, directory: string) => void
@@ -551,6 +553,11 @@ function HomeProjectRow(
               <MenuV2.Item onSelect={() => props.onEditProject(props.server, props.project)}>
                 {props.language.t("dialog.project.edit.title")}
               </MenuV2.Item>
+              <Show when={props.canImportSession}>
+                <MenuV2.Item onSelect={() => props.onImportSession(props.server, props.project)}>
+                  {props.language.t("command.session.import")}
+                </MenuV2.Item>
+              </Show>
               <Show when={props.canRevealProject(props.server)}>
                 <MenuV2.Item onSelect={() => props.onRevealProject(props.server, props.project)}>
                   {props.language.t(
