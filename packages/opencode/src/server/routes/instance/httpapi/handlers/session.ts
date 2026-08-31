@@ -6,6 +6,7 @@ import { Command } from "@/command"
 import { Permission } from "@/permission"
 import { SessionShare } from "@/share/session"
 import { Session } from "@/session/session"
+import { SessionImport } from "@/session/import"
 import { SessionCompaction } from "@/session/compaction"
 import { MessageV2 } from "@/session/message-v2"
 import { SessionPrompt } from "@/session/prompt"
@@ -19,6 +20,7 @@ import { NamedError } from "@opencode-ai/core/util/error"
 import { Cause, Effect, Option, Schema, Scope } from "effect"
 import * as Stream from "effect/Stream"
 import { InstanceState } from "@/effect/instance-state"
+import { InstanceRef } from "@/effect/instance-ref"
 import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { HttpApiBuilder, HttpApiError, HttpApiSchema } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
@@ -72,6 +74,17 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
         search: ctx.query.search,
         limit: ctx.query.limit,
       })
+    })
+
+    const importSession = Effect.fn("SessionHttpApi.import")(function* (ctx: {
+      payload: typeof SessionImport.Data.Type
+    }) {
+      const instance = yield* InstanceRef
+      if (!instance) return yield* new HttpApiError.BadRequest({})
+      const info = yield* SessionImport.run({ data: ctx.payload, context: instance }).pipe(
+        Effect.mapError(() => new HttpApiError.BadRequest({})),
+      )
+      return yield* session.get(info.id).pipe(Effect.orDie)
     })
 
     const status = Effect.fn("SessionHttpApi.status")(function* () {
@@ -411,6 +424,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     })
 
     return handlers
+      .handle("importSession", importSession)
       .handle("list", list)
       .handle("status", status)
       .handle("get", get)

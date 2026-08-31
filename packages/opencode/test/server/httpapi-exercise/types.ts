@@ -6,6 +6,7 @@ import type { Project } from "../../../src/project/project"
 import type { Worktree } from "../../../src/worktree"
 import type { MessageV2 } from "../../../src/session/message-v2"
 import type { SessionID } from "../../../src/session/schema"
+import type { Session } from "../../../src/session/session"
 
 export const OpenApiMethods = ["get", "post", "put", "delete", "patch"] as const
 export const Methods = ["GET", "POST", "PUT", "DELETE", "PATCH"] as const
@@ -118,7 +119,7 @@ export type Result =
   | { status: "fail"; scenario: ActiveScenario; message: string }
   | { status: "skip"; scenario: TodoScenario }
 
-export type SessionInfo = { id: SessionID; title: string; parentID?: SessionID }
+export type SessionInfo = Session.Info
 export type TodoInfo = {
   content: string
   status: "pending" | "in_progress" | "completed" | "cancelled"

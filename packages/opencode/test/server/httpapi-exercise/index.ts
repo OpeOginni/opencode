@@ -1165,6 +1165,31 @@ const scenarios: Scenario[] = [
     .seeded((ctx) => ctx.session({ title: "Status session" }))
     .json(200, object),
   http.protected
+    .post("/session/import", "session.import")
+    .mutating()
+    .seeded((ctx) => ctx.session({ title: "Imported session" }))
+    .at((ctx) => ({
+      path: "/session/import",
+      headers: ctx.headers(),
+      body: {
+        info: {
+          id: ctx.state.id,
+          slug: ctx.state.slug,
+          projectID: ctx.state.projectID,
+          directory: ctx.state.directory,
+          title: ctx.state.title,
+          version: ctx.state.version,
+          time: ctx.state.time,
+        },
+        messages: [],
+      },
+    }))
+    .json(200, (body, ctx) => {
+      object(body)
+      check(body.id === ctx.state.id, "imported session should preserve its ID")
+      check(body.directory === ctx.directory, "imported session should use scenario directory")
+    }),
+  http.protected
     .post("/session", "session.create")
     .mutating()
     .at((ctx) => ({ path: "/session", headers: ctx.headers(), body: { title: "Created session" } }))

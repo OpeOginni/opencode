@@ -9436,6 +9436,40 @@ export type ProviderOauthCallbackResponses = {
 
 export type ProviderOauthCallbackResponse = ProviderOauthCallbackResponses[keyof ProviderOauthCallbackResponses]
 
+export type SessionImportData = {
+  body?: {
+    info: Session
+    messages: Array<{
+      info: Message
+      parts: Array<Part>
+    }>
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/session/import"
+}
+
+export type SessionImportErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+}
+
+export type SessionImportError = SessionImportErrors[keyof SessionImportErrors]
+
+export type SessionImportResponses = {
+  /**
+   * Imported session
+   */
+  200: Session
+}
+
+export type SessionImportResponse = SessionImportResponses[keyof SessionImportResponses]
+
 export type SessionListData = {
   body?: never
   path?: never

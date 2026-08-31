@@ -117,7 +117,7 @@ export function fromRow(row: SessionRow): Info {
   }
 }
 
-export function toRow(info: Info) {
+export function toRow(info: typeof Info.Type) {
   return {
     id: info.id,
     project_id: info.projectID,
@@ -134,7 +134,7 @@ export function toRow(info: Info) {
     summary_additions: info.summary?.additions,
     summary_deletions: info.summary?.deletions,
     summary_files: info.summary?.files,
-    summary_diffs: info.summary?.diffs,
+    summary_diffs: info.summary?.diffs?.map((diff) => ({ ...diff })),
     metadata: info.metadata,
     cost: info.cost ?? 0,
     tokens_input: (info.tokens ?? EmptyTokens).input,
@@ -150,7 +150,7 @@ export function toRow(info: Info) {
           diff: info.revert.diff,
         }
       : null,
-    permission: info.permission,
+    permission: info.permission ? [...info.permission] : undefined,
     time_created: info.time.created,
     time_updated: info.time.updated,
     time_compacting: info.time.compacting,

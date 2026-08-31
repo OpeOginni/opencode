@@ -3,6 +3,7 @@ import { Permission } from "@/permission"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 
 import { Session } from "@/session/session"
+import { SessionImport } from "@/session/import"
 import { MessageV2 } from "@/session/message-v2"
 import { SessionPrompt } from "@/session/prompt"
 import { SessionRevert } from "@/session/revert"
@@ -78,6 +79,7 @@ export const PermissionResponsePayload = Schema.Struct({
 export const SessionPaths = {
   list: root,
   status: `${root}/status`,
+  import: `${root}/import`,
   get: `${root}/:sessionID`,
   children: `${root}/:sessionID/children`,
   todo: `${root}/:sessionID/todo`,
@@ -108,6 +110,18 @@ export const SessionApi = HttpApi.make("session")
   .add(
     HttpApiGroup.make("session")
       .add(
+        HttpApiEndpoint.post("importSession", SessionPaths.import, {
+          query: WorkspaceRoutingQuery,
+          payload: SessionImport.Data,
+          success: described(Session.Info, "Imported session"),
+          error: HttpApiError.BadRequest,
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.import",
+            summary: "Import session",
+            description: "Import a session transcript from an OpenCode session export.",
+          }),
+        ),
         HttpApiEndpoint.get("list", SessionPaths.list, {
           query: ListQuery,
           success: described(Schema.Array(Session.Info), "List of sessions"),

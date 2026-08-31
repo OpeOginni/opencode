@@ -5,7 +5,7 @@ import { SessionProjector } from "@opencode-ai/core/session/projector"
 import { Deferred, Effect, Exit, Layer } from "effect"
 import { Session as SessionNs } from "@/session/session"
 import { MessageV2 } from "../../src/session/message-v2"
-import { MessageID, PartID, type SessionID } from "../../src/session/schema"
+import { MessageID, PartID, SessionID } from "../../src/session/schema"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { provideInstance, tmpdirScoped } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
@@ -16,11 +16,17 @@ import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { InstanceStore } from "@/project/instance-store"
 import { InstanceBootstrap } from "@/project/bootstrap"
+import { InstanceRef } from "@/effect/instance-ref"
+import { SessionImport } from "@/session/import"
+import { Database } from "@opencode-ai/core/database/database"
+import { ModelV2 } from "@opencode-ai/core/model"
+import { ProviderV2 } from "@opencode-ai/core/provider"
 
 const it = testEffect(
   AppNodeBuilder.build(
     LayerNode.group([
       SessionNs.node,
+      Database.node,
       EventV2Bridge.node,
       SessionProjector.node,
       CrossSpawnSpawner.node,
@@ -127,6 +133,84 @@ describe("session.created event", () => {
         data: { sessionID: info.id },
       })
 
+      yield* session.remove(info.id)
+    }),
+  )
+})
+
+describe("session import", () => {
+  it.instance("imports a transcript into the active project", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionNs.Service
+      const context = yield* InstanceRef
+      if (!context) return yield* Effect.die("InstanceRef not provided")
+
+      const info = yield* session.create({ title: "Imported session" })
+      const messageID = MessageID.ascending()
+      yield* session.updateMessage({
+        id: messageID,
+        sessionID: info.id,
+        role: "user",
+        time: { created: Date.now() },
+        agent: "build",
+        model: { providerID: ProviderV2.ID.make("test"), modelID: ModelV2.ID.make("test") },
+      })
+      yield* session.updatePart({
+        id: PartID.ascending(),
+        messageID,
+        sessionID: info.id,
+        type: "text",
+        text: "hello",
+      })
+      const data = { info, messages: yield* session.messages({ sessionID: info.id }) }
+      yield* session.remove(info.id)
+
+      const imported = yield* SessionImport.run({ data, context }).pipe(Effect.orDie)
+      const messages = yield* session.messages({ sessionID: imported.id })
+
+      expect(imported.projectID).toBe(context.project.id)
+      expect(imported.directory).toBe(context.directory)
+      expect(messages).toHaveLength(1)
+      expect(messages[0].parts).toHaveLength(1)
+      expect(messages[0].parts[0]).toMatchObject({ type: "text", text: "hello" })
+
+      yield* session.remove(imported.id)
+    }),
+  )
+
+  it.instance("rejects mismatched transcript IDs", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionNs.Service
+      const context = yield* InstanceRef
+      if (!context) return yield* Effect.die("InstanceRef not provided")
+      const info = yield* session.create({})
+
+      const result = yield* SessionImport.run({
+        context,
+        data: {
+          info,
+          messages: [
+            {
+              info: {
+                id: MessageID.ascending(),
+                sessionID: SessionID.descending(),
+                role: "user",
+                time: { created: Date.now() },
+                agent: "build",
+                model: { providerID: ProviderV2.ID.make("test"), modelID: ModelV2.ID.make("test") },
+              },
+              parts: [],
+            },
+          ],
+        },
+      }).pipe(
+        Effect.match({
+          onFailure: (error) => error._tag,
+          onSuccess: () => "success",
+        }),
+      )
+
+      expect(result).toBe("SessionImportInvalidError")
       yield* session.remove(info.id)
     }),
   )

@@ -51,6 +51,11 @@ describe("getWorkspaceRouteSessionID", () => {
     expect(getWorkspaceRouteSessionID(url)).toBeNull()
   })
 
+  test("returns null for /session/import", () => {
+    const url = new URL("http://localhost/session/import")
+    expect(getWorkspaceRouteSessionID(url)).toBeNull()
+  })
+
   test("returns null for non-session paths", () => {
     const url = new URL("http://localhost/config")
     expect(getWorkspaceRouteSessionID(url)).toBeNull()

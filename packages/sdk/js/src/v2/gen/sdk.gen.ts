@@ -111,6 +111,7 @@ import type {
   McpRemoteConfig,
   McpStatusErrors,
   McpStatusResponses,
+  Message,
   ModelRef,
   MoveSessionDestination,
   OutputFormat,
@@ -175,6 +176,7 @@ import type {
   QuestionReplyErrors,
   QuestionReplyResponses,
   QuestionV2Reply,
+  Session as Session4,
   SessionAbortErrors,
   SessionAbortResponses,
   SessionChildrenErrors,
@@ -193,6 +195,8 @@ import type {
   SessionForkResponses,
   SessionGetErrors,
   SessionGetResponses,
+  SessionImportErrors,
+  SessionImportResponses,
   SessionInitErrors,
   SessionInitResponses,
   SessionListErrors,
@@ -3360,6 +3364,48 @@ export class Provider extends HeyApiClient {
 }
 
 export class Session2 extends HeyApiClient {
+  /**
+   * Import session
+   *
+   * Import a session transcript from an OpenCode session export.
+   */
+  public import<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      info?: Session4
+      messages?: Array<{
+        info: Message
+        parts: Array<Part2>
+      }>
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "info" },
+            { in: "body", key: "messages" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<SessionImportResponses, SessionImportErrors, ThrowOnError>({
+      url: "/session/import",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
   /**
    * List sessions
    *
