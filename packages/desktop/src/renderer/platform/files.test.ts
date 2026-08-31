@@ -1,16 +1,27 @@
 import { describe, expect, test } from "bun:test"
 import { createDesktopFiles } from "./files"
 
-function fileApi(events: string[]) {
+function fileApi(
+  events: string[],
+  onOpen?: (options?: { multiple?: boolean; title?: string; defaultPath?: string; extensions?: string[] }) => void,
+) {
   return {
     openDirectoryPicker: async () => null,
-    openFilePicker: async () => ({
-      token: "selection",
-      files: [
-        { path: "C:\\first.txt", name: "first.txt", size: 5 },
-        { path: "C:\\second.txt", name: "second.txt", size: 6 },
-      ],
-    }),
+    openFilePicker: async (options?: {
+      multiple?: boolean
+      title?: string
+      defaultPath?: string
+      extensions?: string[]
+    }) => {
+      onOpen?.(options)
+      return {
+        token: "selection",
+        files: [
+          { path: "C:\\first.txt", name: "first.txt", size: 5 },
+          { path: "C:\\second.txt", name: "second.txt", size: 6 },
+        ],
+      }
+    },
     readPickedFile: async (_token: string, path: string) => {
       events.push(`read:${path}`)
       return new TextEncoder().encode(path).buffer
@@ -33,6 +44,18 @@ function fileApi(events: string[]) {
 }
 
 describe("desktop attachment files", () => {
+  test("omits absent optional picker fields", async () => {
+    const files = createDesktopFiles(
+      fileApi([], (options) => {
+        expect(options).toEqual({ multiple: false, extensions: ["json"] })
+      }),
+      "windows",
+      ["txt"],
+    )
+
+    await files.openAttachmentPickerDialog({ extensions: ["json"] }, async () => {})
+  })
+
   test("reads selected files sequentially and releases the token", async () => {
     const events: string[] = []
     const files = createDesktopFiles(fileApi(events), "windows", ["txt"])

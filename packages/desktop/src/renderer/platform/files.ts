@@ -32,9 +32,9 @@ export function createDesktopFiles(api: DesktopFileAPI, os: DesktopOS, acceptedE
   const openAttachmentPickerDialog: NonNullable<Platform["openAttachmentPickerDialog"]> = async (options, onFile) => {
     const result = await api.openFilePicker({
       multiple: options?.multiple ?? false,
-      title: options?.title,
-      defaultPath: options?.defaultPath,
       extensions: options?.extensions ?? acceptedExtensions,
+      ...(options?.title !== undefined ? { title: options.title } : {}),
+      ...(options?.defaultPath !== undefined ? { defaultPath: options.defaultPath } : {}),
     })
     if (!result) return
     try {
