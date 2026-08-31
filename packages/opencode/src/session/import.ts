@@ -34,6 +34,7 @@ export const run = Effect.fn("SessionImport.run")(function* (input: { data: Data
     projectID: input.context.project.id,
     directory: input.context.directory,
     path: path.relative(path.resolve(input.context.worktree), input.context.directory).replaceAll("\\", "/"),
+    time: { ...input.data.info.time, updated: Date.now() },
   }
   const row = Session.toRow(info)
 
@@ -45,7 +46,12 @@ export const run = Effect.fn("SessionImport.run")(function* (input: { data: Data
           .values(row)
           .onConflictDoUpdate({
             target: SessionTable.id,
-            set: { project_id: row.project_id, directory: row.directory, path: row.path },
+            set: {
+              project_id: row.project_id,
+              directory: row.directory,
+              path: row.path,
+              time_updated: row.time_updated,
+            },
           })
           .run()
 

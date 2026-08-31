@@ -146,6 +146,7 @@ describe("session import", () => {
       if (!context) return yield* Effect.die("InstanceRef not provided")
 
       const info = yield* session.create({ title: "Imported session" })
+      const exportedAt = Date.now() - 60_000
       const messageID = MessageID.ascending()
       yield* session.updateMessage({
         id: messageID,
@@ -162,14 +163,20 @@ describe("session import", () => {
         type: "text",
         text: "hello",
       })
-      const data = { info, messages: yield* session.messages({ sessionID: info.id }) }
+      const data = {
+        info: { ...info, time: { ...info.time, updated: exportedAt } },
+        messages: yield* session.messages({ sessionID: info.id }),
+      }
       yield* session.remove(info.id)
 
       const imported = yield* SessionImport.run({ data, context }).pipe(Effect.orDie)
+      const saved = yield* session.get(imported.id)
       const messages = yield* session.messages({ sessionID: imported.id })
 
       expect(imported.projectID).toBe(context.project.id)
       expect(imported.directory).toBe(context.directory)
+      expect(imported.time.updated).toBeGreaterThan(exportedAt)
+      expect(saved.time.updated).toBe(imported.time.updated)
       expect(messages).toHaveLength(1)
       expect(messages[0].parts).toHaveLength(1)
       expect(messages[0].parts[0]).toMatchObject({ type: "text", text: "hello" })
