@@ -84,11 +84,17 @@ export function createHomeProjectsController(home: HomeController) {
             },
             async (file) => {
               const data = JSON.parse(await file.text()) as SessionExportData
-              const result = await home.server.context(conn).sdk.client.session.import({
+              const ctx = home.server.context(conn)
+              const result = await ctx.sdk.client.session.import({
                 directory: project.worktree,
                 ...data,
               })
               if (!result.data) throw new Error(language.t("common.requestFailed"))
+              ctx.sync.homeSessions.apply({
+                type: "session.updated",
+                properties: { sessionID: result.data.id, info: result.data },
+              })
+              home.project.openProjectSession(conn, project.worktree, result.data.id)
             },
           )
           .catch((cause: unknown) =>

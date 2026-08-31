@@ -53,6 +53,14 @@ export function createHomeController() {
     void tabs.newDraft({ server: ServerConnection.key(conn), directory })
   }
 
+  function openProjectSession(conn: ServerConnection.Any, directory: string, sessionID: string) {
+    const ctx = global.ensureServerCtx(conn)
+    ctx.projects.open(directory)
+    ctx.projects.touch(directory)
+    const tab = tabs.addSessionTab({ server: ServerConnection.key(conn), sessionId: sessionID })
+    tabs.select(tab)
+  }
+
   return {
     selection: {
       value: selection,
@@ -114,6 +122,7 @@ export function createHomeController() {
         openProjectNewSession(conn, project.worktree)
       },
       openProjectNewSession,
+      openProjectSession,
     },
   }
 }
