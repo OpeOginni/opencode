@@ -9,6 +9,7 @@ import { usePlatform } from "@/context/platform"
 import { ServerConnection } from "@/context/server"
 import { closeHomeProject, errorMessage, homeProjectDirectories } from "@/pages/layout/helpers"
 import { Persist, persisted } from "@/utils/persist"
+import type { SessionExportData } from "@/utils/session-export"
 import { showToast } from "@/utils/toast"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { createResource } from "solid-js"
@@ -71,6 +72,32 @@ export function createHomeProjectsController(home: HomeController) {
       select: home.project.select,
       add: home.project.add,
       openNewSession: home.project.openProjectNewSession,
+      canImportSession: !!platform.openAttachmentPickerDialog,
+      importSession: (conn: ServerConnection.Any, project: LocalProject) => {
+        if (!platform.openAttachmentPickerDialog) return
+        void platform
+          .openAttachmentPickerDialog(
+            {
+              title: language.t("command.session.import"),
+              accept: ["application/json"],
+              extensions: ["json"],
+            },
+            async (file) => {
+              const data = JSON.parse(await file.text()) as SessionExportData
+              const result = await home.server.context(conn).sdk.client.session.import({
+                directory: project.worktree,
+                ...data,
+              })
+              if (!result.data) throw new Error(language.t("common.requestFailed"))
+            },
+          )
+          .catch((cause: unknown) =>
+            showToast({
+              title: language.t("common.requestFailed"),
+              description: errorMessage(cause, language.t("common.requestFailed")),
+            }),
+          )
+      },
       edit: (conn: ServerConnection.Any, project: LocalProject) => {
         void import("@/components/dialog-edit-project-v2").then(({ DialogEditProjectV2 }) => {
           void dialog.show(() => <DialogEditProjectV2 server={conn} project={project} />)
