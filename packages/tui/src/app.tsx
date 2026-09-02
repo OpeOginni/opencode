@@ -64,6 +64,7 @@ import { DialogStatus } from "./component/dialog-status"
 import { DialogConfig } from "./component/dialog-config"
 import { DialogDebug } from "./component/dialog-debug"
 import { DialogPair, type DialogPairCredentials } from "./component/dialog-pair"
+import { DialogUpdate } from "./component/dialog-update"
 import { DialogThemeList } from "./component/dialog-theme-list"
 import { DialogHelp } from "./ui/dialog-help"
 import { DialogAgent } from "./component/dialog-agent"
@@ -88,7 +89,7 @@ import { PromptRefProvider, usePromptRef } from "./context/prompt"
 import { Config, ConfigProvider, useConfig } from "./config"
 import { newSessionLocation } from "./config/new-session-location"
 import { PluginProvider, usePlugin, type PackageResolver } from "./plugin/context"
-import { tuiPluginDirectories } from "./plugin/discovery"
+import { localPluginDirectories } from "./plugin/discovery"
 import { PluginRoute, Slot } from "./plugin/render"
 import { CommandPaletteDialog } from "./component/command-palette"
 import { COMMAND_PALETTE_COMMAND, Keymap, type KeymapCommand } from "./context/keymap"
@@ -184,6 +185,9 @@ export type TuiInput = {
   }
   args: Args
   config: Config.Interface
+  updater?: {
+    apply: (version: string) => Promise<void>
+  }
   packages: PackageResolver
   environment?: Readonly<Record<string, string>>
   terminalHandoff?: () => Promise<
@@ -210,12 +214,15 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
     Effect.catch(() => Effect.tryPromise(() => api.location.get())),
   )
   const directory = location.directory
-  const pluginDirectories = yield* Effect.promise(() => tuiPluginDirectories(process.cwd(), global.config))
+  const pluginDirectories = yield* Effect.promise(() => localPluginDirectories(process.cwd(), global.config))
   const handoff = input.terminalHandoff ? yield* Effect.promise(input.terminalHandoff) : undefined
   const managed = input.server.service
   const service = managed
     ? {
         reconnect: async (signal: AbortSignal) => {
+          // Give the server a chance to respawn itself before starting client-side recovery.
+          await new Promise((resolve) => setTimeout(resolve, 50))
+          if (signal.aborted) throw signal.reason ?? new Error("Server reconnect cancelled")
           const endpoint = await managed.reconnect(signal)
           const next = { baseUrl: endpoint.url, headers: Service.headers(endpoint) }
           return { api: OpenCode.make(next), url: endpoint.url }
@@ -405,6 +412,7 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
                                                                             directories={pluginDirectories}
                                                                           >
                                                                             <App
+                                                                              updater={input.updater}
                                                                               pair={
                                                                                 input.server.endpoint.auth
                                                                                   ? input.server.endpoint.auth
@@ -468,7 +476,7 @@ function startupPrompt(prompt?: string) {
   return prompt ? { text: prompt, files: [], agents: [], pasted: [] } : undefined
 }
 
-function App(props: { pair?: DialogPairCredentials }) {
+function App(props: { pair?: DialogPairCredentials; updater?: TuiInput["updater"] }) {
   const log = useLog({ component: "app" })
   const app = useTuiApp()
   const startup = useTuiStartup()
@@ -507,6 +515,10 @@ function App(props: { pair?: DialogPairCredentials }) {
   const [layout, updateLayout] = useStorage().store<{ verticalTabsWidth?: number }>("layout", {
     initial: { verticalTabsWidth: SESSION_SIDEBAR_WIDTH },
   })
+  const [updateNotifications, markUpdateNotification] = useStorage().store<{ versions: string[] }>(
+    "update-notifications",
+    { initial: { versions: [] } },
+  )
   const tabsResize = createPaneResize({
     value: () => layout.verticalTabsWidth ?? SESSION_SIDEBAR_WIDTH,
     defaultValue: () => SESSION_SIDEBAR_WIDTH,
@@ -1212,6 +1224,19 @@ function App(props: { pair?: DialogPairCredentials }) {
     })
   })
 
+  event.on("installation.update-available", (evt) => {
+    const updater = props.updater
+    const restart = client.restart
+    if (!updater || !restart) return
+    const version = evt.data.version
+    if (updateNotifications.versions.includes(version)) return
+    void markUpdateNotification((draft) => {
+      draft.versions = [...draft.versions, version].slice(-100)
+    }).catch((error) => log.error("failed to persist update notification", { error }))
+    dialog.replace(() => <DialogUpdate version={version} install={() => updater.apply(version)} restart={restart} />)
+    dialog.setCentered(true)
+  })
+
   event.on("tui.session.select", (evt, { workspace }) => {
     if (workspace !== (location.current?.workspaceID ?? data.location.default().workspaceID)) return
     route.navigate({
@@ -1330,7 +1355,7 @@ function App(props: { pair?: DialogPairCredentials }) {
           <PaneResizeHandle resize={tabsResize} left={tabsResize.size() - 1} />
         </Show>
       </box>
-      <Show when={devtools()}>
+      <Show when={devtools() && !(route.data.type === "plugin" && route.data.id === "opencode.stats")}>
         <DevToolsBar />
       </Show>
       <Show when={!startup.skipInitialLoading}>

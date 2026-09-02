@@ -27,6 +27,8 @@ import { Icon, type IconProps } from "@opencode-ai/ui/icon"
 import { ToolErrorCard } from "../components/tool-error-card"
 import { DiffChanges } from "@opencode-ai/ui/diff-changes"
 import { Markdown } from "../components/markdown"
+import { createMarkdownImages } from "../components/markdown-image"
+import { useMarkdown } from "../context/markdown"
 import { getDirectory, getFilename } from "@opencode-ai/util/path"
 import { checksum } from "@opencode-ai/util/encode"
 import { Tooltip } from "@opencode-ai/ui/tooltip"
@@ -272,6 +274,12 @@ function readToolPath(input: Record<string, unknown>) {
   return undefined
 }
 
+function readImagePath(input: Record<string, unknown>) {
+  const path = readToolPath(input)
+  if (!path || !/\.(png|jpe?g|gif|webp|svg|avif|bmp|ico)$/i.test(path)) return
+  return path.replaceAll("\\", "/")
+}
+
 function skillToolName(input: Record<string, unknown>, metadata?: Record<string, unknown>) {
   if (typeof metadata?.name === "string") return metadata.name
   if (typeof input.id === "string") return input.id
@@ -491,18 +499,23 @@ export function CurrentContextToolGroup(props: {
   )
   const names = createMemo(() =>
     [
-      ...new Set(
-        tools().map((tool) => {
-          const input = currentToolInput(tool)
-          if (tool.name === "skill") return i18n.t("ui.tool.skill")
-          if (tool.name === "subagent") return i18n.t("ui.tool.agent.default")
-          return getToolInfo(tool.name, input, currentToolMetadata(tool)).title
-        }),
-      ),
-    ].join(", "),
+      ...tools().reduce((counts, tool) => {
+        const input = currentToolInput(tool)
+        const name =
+          tool.name === "skill"
+            ? i18n.t("ui.tool.skill")
+            : tool.name === "subagent"
+              ? i18n.t("ui.tool.agent.default")
+              : getToolInfo(tool.name, input, currentToolMetadata(tool)).title
+        counts.set(name, (counts.get(name) ?? 0) + 1)
+        return counts
+      }, new Map<string, number>()),
+    ]
+      .map(([name, count]) => `${count} ${name}`)
+      .join(", "),
   )
   const label = createMemo(() => {
-    const title = `${tools().length} ${names()}`
+    const title = names()
     const text = i18n.t("ui.messagePart.tools.used", { tools: title })
     const index = text.indexOf(title)
     return { text, title, before: text.slice(0, index).trim(), after: text.slice(index + title.length).trim() }
@@ -621,7 +634,9 @@ export function CurrentContextToolGroup(props: {
                       <div data-slot="context-tool-group-item">
                         <Show
                           when={
-                            tool().state.status !== "error" && ["read", "glob", "grep", "list"].includes(tool().name)
+                            tool().state.status !== "error" &&
+                            ["read", "glob", "grep", "list"].includes(tool().name) &&
+                            !(tool().name === "read" && readImagePath(currentToolInput(tool())))
                           }
                           fallback={
                             <Show
@@ -1012,7 +1027,9 @@ function toolErrorSubtitle(props: ToolProps, i18n: UiI18n) {
   if (props.tool === "websearch") return text(props.input.query)
   if (props.tool === "skill") return skillToolName(props.input, props.metadata)
   if (props.tool === "patch") {
-    const count = patchFileGroups(props.metadata.files).length
+    const count = new Set(
+      Array.isArray(props.metadata.files) ? props.metadata.files.filter(changedFileDiff).map((file) => file.file) : [],
+    ).size
     if (count === 0) return undefined
     return `${count} ${i18n.plural("ui.common.file", count)}`
   }
@@ -1049,6 +1066,7 @@ ToolRegistry.register({
   render(props) {
     const data = useData()
     const i18n = useI18n()
+    const image = createMemo(() => (props.status === "completed" ? readImagePath(props.input) : undefined))
     const args: string[] = []
     if (typeof props.input.offset === "number") args.push("offset=" + props.input.offset)
     if (typeof props.input.limit === "number") args.push("limit=" + props.input.limit)
@@ -1071,12 +1089,22 @@ ToolRegistry.register({
         <BasicTool
           {...props}
           icon="glasses"
+          hasContent={!!image()}
+          defer
+          onOpenChange={(open) => {
+            props.onOpenChange?.(open)
+            props.onContentRendered?.()
+          }}
           trigger={{
             title: i18n.t("ui.tool.read"),
             subtitle: getFilename(readToolPath(props.input) ?? ""),
             args,
           }}
-        />
+        >
+          <Show when={image()} keyed>
+            {(path) => <ReadImage path={path} onContentRendered={props.onContentRendered} />}
+          </Show>
+        </BasicTool>
         <Show when={paths().length > 0}>
           <div
             data-component="tool-loaded-item"
@@ -1101,6 +1129,28 @@ ToolRegistry.register({
     )
   },
 })
+
+function ReadImage(props: { path: string; onContentRendered?: () => void }) {
+  const markdown = useMarkdown()
+  let root!: HTMLDivElement
+  createEffect(() => {
+    if (!markdown?.readImage) return
+    const images = createMarkdownImages(markdown.readImage)
+    images.update(root)
+    onCleanup(() => images.dispose())
+  })
+  onMount(() => props.onContentRendered?.())
+  return (
+    <div ref={root} data-component="read-image">
+      <img
+        data-local-image={props.path}
+        alt={getFilename(props.path)}
+        onLoad={() => props.onContentRendered?.()}
+        onError={() => props.onContentRendered?.()}
+      />
+    </div>
+  )
+}
 
 ToolRegistry.register({
   name: "list",

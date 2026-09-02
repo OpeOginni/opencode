@@ -37,6 +37,7 @@ export const DEFAULT_SEARCH_TIMEOUT_MS = 30_000
 export class GlobInput extends Schema.Class<GlobInput>("FileSystem.GlobInput")({
   pattern: Schema.String,
   path: Schema.optionalKey(RelativePath),
+  hidden: Schema.optionalKey(Schema.Boolean),
   limit: Schema.optionalKey(PositiveInt),
 }) {}
 
@@ -44,6 +45,8 @@ export class GrepInput extends Schema.Class<GrepInput>("FileSystem.GrepInput")({
   pattern: Schema.String,
   path: Schema.optionalKey(RelativePath),
   include: Schema.optionalKey(Schema.String),
+  literal: Schema.optionalKey(Schema.Boolean),
+  caseSensitive: Schema.optionalKey(Schema.Boolean),
   limit: Schema.optionalKey(PositiveInt),
 }) {}
 

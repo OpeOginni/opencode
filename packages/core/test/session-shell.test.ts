@@ -1,4 +1,4 @@
-import { describe, expect } from "bun:test"
+import { describe, expect, setDefaultTimeout } from "bun:test"
 import fs from "fs/promises"
 import path from "path"
 import { Cause, Context, Deferred, Effect, Exit, Fiber, Layer, Option, Schedule, Stream } from "effect"
@@ -16,6 +16,9 @@ import { LayerNode } from "@opencode-ai/util/effect/layer-node"
 import { location } from "./fixture/location"
 import { tmpdirScoped } from "./fixture/tmpdir"
 import { testEffect } from "./lib/effect"
+
+// Every test boots a real Location, so shell start waits for cold plugin activation before spawning.
+setDefaultTimeout(15_000)
 
 class ExecutionControl extends Context.Service<
   ExecutionControl,
@@ -54,8 +57,8 @@ const executionLayer = Layer.effect(
 
 const it = testEffect(
   AppNodeBuilder.build(LayerNode.group([Bus.node, Session.node, SessionExecution.node, LocationServiceMap.node]), [
-    [Bus.node, Bus.configured({ persist: true })],
-    [SessionExecution.node, executionLayer],
+    Bus.node.replace(Bus.configured({ persist: true })),
+    SessionExecution.node.replace(executionLayer.pipe(Layer.provide(controlLayer))),
   ]).pipe(Layer.provideMerge(controlLayer)),
 )
 

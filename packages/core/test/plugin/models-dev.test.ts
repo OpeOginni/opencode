@@ -27,12 +27,12 @@ const locationLayer = Layer.succeed(
   Location.Service.of(location({ directory: AbsolutePath.make(import.meta.dir) })),
 )
 const layer = AppNodeBuilder.build(LayerNode.group([Catalog.node, Integration.node, Bus.node]), [
-  [Location.node, locationLayer],
+  Location.node.replace(locationLayer),
 ])
 const it = testEffect(layer)
 const real = testEffect(PluginTestLayer)
 const models = (file: string) =>
-  AppNodeBuilder.build(ModelsDev.node, [[ModelsDev.node, ModelsDev.configured({ file, fetch: false })]])
+  AppNodeBuilder.build(ModelsDev.node, [ModelsDev.node.replace(ModelsDev.configured({ file, fetch: false }))])
 
 describe("ModelsDevPlugin", () => {
   real.effect("keeps the retained model seed unchanged across catalog replay", () =>
@@ -76,8 +76,8 @@ describe("ModelsDevPlugin", () => {
 
       const scope = yield* Scope.make()
       yield* catalog
-        .transform((draft) =>
-          draft.model.update(providerID, modelID, (model) => {
+        .transform((editor) =>
+          editor.model.update(providerID, modelID, (model) => {
             model.variants ??= []
             model.variants.push({ id: Model.VariantID.make("configured") })
           }),
@@ -409,6 +409,60 @@ describe("ModelsDevPlugin", () => {
           )
         }),
     ),
+  )
+
+  it.effect("copies model request bodies without reinterpreting literal __proto__ keys", () =>
+    Effect.gen(function* () {
+      const integrations = yield* Integration.Service
+      const catalog = yield* Catalog.Service
+      const providerID = Provider.ID.make("acme")
+      const modelID = Model.ID.make("gpt-5.4")
+      // A JSON body may legitimately contain a "__proto__" key; both copy stages must keep it as an own property.
+      const body = JSON.parse('{"__proto__":{"service_tier":"priority"},"keep":true}') as Record<string, unknown>
+      const snapshot = {
+        info: {
+          id: providerID,
+          name: "Acme",
+          activation: "auto",
+          package: Provider.aisdk("@ai-sdk/openai-compatible"),
+        },
+        environment: [],
+        models: [
+          {
+            id: modelID,
+            modelID,
+            providerID,
+            name: "GPT-5.4",
+            capabilities: { tools: true, input: [], output: [] },
+            variants: [],
+            time: { released: Date.parse("2026-01-01") },
+            cost: [],
+            status: "active",
+            enabled: true,
+            limit: { context: 1_050_000, output: 128_000 },
+            body,
+          },
+        ],
+      } satisfies ModelsDev.Snapshot
+      yield* ModelsDevPlugin.effect(
+        host({
+          catalog: catalogHost(catalog),
+          integration: integrationHost(integrations),
+        }),
+      ).pipe(
+        Effect.provideService(
+          ModelsDev.Service,
+          ModelsDev.Service.of({ get: () => Effect.succeed([snapshot]), refresh: () => Effect.void }),
+        ),
+      )
+
+      const copied = (yield* catalog.model.get(providerID, modelID))?.body
+      expect(copied).not.toBe(body)
+      expect(Object.hasOwn(copied ?? {}, "__proto__")).toBe(true)
+      expect(Object.keys(copied ?? {})).toEqual(["__proto__", "keep"])
+      expect(JSON.stringify(copied)).toBe(JSON.stringify(body))
+      expect(copied).not.toHaveProperty("service_tier")
+    }),
   )
 
   it.effect("omits legacy provider aliases", () =>

@@ -311,6 +311,79 @@ describe("Bedrock Converse route", () => {
     }),
   )
 
+  it.effect("removes empty keys recursively from outbound tool inputs without mutating history", () =>
+    Effect.gen(function* () {
+      const input = {
+        path: "file.ts",
+        edits: [
+          { oldText: "a", newText: "b", "": "" },
+          null,
+          true,
+          7,
+          "text",
+          ["kept", { "": false, nested: { "": null, value: "ok" } }],
+        ],
+        nested: { "": "drop", empty: {}, onlyEmpty: { "": 1 } },
+        " ": "preserve whitespace key",
+        "": "drop",
+      }
+      const original = structuredClone(input)
+      const call = ToolCallPart.make({ id: "tool_1", name: "edit", input })
+      const prepared = yield* compileRequest(
+        LLM.request({ model, messages: [Message.assistant([call])], cache: "none" }),
+      )
+
+      expect(prepared.body.messages).toEqual([
+        {
+          role: "assistant",
+          content: [
+            {
+              toolUse: {
+                toolUseId: "tool_1",
+                name: "edit",
+                input: {
+                  path: "file.ts",
+                  edits: [{ oldText: "a", newText: "b" }, null, true, 7, "text", ["kept", { nested: { value: "ok" } }]],
+                  nested: { empty: {}, onlyEmpty: {} },
+                  " ": "preserve whitespace key",
+                },
+              },
+            },
+          ],
+        },
+      ])
+      expect(input).toEqual(original)
+      expect(call.input).toBe(input)
+    }),
+  )
+
+  it.effect("keeps empty tool inputs and empties inputs containing only empty keys", () =>
+    Effect.gen(function* () {
+      const prepared = yield* compileRequest(
+        LLM.request({
+          model,
+          messages: [
+            Message.assistant([
+              ToolCallPart.make({ id: "tool_empty_key", name: "first", input: { "": { value: true } } }),
+              ToolCallPart.make({ id: "tool_empty_object", name: "second", input: {} }),
+            ]),
+          ],
+          cache: "none",
+        }),
+      )
+
+      expect(prepared.body.messages).toEqual([
+        {
+          role: "assistant",
+          content: [
+            { toolUse: { toolUseId: "tool_empty_key", name: "first", input: {} } },
+            { toolUse: { toolUseId: "tool_empty_object", name: "second", input: {} } },
+          ],
+        },
+      ])
+    }),
+  )
+
   it.effect("merges parallel tool results into one user message", () =>
     Effect.gen(function* () {
       const prepared = yield* compileRequest(
@@ -558,7 +631,42 @@ describe("Bedrock Converse route", () => {
       )
       const response = yield* LLMClient.generate(baseRequest).pipe(Effect.provide(fixedBytes(body)))
 
+      expect(response.events.filter((event) => event.type === "finish")).toHaveLength(1)
       expect(response.usage).toMatchObject({ inputTokens: 5, outputTokens: 2, totalTokens: 7 })
+    }),
+  )
+
+  it.effect("retains metadata usage that arrives before messageStop", () =>
+    Effect.gen(function* () {
+      const body = eventStreamBody(
+        ["metadata", { usage: { inputTokens: 5, outputTokens: 2, totalTokens: 7 } }],
+        ["messageStop", { stopReason: "end_turn" }],
+      )
+      const response = yield* LLMClient.generate(baseRequest).pipe(Effect.provide(fixedBytes(body)))
+
+      expect(response.events.filter((event) => event.type === "finish")).toHaveLength(1)
+      expect(response.finishReason).toEqual({ normalized: "stop", raw: "end_turn" })
+      expect(response.usage).toMatchObject({ inputTokens: 5, outputTokens: 2, totalTokens: 7 })
+    }),
+  )
+
+  it.effect("rejects metadata-only streams as incomplete with HTTP context", () =>
+    Effect.gen(function* () {
+      const error = yield* LLMClient.generate(baseRequest).pipe(
+        Effect.provide(
+          fixedBytes(eventStreamBody(["metadata", { usage: { inputTokens: 5, outputTokens: 2, totalTokens: 7 } }])),
+        ),
+        Effect.flip,
+      )
+
+      expect(error.reason).toMatchObject({
+        _tag: "InvalidProviderOutput",
+        classification: "incomplete-stream",
+        http: {
+          status: 200,
+          headers: { "content-type": "application/vnd.amazon.eventstream" },
+        },
+      })
     }),
   )
 
@@ -1356,6 +1464,20 @@ describe("Bedrock Converse route", () => {
     }),
   )
 
+  it.effect("rejects image media that is not valid base64", () =>
+    Effect.gen(function* () {
+      const error = yield* compileRequest(
+        LLM.request({
+          model,
+          messages: [Message.user({ type: "media", mediaType: "image/png", data: "https://example.test/image.png" })],
+        }),
+      ).pipe(Effect.flip)
+
+      expect(error).toMatchObject({ reason: { _tag: "InvalidRequest" } })
+      expect(error.message).toContain("Bedrock Converse media data must be valid base64")
+    }),
+  )
+
   it.effect("lowers document media into Bedrock document blocks with format and name", () =>
     Effect.gen(function* () {
       const prepared = yield* compileRequest(
@@ -1476,6 +1598,37 @@ describe("Bedrock Converse route", () => {
           ],
         },
       ])
+    }),
+  )
+
+  it.effect("rejects remote media URLs in tool results", () =>
+    Effect.gen(function* () {
+      const error = yield* compileRequest(
+        LLM.request({
+          model,
+          messages: [
+            Message.assistant([ToolCallPart.make({ id: "call_1", name: "read", input: {} })]),
+            Message.tool({
+              id: "call_1",
+              name: "read",
+              result: {
+                type: "content",
+                value: [
+                  {
+                    type: "file",
+                    uri: "https://example.test/report.pdf",
+                    mime: "application/pdf",
+                    name: "report.pdf",
+                  },
+                ],
+              },
+            }),
+          ],
+        }),
+      ).pipe(Effect.flip)
+
+      expect(error).toMatchObject({ reason: { _tag: "InvalidRequest" } })
+      expect(error.message).toContain("Bedrock Converse media data must be valid base64")
     }),
   )
 

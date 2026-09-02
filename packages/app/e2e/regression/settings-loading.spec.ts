@@ -45,15 +45,15 @@ test("workspaces opens without waiting for inventory or sessions", async ({ page
   })
   const settings = page.getByTestId("settings-screen")
   const requested = page.waitForRequest((request) => new URL(request.url()).pathname.startsWith("/api/worktree/"))
-  await settings.getByRole("tab", { name: "Workspaces", exact: true }).click()
+  await settings.getByRole("tab", { name: "Worktrees", exact: true }).click()
   await requested
-  await expect(settings.getByRole("heading", { name: "Workspaces", exact: true })).toBeVisible()
+  await expect(settings.getByRole("heading", { name: "Worktrees", exact: true })).toBeVisible()
   await expect(settings.getByRole("button", { name: "Back to app" })).toBeVisible()
-  await expect(settings.getByText("No workspaces", { exact: true })).toHaveCount(0)
+  await expect(settings.getByText("No worktrees", { exact: true })).toHaveCount(0)
 
   inventory.resolve()
   await expect(settings.getByText(sandboxes[0], { exact: true })).toBeVisible()
-  await expect(settings.getByText("12 workspaces", { exact: true })).toBeVisible()
+  await expect(settings.getByText("12 worktrees", { exact: true })).toBeVisible()
   sessions.resolve()
   await expect(settings.getByText("Workspace 1 session", { exact: true })).toBeVisible()
 
@@ -63,29 +63,17 @@ test("workspaces opens without waiting for inventory or sessions", async ({ page
     await route.fallback()
   })
   await settings.getByRole("tab", { name: "Preferences", exact: true }).click()
-  await settings.getByRole("tab", { name: "Workspaces", exact: true }).click()
+  await settings.getByRole("tab", { name: "Worktrees", exact: true }).click()
   await expect(settings.getByText("Workspace 1 session", { exact: true })).toBeVisible()
   refresh.resolve()
 })
 
-test("extensions opens without waiting for MCPs or plugins", async ({ page }) => {
+test("extensions opens without waiting for MCPs", async ({ page }) => {
   const mcps = Promise.withResolvers<void>()
-  const plugins = Promise.withResolvers<void>()
   await page.route("**/api/mcp", async (route) => {
     await mcps.promise
     await route.fulfill({
       json: { location: { directory }, data: [{ name: "demo-mcp", status: { status: "connected" } }] },
-    })
-  })
-  await page.route("**/api/plugin", async (route) => {
-    await plugins.promise
-    await route.fulfill({
-      json: {
-        location: { directory },
-        data: [
-          { id: "demo-plugin", source: { type: "package", package: "demo-plugin" }, status: "active", tui: false },
-        ],
-      },
     })
   })
   const settings = page.getByTestId("settings-screen")
@@ -94,10 +82,6 @@ test("extensions opens without waiting for MCPs or plugins", async ({ page }) =>
   await requested
   await expect(settings.getByRole("heading", { name: "Extensions", exact: true })).toBeVisible()
   await expect(settings.getByRole("button", { name: "Back to app" })).toBeVisible()
-  await settings.getByRole("tab", { name: "Plugins", exact: true }).click()
-  await expect(settings.getByRole("tab", { name: "Plugins", exact: true })).toHaveAttribute("aria-selected", "true")
-  plugins.resolve()
-  await expect(settings.getByText("demo-plugin", { exact: true })).toBeVisible()
   mcps.resolve()
   await settings.getByRole("tab", { name: "MCPs", exact: true }).click()
   await expect(settings.getByRole("switch", { name: "demo-mcp" })).toBeChecked()
@@ -105,7 +89,7 @@ test("extensions opens without waiting for MCPs or plugins", async ({ page }) =>
 
 test("workspace inventory uses the settings panel scroll area", async ({ page }) => {
   const settings = page.getByTestId("settings-screen")
-  await settings.getByRole("tab", { name: "Workspaces", exact: true }).click()
+  await settings.getByRole("tab", { name: "Worktrees", exact: true }).click()
   await expect(settings.getByText("Workspace 1 session", { exact: true })).toBeVisible()
   const list = settings.locator('[data-component="settings-list"]')
   await expect(list).toHaveCSS("max-height", "none")

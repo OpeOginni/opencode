@@ -6,7 +6,7 @@ import { Deferred, Duration, Effect, Fiber, Layer, Option, Schedule, Stream } fr
 import { Config } from "@opencode-ai/core/config"
 import { ConfigLocationWatcherPlugin } from "@opencode-ai/core/config/plugin/location-watcher"
 import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
-import { makeLocationNode, type LocationNode } from "@opencode-ai/util/effect/app-node"
+import { makeLocationNode } from "@opencode-ai/util/effect/app-node"
 import { LayerNode } from "@opencode-ai/util/effect/layer-node"
 import { Bus } from "@opencode-ai/core/bus"
 import { FSUtil } from "@opencode-ai/util/fs-util"
@@ -29,11 +29,6 @@ const describeNative = process.env.CI ? describe.skip : describe
 const it = testEffect(AppNodeBuilder.build(LayerNode.group([FSUtil.node, Bus.node])))
 
 const configLayer = Config.testLayer()
-const pluginNode = makeLocationNode({
-  service: PluginSupervisor.Service,
-  layer: Layer.succeed(PluginSupervisor.Service, PluginSupervisor.Service.of({ flush: Effect.void })),
-  deps: [],
-})
 
 function withNative(native: Watcher.NativeInterface) {
   return Effect.provide(Watcher.layer().pipe(Layer.provide(Layer.succeed(Watcher.Native, native))))
@@ -129,19 +124,19 @@ function provide(
   vcs?: Location.Interface["vcs"],
   watcher?: Layer.Layer<Watcher.Service>,
   config: Layer.Layer<Config.Service> = configLayer,
-  plugins: LocationNode<PluginSupervisor.Service> = pluginNode,
+  plugins?: LayerNode.Replacement,
 ) {
   const locationLayer = Layer.succeed(
     Location.Service,
     Location.Service.of(location({ directory: AbsolutePath.make(directory) }, { vcs })),
   )
   const built = AppNodeBuilder.build(
-    LayerNode.group([LocationWatcher.node, LocationWatcherPolicy.node, Bus.node, Config.node]),
+    LayerNode.group([PluginSupervisor.node, LocationWatcher.node, LocationWatcherPolicy.node, Bus.node, Config.node]),
     [
-      [Config.node, config],
-      [Location.node, locationLayer],
-      [PluginSupervisor.node, plugins],
-      ...(watcher ? ([[Watcher.node, watcher]] as const) : []),
+      Config.node.replace(config),
+      Location.node.replace(locationLayer),
+      plugins ?? PluginSupervisor.node.replace(Layer.empty),
+      ...(watcher ? ([Watcher.node.replace(watcher)] as const) : []),
     ],
   )
   return Effect.provide(built)
@@ -154,7 +149,7 @@ function withTmp<A, E, R>(
     init?: (directory: string) => Promise<void>
     watcher?: Layer.Layer<Watcher.Service>
     config?: Layer.Layer<Config.Service>
-    plugins?: LocationNode<PluginSupervisor.Service>
+    plugins?: LayerNode.Replacement
   },
 ) {
   return Effect.acquireRelease(
@@ -307,13 +302,11 @@ describe("LocationWatcher subscriptions", () => {
       }),
     )
     const plugins = makeLocationNode({
-      service: PluginSupervisor.Service,
-      layer: Layer.effect(
-        PluginSupervisor.Service,
+      name: "test/watcher-plugins",
+      layer: Layer.effectDiscard(
         Effect.gen(function* () {
           const policy = yield* LocationWatcherPolicy.Service
-          yield* policy.transform((draft) => draft.add([".git"]))
-          return PluginSupervisor.Service.of({ flush: Effect.void })
+          yield* policy.transform((editor) => editor.add([".git"]))
         }),
       ),
       deps: [LocationWatcherPolicy.node],
@@ -325,7 +318,7 @@ describe("LocationWatcher subscriptions", () => {
           yield* Effect.sleep("50 millis")
           expect(subscriptions).toEqual([])
         }),
-      { vcs: "git", watcher, plugins },
+      { vcs: "git", watcher, plugins: PluginSupervisor.node.replace(plugins) },
     )
   })
 })

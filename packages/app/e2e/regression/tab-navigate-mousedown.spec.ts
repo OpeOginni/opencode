@@ -9,6 +9,32 @@ const sessionB = session("ses_tab_b", "Tab B session")
 const sessionC = session("ses_tab_c", "Tab C session")
 const unresolvedSessionID = "ses_tab_unresolved"
 
+test("new session tab hugs its content", async ({ page }) => {
+  await mockServer(page)
+  await page.addInitScript(
+    ({ server, sessionID, directory }) => {
+      localStorage.setItem(
+        "opencode.window.browser.dat:tabs",
+        JSON.stringify([
+          { type: "session", server, sessionId: sessionID },
+          { type: "draft", server, directory, draftID: "draft_tab_width" },
+        ]),
+      )
+    },
+    { server, sessionID: sessionA.id, directory: sessionA.directory },
+  )
+
+  const href = `/server/${base64Encode(server)}/session/${sessionA.id}`
+  await page.goto(href)
+
+  const sessionTab = page.locator(`[data-titlebar-tab-slot]:has(a[href="${href}"])`)
+  const draftTab = page.locator('[data-titlebar-tab-slot]:has(a[href^="/new-session?draftId="])')
+  await expect(draftTab).toContainText("New session")
+  const width = (await draftTab.boundingBox())?.width ?? 0
+  expect(width).toBeGreaterThan(100)
+  expect(width).toBeLessThan((await sessionTab.boundingBox())?.width ?? 0)
+})
+
 test("pressing mouse down on a tab navigates before mouse up", async ({ page }) => {
   await mockServer(page)
   await page.addInitScript(
@@ -69,7 +95,7 @@ test("keyboard navigation follows the visible tab order", async ({ page }) => {
   await expect(page).toHaveURL(new RegExp(`${hrefC.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`))
 })
 
-test("cramped tabs only show the close button for the active tab", async ({ page }) => {
+test("mobile drawer exposes close controls and navigates between tabs", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 720 })
   await mockServer(page)
   await page.addInitScript(
@@ -89,26 +115,31 @@ test("cramped tabs only show the close button for the active tab", async ({ page
   const hrefA = `/server/${base64Encode(server)}/session/${sessionA.id}`
   const hrefB = `/server/${base64Encode(server)}/session/${sessionB.id}`
   await page.goto(hrefA)
+  await page.getByRole("button", { name: "Tabs", exact: true }).click()
 
   const tabA = page.locator(`[data-titlebar-tab-slot]:has(a[href="${hrefA}"])`)
   const tabB = page.locator(`[data-titlebar-tab-slot]:has(a[href="${hrefB}"])`)
   await expect(tabA).toHaveAttribute("data-active", "true")
   await expect(tabB).toBeVisible()
   await expect(tabA.locator('[data-slot="tab-close"]')).toBeVisible()
-  await expect(tabB.locator('[data-slot="tab-close"]')).toBeHidden()
+  await expect(tabB.locator('[data-slot="tab-close"]')).toBeVisible()
 
   await tabB.locator(`a[href="${hrefB}"]`).click()
 
   await expect(page).toHaveURL(new RegExp(`${hrefB.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`))
-  await expect(tabA.locator('[data-slot="tab-close"]')).toBeHidden()
+  await expect(page.getByRole("dialog", { name: "Tabs", exact: true })).toBeHidden()
+  await page.getByRole("button", { name: "Tabs", exact: true }).click()
+  await expect(tabA.locator('[data-slot="tab-close"]')).toBeVisible()
   await expect(tabB.locator('[data-slot="tab-close"]')).toBeVisible()
 
   for (const direction of ["ltr", "rtl"]) {
     await page.evaluate((direction) => document.documentElement.setAttribute("dir", direction), direction)
     await page.setViewportSize({ width: 450, height: 720 })
-    await expect(tabA.locator("[data-titlebar-tab]")).toHaveAttribute("data-title-overflow", "true")
+    await expect(tabA).toBeVisible()
     await page.setViewportSize({ width: 1280, height: 720 })
     await expect(tabA.locator("[data-titlebar-tab]")).toHaveAttribute("data-title-overflow", "false")
+    await page.setViewportSize({ width: 450, height: 720 })
+    await page.getByRole("button", { name: "Tabs", exact: true }).click()
   }
 })
 
@@ -116,7 +147,10 @@ test("vertical tabs show project details, resize, and navigate", async ({ page }
   await mockServer(page)
   await page.addInitScript(
     ({ server, sessionA, sessionB }) => {
-      localStorage.setItem("settings.v3", JSON.stringify({ appearance: { tabLayout: "vertical" } }))
+      localStorage.setItem(
+        "settings.v3",
+        JSON.stringify({ appearance: { tabLayout: "vertical", showProjectName: true }, general: { showStatus: true } }),
+      )
       localStorage.setItem(
         "opencode.window.browser.dat:tabs",
         JSON.stringify([
@@ -139,7 +173,26 @@ test("vertical tabs show project details, resize, and navigate", async ({ page }
   await expect(tabA).toContainText(sessionA.title)
   await expect(tabB).toContainText(sessionB.title)
   await expect(tabB.locator('[data-slot="tab-project"]')).toHaveText("tab-project")
+  await expect(sidebar.getByRole("button", { name: "Home", exact: true })).toHaveText("Home")
   await expect(sidebar.getByRole("button", { name: "New session" })).toBeVisible()
+  await expect(sidebar.locator('[data-slot="vertical-tabs-footer"]')).toBeVisible()
+  const status = sidebar.getByRole("button", { name: "Status", exact: true })
+  await expect(status).toBeVisible()
+  await expect
+    .poll(async () => {
+      const bounds = await sidebar.boundingBox()
+      const button = await status.boundingBox()
+      return !!bounds && !!button && bounds.x + bounds.width - button.x - button.width <= 12
+    })
+    .toBe(true)
+  await expect(page.locator('[data-slot="titlebar-v2"]')).toBeHidden()
+  await expect
+    .poll(async () => {
+      const button = await sidebar.getByRole("button", { name: "New session" }).boundingBox()
+      const tab = await tabA.boundingBox()
+      return !!button && !!tab && button.y + button.height < tab.y
+    })
+    .toBe(true)
   await expect(page.locator('[data-slot="titlebar-tabs"]')).toHaveCount(0)
 
   const handle = sidebar.locator('[data-component="resize-handle"]')
@@ -166,7 +219,7 @@ test("vertical tabs show project details, resize, and navigate", async ({ page }
   await expect(tabB).toBeVisible()
 })
 
-test("appearance experimental setting switches tab orientation", async ({ page }) => {
+test("appearance experimental settings control vertical tab details", async ({ page }) => {
   await mockServer(page)
   await page.addInitScript(
     ({ server, sessionA }) => {
@@ -198,32 +251,41 @@ test("appearance experimental setting switches tab orientation", async ({ page }
   await expect(layout).toContainText("Vertical")
   await expect(page.locator('[data-slot="vertical-tabs-sidebar"]')).toBeVisible()
   await expect(page.locator('[data-slot="titlebar-tabs"]')).toHaveCount(0)
+  const projectNames = page.locator('[data-slot="vertical-tabs-sidebar"] [data-slot="tab-project"]')
+  await expect(projectNames).toHaveCount(0)
+  const projectNameSwitch = settings.getByRole("switch", { name: "Show project names", exact: true })
+  await settings.locator('[data-action="settings-show-project-name"] [data-slot="switch-control"]').click()
+  await expect(projectNameSwitch).toBeChecked()
+  await expect(projectNames).toHaveText(["tab-project"])
   await expect(settings.getByRole("tablist")).toHaveCSS("width", "240px")
 
   await page.setViewportSize({ width: 920, height: 720 })
   await expect(page.locator('[data-slot="vertical-tabs-sidebar"]')).toHaveCSS("width", "260px")
-  await expect(settings.getByRole("tablist")).toHaveCSS("width", "160px")
+  await expect(settings.getByRole("tablist")).toBeHidden()
+  await expect(settings.getByRole("button", { name: "Appearance", exact: true })).toBeVisible()
 
   await page.setViewportSize({ width: 800, height: 720 })
-  await expect(settings.getByRole("tablist")).toHaveCSS("width", "160px")
-  await expect(version).toBeInViewport()
+  await expect(settings.getByRole("tablist")).toBeHidden()
+  await expect(settings.getByRole("button", { name: "Appearance", exact: true })).toBeVisible()
 
   await page.setViewportSize({ width: 390, height: 720 })
-  await expect(version).toBeInViewport()
+  await expect(settings.getByRole("button", { name: "Appearance", exact: true })).toBeVisible()
   await settings.evaluate((element) => element.setAttribute("dir", "rtl"))
-  await expect(version).toBeInViewport()
-  await expect(version).toHaveCSS("direction", "ltr")
+  await expect(settings.getByRole("button", { name: "Appearance", exact: true })).toBeInViewport()
 
   await page.setViewportSize({ width: 390, height: 360 })
-  await version.scrollIntoViewIfNeeded()
-  await expect(version).toBeInViewport()
+  await expect(settings.getByRole("button", { name: "Appearance", exact: true })).toBeInViewport()
 
   // Reload the UI-selected preference without seeding settings storage.
   await page.reload()
   const href = `/server/${base64Encode(server)}/session/${sessionA.id}`
+  await page.getByRole("button", { name: "Tabs", exact: true }).click()
+  await expect(page.locator('[data-slot="mobile-tabs-drawer"] [data-slot="tab-project"]')).toHaveText([
+    "tab-project",
+  ])
   await expect(
     page
-      .locator('[data-slot="titlebar-tabs"]')
+      .locator('[data-slot="mobile-tabs-drawer"]')
       .locator(`[data-titlebar-tab-link][href="${href}"]`)
       .getByText(sessionA.title, { exact: true }),
   ).toBeVisible()
@@ -242,7 +304,7 @@ test("appearance experimental setting switches tab orientation", async ({ page }
   await expect(layout).toContainText("Vertical")
 })
 
-test("vertical tab preference falls back to horizontal on mobile", async ({ page }) => {
+test("vertical tab preference uses the drawer on mobile", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 720 })
   await mockServer(page)
   await page.addInitScript(
@@ -259,7 +321,8 @@ test("vertical tab preference falls back to horizontal on mobile", async ({ page
   const href = `/server/${base64Encode(server)}/session/${sessionA.id}`
   await page.goto(href)
 
-  const tabs = page.locator('[data-slot="titlebar-tabs"]')
+  await page.getByRole("button", { name: "Tabs", exact: true }).click()
+  const tabs = page.locator('[data-slot="mobile-tabs-drawer"]')
   await expect(tabs.locator(`[data-titlebar-tab-link][href="${href}"]`)).toContainText(sessionA.title)
   await expect(page.locator('[data-slot="vertical-tabs-sidebar"]')).toHaveCount(0)
 
