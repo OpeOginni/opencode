@@ -499,18 +499,23 @@ export function CurrentContextToolGroup(props: {
   )
   const names = createMemo(() =>
     [
-      ...new Set(
-        tools().map((tool) => {
-          const input = currentToolInput(tool)
-          if (tool.name === "skill") return i18n.t("ui.tool.skill")
-          if (tool.name === "subagent") return i18n.t("ui.tool.agent.default")
-          return getToolInfo(tool.name, input, currentToolMetadata(tool)).title
-        }),
-      ),
-    ].join(", "),
+      ...tools().reduce((counts, tool) => {
+        const input = currentToolInput(tool)
+        const name =
+          tool.name === "skill"
+            ? i18n.t("ui.tool.skill")
+            : tool.name === "subagent"
+              ? i18n.t("ui.tool.agent.default")
+              : getToolInfo(tool.name, input, currentToolMetadata(tool)).title
+        counts.set(name, (counts.get(name) ?? 0) + 1)
+        return counts
+      }, new Map<string, number>()),
+    ]
+      .map(([name, count]) => `${count} ${name}`)
+      .join(", "),
   )
   const label = createMemo(() => {
-    const title = `${tools().length} ${names()}`
+    const title = names()
     const text = i18n.t("ui.messagePart.tools.used", { tools: title })
     const index = text.indexOf(title)
     return { text, title, before: text.slice(0, index).trim(), after: text.slice(index + title.length).trim() }
@@ -1022,7 +1027,9 @@ function toolErrorSubtitle(props: ToolProps, i18n: UiI18n) {
   if (props.tool === "websearch") return text(props.input.query)
   if (props.tool === "skill") return skillToolName(props.input, props.metadata)
   if (props.tool === "patch") {
-    const count = patchFileGroups(props.metadata.files).length
+    const count = new Set(
+      Array.isArray(props.metadata.files) ? props.metadata.files.filter(changedFileDiff).map((file) => file.file) : [],
+    ).size
     if (count === 0) return undefined
     return `${count} ${i18n.plural("ui.common.file", count)}`
   }

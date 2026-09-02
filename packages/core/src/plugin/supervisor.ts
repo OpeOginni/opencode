@@ -1,8 +1,7 @@
 export * as PluginSupervisor from "./supervisor.js"
-export { Service, type Interface } from "./supervisor-service.js"
 
 import { Event } from "@opencode-ai/schema/config"
-import { Cause, Effect, Latch, Layer, Stream } from "effect"
+import { Cause, Effect, Layer, Stream } from "effect"
 import path from "path"
 import { ConfigPluginSource } from "../config/plugin/source.js"
 import { makeLocationNode } from "@opencode-ai/util/effect/app-node"
@@ -13,7 +12,6 @@ import { InstancePlugins } from "./instance.js"
 import { PluginInternal } from "./internal.js"
 import { PluginModule } from "./module.js"
 import { SdkPlugins } from "./sdk.js"
-import { Service } from "./supervisor-service.js"
 import { PluginUpdate } from "./update.js"
 
 const resolve = Effect.fn("PluginSupervisor.resolve")(function* (
@@ -55,11 +53,13 @@ const resolve = Effect.fn("PluginSupervisor.resolve")(function* (
     }
 
     const plugin = yield* PluginModule.load(operation, { install }).pipe(
-      Effect.catchCause((cause) =>
-        Effect.logWarning("failed to load plugin", { target: operation.target, cause }).pipe(
-          Effect.as({ error: Cause.pretty(cause) }),
-        ),
-      ),
+      Effect.catchCause((cause) => {
+        const ref = `err_${crypto.randomUUID().slice(0, 8)}`
+        const error = Cause.squash(cause)
+        return Effect.logWarning("failed to load plugin", { target: operation.target, ref, cause }).pipe(
+          Effect.as({ error: error instanceof PluginModule.LoadError ? error.message : "Plugin failed to load", ref }),
+        )
+      }),
     )
     if ("pending" in plugin) {
       pending.add(operation.target)
@@ -68,7 +68,7 @@ const resolve = Effect.fn("PluginSupervisor.resolve")(function* (
     if ("error" in plugin) {
       failures.set(operation.target, {
         source: pluginSource(operation.target),
-        state: { status: "failed", error: plugin.error },
+        state: { status: "failed", error: plugin.error, ref: plugin.ref },
         features: { server: true },
       })
       continue
@@ -80,19 +80,31 @@ const resolve = Effect.fn("PluginSupervisor.resolve")(function* (
     enabled.add(plugin.id)
   }
 
+  const ordered = [
+    ...pre.filter((plugin) => enabled.has(plugin.id)),
+    ...[...packages.values()].filter((plugin) => enabled.has(plugin.id)),
+    ...post.filter((plugin) => enabled.has(plugin.id)),
+  ]
+  // Registry activation dies on a duplicate ID, which would drop the whole generation including builtins.
+  // Keep the first occurrence in boot order and report later ones like any other plugin setup failure.
+  const duplicate = (plugin: Plugin.Generation, index: number) =>
+    ordered.findIndex((other) => other.id === plugin.id) !== index
   return {
-    plugins: [
-      ...pre.filter((plugin) => enabled.has(plugin.id)),
-      ...[...packages.values()].filter((plugin) => enabled.has(plugin.id)),
-      ...post.filter((plugin) => enabled.has(plugin.id)),
+    plugins: ordered.filter((plugin, index) => !duplicate(plugin, index)),
+    failures: [
+      ...failures.values(),
+      ...ordered.filter(duplicate).map((plugin) => ({
+        id: Plugin.ID.make(plugin.id),
+        source: plugin.source ?? { type: "builtin" as const },
+        state: { status: "failed" as const, error: `Duplicate plugin ID: ${plugin.id}` },
+        features: { server: true as const, ...plugin.features },
+      })),
     ],
-    failures: [...failures.values()],
     pending: [...pending],
   }
 })
 
-export const layer = Layer.effect(
-  Service,
+export const layer = Layer.effectDiscard(
   Effect.gen(function* () {
     const registry = yield* Plugin.Service
     const sdk = yield* SdkPlugins.Service
@@ -100,16 +112,19 @@ export const layer = Layer.effect(
     const sources = yield* ConfigPluginSource.Service
     const bus = yield* Bus.Service
     const updates = yield* PluginUpdate.Service
-    const ready = yield* Latch.make()
+    const internal = yield* PluginInternal.list()
+    let release: Effect.Effect<void> | undefined = yield* registry.hold()
+    yield* Effect.addFinalizer(() => release ?? Effect.void)
+    // Built-ins capture services from this layer; unload them before those services close.
+    yield* Effect.addFinalizer(registry.close)
     let packages = new Set<string>()
     let outdated = new Set<string>()
+    const updating = new Set<string>()
     let generation = 0
     let observed = 0
 
     const activate = Effect.fn("PluginSupervisor.activate")(function* () {
       const current = ++generation
-      // Resolve OpenCode's internal plugins with their privileged Location services.
-      const internal = yield* PluginInternal.list()
       // Combine internal plugins with host-contributed plugins in boot order.
       // Instance-bound plugins come last: later activation can override earlier
       // container writes, so the instance's explicit choices win over globals.
@@ -127,8 +142,12 @@ export const layer = Layer.effect(
       // Activate everything available locally before waiting on missing package installs.
       const immediate = yield* resolve(pre, post, operations, false)
       const source = (source: Plugin.Source) =>
-        source.type === "package" && outdated.has(source.target)
-          ? { ...source, outdated: true as const }
+        source.type === "package"
+          ? {
+              ...source,
+              ...(outdated.has(source.target) ? { outdated: true as const } : {}),
+              ...(updating.has(source.target) ? { updating: true as const } : {}),
+            }
           : source
       const apply = (resolved: typeof immediate) =>
         registry.activate(
@@ -164,7 +183,10 @@ export const layer = Layer.effect(
       updates.changes().pipe(
         Stream.filter((update) => packages.has(update.target)),
         Stream.tap((update) =>
-          Effect.sync(() => (update.outdated ? outdated.add(update.target) : outdated.delete(update.target))),
+          Effect.sync(() => {
+            update.outdated ? outdated.add(update.target) : outdated.delete(update.target)
+            update.updating ? updating.add(update.target) : updating.delete(update.target)
+          }),
         ),
         Stream.map(() => undefined),
       ),
@@ -173,7 +195,7 @@ export const layer = Layer.effect(
       Stream.mapEffect(() =>
         Effect.gen(function* () {
           observed++
-          yield* ready.close
+          if (!release) release = yield* registry.hold()
           return observed
         }),
       ),
@@ -185,13 +207,25 @@ export const layer = Layer.effect(
       Stream.runForEach((target) =>
         Effect.gen(function* () {
           yield* activate().pipe(Effect.catchCause((cause) => Effect.logError("failed to reload plugins", { cause })))
-          if (observed === target) yield* ready.open
+          if (observed !== target) return
+          const settled = release
+          release = undefined
+          if (settled) yield* settled
         }),
       ),
       Effect.forkScoped({ startImmediately: true }),
     )
-    yield* Effect.sleep("24 hours").pipe(Effect.andThen(activate()), Effect.forever, Effect.forkScoped)
-    return Service.of({ awaitActivation: ready.await })
+    yield* Effect.sleep("24 hours").pipe(
+      Effect.andThen(
+        Effect.acquireUseRelease(
+          registry.hold(),
+          () => activate(),
+          (release) => release,
+        ),
+      ),
+      Effect.forever,
+      Effect.forkScoped,
+    )
   }),
 )
 
@@ -211,4 +245,4 @@ function pluginSource(target: string): Plugin.Source {
   return { type: "package", target }
 }
 
-export const node = makeLocationNode({ service: Service, layer, deps: nodeDeps })
+export const node = makeLocationNode({ name: "plugin-supervisor", layer, deps: nodeDeps })
