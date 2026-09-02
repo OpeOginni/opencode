@@ -99,7 +99,7 @@ export type PromptRef = {
   reset(): void
   blur(): void
   focus(): void
-  submit(): void
+  submit(): Promise<boolean>
 }
 
 const DRAFT_RETENTION_MIN_CHARS = 20
@@ -703,7 +703,7 @@ export function Prompt(props: PromptProps) {
       resetComposer()
     },
     submit() {
-      void submit()
+      return submit()
     },
   }
 

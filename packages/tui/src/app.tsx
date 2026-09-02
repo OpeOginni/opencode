@@ -365,12 +365,20 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
                                         <ToastProvider>
                                           <RouteProvider
                                             initialRoute={
-                                              input.args.continue && !input.args.sessionID
+                                              input.args.sessionID && !input.args.fork
                                                 ? {
                                                     type: "session",
-                                                    sessionID: "dummy",
+                                                    sessionID: input.args.sessionID,
+                                                    prompt: startupPrompt(input.args.prompt),
+                                                    autoSubmit: input.args.prompt !== undefined,
                                                   }
-                                                : undefined
+                                                : !input.args.sessionID && !input.args.continue && input.args.prompt
+                                                  ? {
+                                                      type: "home",
+                                                      prompt: startupPrompt(input.args.prompt),
+                                                      autoSubmit: true,
+                                                    }
+                                                  : undefined
                                             }
                                           >
                                             <ClientProvider api={api} url={input.server.endpoint.url} service={service}>
@@ -455,6 +463,10 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
     if (result.epilogue) process.stdout.write(result.epilogue + "\n")
   })
 })
+
+function startupPrompt(prompt?: string) {
+  return prompt ? { text: prompt, files: [], agents: [], pasted: [] } : undefined
+}
 
 function App(props: { pair?: DialogPairCredentials }) {
   const log = useLog({ component: "app" })
@@ -604,7 +616,7 @@ function App(props: { pair?: DialogPairCredentials }) {
   })
 
   const args = useArgs()
-  const startupPrompt = args.prompt ? { text: args.prompt, files: [], agents: [], pasted: [] } : undefined
+  const prompt = startupPrompt(args.prompt)
   onMount(() => {
     batch(() => {
       if (args.agent) local.agent.set(args.agent)
@@ -617,13 +629,6 @@ function App(props: { pair?: DialogPairCredentials }) {
             duration: 3000,
           })
         local.model.set({ providerID, modelID }, { recent: true })
-      }
-      if (args.sessionID && !args.fork) {
-        route.navigate({
-          type: "session",
-          sessionID: args.sessionID,
-          prompt: startupPrompt,
-        })
       }
     })
   })
@@ -645,12 +650,14 @@ function App(props: { pair?: DialogPairCredentials }) {
         const match = response.data[0]?.id
         if (!match) return
         if (!args.fork) {
-          route.navigate({ type: "session", sessionID: match, prompt: startupPrompt })
+          route.navigate({ type: "session", sessionID: match, prompt, autoSubmit: prompt !== undefined })
           return
         }
         void client.api.session
           .fork({ sessionID: match, boundary: { type: "through" } })
-          .then((result) => route.navigate({ type: "session", sessionID: result.id, prompt: startupPrompt }))
+          .then((result) =>
+            route.navigate({ type: "session", sessionID: result.id, prompt, autoSubmit: prompt !== undefined }),
+          )
           .catch(toast.error)
       })
       .catch(toast.error)
@@ -663,7 +670,9 @@ function App(props: { pair?: DialogPairCredentials }) {
     forked = true
     void client.api.session
       .fork({ sessionID: args.sessionID, boundary: { type: "through" } })
-      .then((result) => route.navigate({ type: "session", sessionID: result.id, prompt: startupPrompt }))
+      .then((result) =>
+        route.navigate({ type: "session", sessionID: result.id, prompt, autoSubmit: prompt !== undefined }),
+      )
       .catch(toast.error)
   })
 
