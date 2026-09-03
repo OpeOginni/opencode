@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, For, on, Show, type Accessor, type JSX } from "solid-js"
+import { createEffect, createMemo, createSignal, For, on, onCleanup, Show, type Accessor, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { createAnimatedPresence } from "@/runtime/animated-presence"
 import type { SessionUserActions } from "@opencode-ai/session-ui/actions"
@@ -32,6 +32,7 @@ import { parseCommentNote, readPromptPresentation } from "@/composer/comment-not
 import { useCommand } from "@/shell/commands/command"
 import { useSettings } from "@/settings/model"
 import { SessionTitleHeader } from "../session-identity-header"
+import { SessionHeader } from "@/session/header/session-header"
 
 type BackgroundTask = {
   id: string
@@ -341,8 +342,11 @@ export function MessageTimeline(props: MessageTimelineProps) {
     if (message?.type === "assistant" && message.time.completed !== undefined) {
       const content = Timeline.resolveContent(message, tail.group.ref.partID)
       // Start the required worker job while the rest of the selected view is constructed.
-      if (content?.type === "text" && content.text.trim())
-        void preloadMarkdown(content.text, tail.group.ref.partID).catch(() => undefined)
+      if (content?.type === "text" && content.text.trim()) {
+        const preload = new AbortController()
+        onCleanup(() => preload.abort())
+        void preloadMarkdown(content.text, tail.group.ref.partID, preload.signal).catch(() => undefined)
+      }
     }
   }
   return (
@@ -416,6 +420,7 @@ function MessageTimelineView(
   const messageByID = projection.messageByID
   const virtualized = createTimelineVirtualizer({
     sessionKey: () => `${server.key}/${props.data.sessionID()}`,
+    presentationKey: () => JSON.stringify(props.data.timelineDetail()),
     projection,
     showHeader,
     pinned,
@@ -523,6 +528,7 @@ function MessageTimelineView(
     reasoningMode: props.data.reasoningMode,
     shellToolDefaultOpen: props.data.shellToolPartsExpanded,
     editToolDefaultOpen: props.data.editToolPartsExpanded,
+    timelineDetail: props.data.timelineDetail,
     disclosure: virtualized.disclosure,
     centered: () => props.centered,
     padding: turnPadding,
@@ -539,33 +545,96 @@ function MessageTimelineView(
       .findLast((ref) => blocking.has(ref.partID))?.partID
   })
   const [backgroundHintRef, setBackgroundHintRef] = createSignal<HTMLDivElement>()
-  const backgroundHintPresence = createAnimatedPresence(backgroundHintPartID, () => backgroundHintRef() ?? null)
+  const backgroundHintPresence = createAnimatedPresence(
+    backgroundHintPartID,
+    () => backgroundHintRef() ?? null,
+    sessionID,
+    1000,
+  )
+  const showWorking = createMemo(() => {
+    const id = sessionID()
+    if (!id || sessionStatus().type !== "busy") return false
+    if (data.session.permission.list(id)?.length || data.session.form.list(id)?.length) return false
+    const active = projection.activeMessageID()
+    if (!active) return false
+    const assistant = projection.assistantMessagesByParent().get(active)?.at(-1)
+    if (assistant?.retry) return false
+    // Pending steers still project under the previous response until delivery.
+    // Its error must not hide feedback for a newly submitted prompt.
+    if (
+      assistant?.error &&
+      !data.session.pending.list(id).some((item) => item.type === "user" && item.delivery === "steer")
+    )
+      return false
+    const content = assistant?.content.at(-1)
+    if (
+      assistant?.time.completed === undefined &&
+      assistant?.time.streamed === undefined &&
+      content?.type === "text" &&
+      content.text.trim()
+    )
+      return false
+    const background = new Set(props.background.tasks().map((task) => task.id))
+    return !projection.rows().some((row) => {
+      if (row.userMessageID !== active) return false
+      if (row._tag === "Thinking") return true
+      if (row._tag === "Notice") {
+        const message = messageByID().get(row.messageID)
+        return message?.type === "compaction" && message.status === "running"
+      }
+      // Used groups keep the fallback regardless of disclosure state.
+      if (row._tag !== "AssistantPart" || row.group.type === "context") return false
+      return (row.group.type === "part" ? [row.group.ref] : row.group.refs).some((ref) => {
+        const content = Timeline.resolveContent(messageByID().get(ref.messageID), ref.partID)
+        if (content?.type !== "tool") return false
+        if (content.state.status === "streaming" || content.state.status === "running") return true
+        const taskID = content.state.metadata?.[content.name === "subagent" ? "sessionID" : "shellID"]
+        return background.has(content.id) || (typeof taskID === "string" && background.has(taskID))
+      })
+    })
+  })
   return (
     <VirtualizedTimeline
       workspaceSession={workspaceSession}
       bottomSpacer={
-        <Show when={backgroundHintPresence.present()}>
-          <div
-            data-component="session-background-hint-row"
-            classList={{
-              "min-w-0 w-full max-w-full": true,
-              "md:max-w-[1000px] md:mx-auto": props.centered,
-            }}
-          >
+        <>
+          <Show when={showWorking()}>
             <div
-              ref={setBackgroundHintRef}
-              class="duration-150 motion-reduce:animate-none"
+              data-component="session-working"
+              role="status"
               classList={{
-                [`flex h-9 items-start pt-3 ${turnPadding()}`]: true,
-                "animate-in fade-in": backgroundHintPresence.animate() && backgroundHintPresence.show(),
-                "animate-out fade-out fill-mode-forwards":
-                  backgroundHintPresence.animate() && !backgroundHintPresence.show(),
+                "min-w-0 w-full max-w-full": true,
+                "md:max-w-[1000px] md:mx-auto": props.centered,
               }}
             >
-              <BackgroundMoveHint />
+              <div class={`flex h-9 items-start pt-3 text-[13px] font-[530] leading-text-compact ${turnPadding()}`}>
+                <TextShimmer text={language.t("session.timeline.working")} active />
+              </div>
             </div>
-          </div>
-        </Show>
+          </Show>
+          <Show when={backgroundHintPresence.present()}>
+            <div
+              data-component="session-background-hint-row"
+              classList={{
+                "min-w-0 w-full max-w-full": true,
+                "md:max-w-[1000px] md:mx-auto": props.centered,
+              }}
+            >
+              <div
+                ref={setBackgroundHintRef}
+                class="duration-150 motion-reduce:animate-none"
+                classList={{
+                  [`flex items-start ${showWorking() ? "h-6" : "h-9 pt-3"} ${turnPadding()}`]: true,
+                  "animate-in fade-in": backgroundHintPresence.animate() && backgroundHintPresence.show(),
+                  "animate-out fade-out fill-mode-forwards":
+                    backgroundHintPresence.animate() && !backgroundHintPresence.show(),
+                }}
+              >
+                <BackgroundMoveHint />
+              </div>
+            </div>
+          </Show>
+        </>
       }
       deferred={(row) => {
         if (row._tag !== "AssistantPart" || row.group.type !== "part") return false
@@ -669,6 +738,58 @@ function MessageTimelineView(
                       />
                     </Show>
                   </Show>
+                  <Show when={sessionID()} keyed>
+                    {(id) => (
+                      <Menu
+                        gutter={6}
+                        placement="bottom-end"
+                        open={title.menuOpen}
+                        onOpenChange={(open) => setTitle("menuOpen", open)}
+                      >
+                        <Menu.Trigger
+                          as={IconButton}
+                          icon={<Icon name="outline-dots" />}
+                          variant="ghost-muted"
+                          size="large"
+                          class="shrink-0"
+                          aria-label={language.t("common.moreOptions")}
+                          aria-expanded={title.menuOpen}
+                        />
+                        <Menu.Portal>
+                          <Menu.Content
+                            style={{ "min-width": "160px" }}
+                            onCloseAutoFocus={(event) => {
+                              if (!title.pendingRename) return
+                              event.preventDefault()
+                              setTitle("pendingRename", false)
+                              openTitleEditor()
+                            }}
+                          >
+                            <Show when={!parentID()}>
+                              <Menu.Item
+                                onSelect={() => {
+                                  setTitle("pendingRename", true)
+                                  setTitle("menuOpen", false)
+                                }}
+                              >
+                                {language.t("common.rename")}
+                              </Menu.Item>
+                              <Menu.Item onSelect={() => void props.action.export(id)}>
+                                {language.t("common.export")}…
+                              </Menu.Item>
+                            </Show>
+                            <Show when={!parentID()}>
+                              {/* TODO: Need a session archive API. */}
+                              <Menu.Separator />
+                              <Menu.Item onSelect={() => props.action.showDelete(id)}>
+                                {language.t("common.delete")}…
+                              </Menu.Item>
+                            </Show>
+                          </Menu.Content>
+                        </Menu.Portal>
+                      </Menu>
+                    )}
+                  </Show>
                 </div>
               </div>
               <Show when={sessionID()} keyed>
@@ -712,56 +833,7 @@ function MessageTimelineView(
                         </Popover>
                       )}
                     </Show>
-                    <Show when={!parentID()}>
-                      <Menu
-                        gutter={6}
-                        placement="bottom-end"
-                        open={title.menuOpen}
-                        onOpenChange={(open) => {
-                          setTitle("menuOpen", open)
-                          if (open) return
-                        }}
-                      >
-                        <Menu.Trigger
-                          as={IconButton}
-                          icon={<Icon name="outline-dots" />}
-                          variant="ghost-muted"
-                          size="large"
-                          aria-label={language.t("common.moreOptions")}
-                          aria-expanded={title.menuOpen}
-                        />
-                        <Menu.Portal>
-                          <Menu.Content
-                            style={{ width: "120px", "min-width": "120px" }}
-                            onCloseAutoFocus={(event) => {
-                              if (title.pendingRename) {
-                                event.preventDefault()
-                                setTitle("pendingRename", false)
-                                openTitleEditor()
-                                return
-                              }
-                            }}
-                          >
-                            <Menu.Item
-                              onSelect={() => {
-                                setTitle("pendingRename", true)
-                                setTitle("menuOpen", false)
-                              }}
-                            >
-                              {language.t("common.rename")}
-                            </Menu.Item>
-                            <Menu.Item onSelect={() => void props.action.export(id)}>
-                              {language.t("common.export")}...
-                            </Menu.Item>
-                            {/* TODO: Need a session archive API. */}
-                            <Menu.Separator />
-                            <Menu.Item onSelect={() => props.action.showDelete(id)}>
-                              {language.t("common.delete")}...
-                            </Menu.Item>
-                          </Menu.Content>
-                        </Menu.Portal>
-                      </Menu>
-                    </Show>
+                    <SessionHeader />
                   </div>
                 )}
               </Show>
