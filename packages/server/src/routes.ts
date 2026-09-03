@@ -47,6 +47,7 @@ import { formLocationLayer } from "./middleware/form-location"
 import { sessionLocationLayer } from "./middleware/session-location"
 import { ServerInfo } from "./server-info"
 import type { ServerOptions } from "./options"
+import { ServerPairing } from "./pairing"
 
 const applicationServiceNodes = [
   Global.node,
@@ -158,7 +159,7 @@ function makeRoutes<AuthError, AuthServices>(
   return serviceLayer.pipe(
     Layer.flatMap((context) => {
       const services = Layer.succeedContext(context)
-      const requestServices = Layer.merge(
+      const requestServices = Layer.mergeAll(
         Layer.succeedContext(
           Context.pick(
             Database.Service,
@@ -169,6 +170,8 @@ function makeRoutes<AuthError, AuthServices>(
           )(context),
         ),
         ServerInfo.layer(serviceURLs, options.app),
+        ServerPairing.layer,
+        auth,
       )
       const api = HttpApiBuilder.layer(Api, { openapiPath: "/openapi.json" }).pipe(
         Layer.provide(handlers.pipe(Layer.provide(services), Layer.provide(Layer.succeed(CorsConfig, options)))),

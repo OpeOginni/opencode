@@ -18,6 +18,7 @@ import {
 import { createServer } from "node:http"
 import { ServerAuth } from "./auth"
 import { isAllowedCorsOrigin } from "./cors"
+import { isServerPairingRedeemRequest } from "@opencode-ai/protocol/groups/server"
 import { authorizedRequest } from "./middleware/authorization"
 import { withoutParentSpan } from "./request-tracing"
 import { createRoutes } from "./routes"
@@ -192,7 +193,10 @@ function dispatch(
     const ready = state.type === "ready" && Option.isSome(app)
     if (
       (url.pathname === "/api" || url.pathname.startsWith("/api/") || url.pathname === "/openapi.json") &&
-      (!ready || (!hasPtyConnectTicketURL(url) && !hasPersistentPtyConnectTicketURL(url))) &&
+      (!ready ||
+        (!hasPtyConnectTicketURL(url) &&
+          !hasPersistentPtyConnectTicketURL(url) &&
+          !isServerPairingRedeemRequest(request.method, url))) &&
       !(yield* authorizedRequest(request, auth))
     )
       return unauthorized()

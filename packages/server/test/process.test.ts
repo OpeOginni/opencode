@@ -54,6 +54,23 @@ it.live("allows browser preflight requests without credentials", () =>
     expect(health.headers.get("access-control-allow-origin")).toBe("http://localhost:3000")
     expect(yield* Effect.promise(() => health.json())).toMatchObject({ version: "test-version" })
 
+    const pairing = yield* Effect.promise(() =>
+      fetch(new URL("/api/server/pairing", HttpServer.formatAddress(server.address)), {
+        method: "POST",
+        headers: { authorization: `Basic ${btoa("opencode:secret")}` },
+      }),
+    )
+    const ticket = (yield* Effect.promise(() => pairing.json())) as { ticket: string }
+    const redeemed = yield* Effect.promise(() =>
+      fetch(new URL("/api/server/pairing/redeem", HttpServer.formatAddress(server.address)), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(ticket),
+      }),
+    )
+    expect(redeemed.status).toBe(200)
+    expect(yield* Effect.promise(() => redeemed.json())).toEqual({ username: "opencode", password: "secret" })
+
     yield* Effect.forEach(
       ["http://192.168.1.10:3001", "https://example.com", "https://untrusted.example.com"],
       (origin) =>

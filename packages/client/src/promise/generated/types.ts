@@ -2529,6 +2529,12 @@ export type HealthGetOutput = ServiceHealth
 
 export type ServerGetOutput = { urls: Array<string> }
 
+export type ServerPairingCreateOutput = { ticket: string; expiresAt: number }
+
+export type ServerPairingRedeemInput = { readonly ticket: { readonly ticket: string }["ticket"] }
+
+export type ServerPairingRedeemOutput = { username: string; password: string }
+
 export type LocationGetInput = {
   readonly location?: {
     readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
