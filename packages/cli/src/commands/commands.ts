@@ -402,7 +402,15 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
         }),
       ],
     }),
-    Spec.make("pair", { description: "Show server pairing information" }),
+    Spec.make("pair", {
+      description: "Show server pairing information",
+      params: {
+        directory: Flag.string("directory").pipe(
+          Flag.withDescription("Directory to open after pairing (defaults to current directory)"),
+          Flag.optional,
+        ),
+      },
+    }),
     Spec.make("serve", {
       description: "Start the v2 API and web server",
       params: {
