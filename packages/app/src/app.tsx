@@ -19,6 +19,8 @@ import { TabsProvider } from "@/shell/tabs/tabs"
 import { WslServersProvider } from "@/servers/wsl/context"
 import { ErrorPage } from "@/shell/errors/error"
 import { AppRoutes, File, preloadRoute } from "@/shell/routes/routes"
+import { PairingHandler } from "@/servers/pairing-handler"
+import type { PairingIntent } from "@/servers/pairing"
 
 export { preloadRoute }
 
@@ -99,6 +101,7 @@ export function AppInterface(props: {
   canonicalLocalServer?: ServerConnection.Key
   servers?: Array<ServerConnection.Any>
   router?: Component<BaseRouterProps>
+  pairing?: PairingIntent
 }) {
   // The visual layout lives in the router root so it remains mounted across
   // route changes. Draft and session routes override only their server-bound data
@@ -107,6 +110,7 @@ export function AppInterface(props: {
     <TabsProvider>
       <GlobalProvider>
         <BodyTypography />
+        <PairingHandler intent={props.pairing} />
         <CommandProvider>
           <DesktopCommands />
           <HighlightsProvider>

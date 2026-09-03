@@ -42,6 +42,7 @@ export const { use: useGlobal, provider: GlobalProvider } = createSimpleContext(
 
     const serverCtxs = new Map<ServerConnection.Key, ReturnType<typeof createServerController>>()
     const serverCtxDisposers = new Map<ServerConnection.Key, () => void>()
+    const serverCtxConnections = new Map<ServerConnection.Key, string>()
 
     const owner = getOwner()
     if (!owner) throw new Error("Global provider requires a Solid owner")
@@ -49,12 +50,15 @@ export const { use: useGlobal, provider: GlobalProvider } = createSimpleContext(
     const ensureServerCtx = (conn: ServerConnection.Any) => {
       const key = ServerConnection.key(conn)
       const existing = serverCtxs.get(key)
-      if (existing) return existing
+      const connection = `${conn.http.url}\n${conn.http.password ?? ""}`
+      if (existing && serverCtxConnections.get(key) === connection) return existing
+      serverCtxDisposers.get(key)?.()
       const serverCtx = createRoot((dispose) => {
         serverCtxDisposers.set(key, dispose)
         return createServerController(conn, server.scope(key), server.projects.forServer(key))
       }, owner)
       serverCtxs.set(key, serverCtx)
+      serverCtxConnections.set(key, connection)
       return serverCtx
     }
 
@@ -70,6 +74,7 @@ export const { use: useGlobal, provider: GlobalProvider } = createSimpleContext(
           serverCtxDisposers.get(key)?.()
           serverCtxDisposers.delete(key)
           serverCtxs.delete(key)
+          serverCtxConnections.delete(key)
         }
       }
     })

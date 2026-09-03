@@ -14,6 +14,7 @@ type DirectoryPickerInput = {
   location?: LocationRef
   title?: string
   multiple?: boolean
+  start?: string
   onSelect: (result: string | string[] | null) => void
 }
 

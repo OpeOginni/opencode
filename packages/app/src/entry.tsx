@@ -12,6 +12,7 @@ import zh from "@/runtime/i18n/zh"
 import { authFromToken } from "@/runtime/server/api"
 import pkg from "../package.json"
 import { ServerConnection } from "@/runtime/server/registry"
+import { parsePairingIntent } from "@/servers/pairing"
 
 const getLocale = () => {
   if (typeof navigator !== "object") return "en" as const
@@ -33,6 +34,10 @@ const root = document.getElementById("root")
 if (!(root instanceof HTMLElement) && import.meta.env.DEV) {
   throw new Error(getRootNotFoundError())
 }
+
+const pairingRequest = location.hash.startsWith("#pair?")
+const pairing = parsePairingIntent(location.href)
+if (pairingRequest) history.replaceState(history.state, "", location.pathname + location.search)
 
 const clearAuthToken = () => {
   const params = new URLSearchParams(location.search)
@@ -74,7 +79,7 @@ if (root instanceof HTMLElement && root.dataset.opencodeMounted === undefined) {
     clearAuthToken()
     const standalone = isStandalone()
     root.dataset.standalone = String(standalone)
-    if (standalone) restorePwaRoute()
+    if (standalone && !pairingRequest) restorePwaRoute()
     const server: ServerConnection.Http = {
       type: "http",
       authToken: !!auth,
@@ -91,6 +96,7 @@ if (root instanceof HTMLElement && root.dataset.opencodeMounted === undefined) {
               defaultServer={ServerConnection.Key.make(web.defaultServerUrl)}
               canonicalLocalServer={ServerConnection.key(server)}
               servers={[server]}
+              pairing={pairing}
             >
               {standalone && <PwaRoutePersistence />}
             </AppInterface>
