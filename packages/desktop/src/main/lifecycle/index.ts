@@ -54,7 +54,7 @@ const runtime = Layer.effect(
     const secondInstance = (_event: Event, argv: string[]) => {
       const urls = argv.filter((arg) => arg.startsWith("opencode://"))
       if (urls.length) {
-        runFork(Effect.logInfo("deep link received via second-instance", { urls }))
+        runFork(Effect.logInfo("deep link received via second-instance", { count: urls.length }))
         emitDeepLinks(urls)
       }
       const win = getLastFocusedWindow()
@@ -64,7 +64,7 @@ const runtime = Layer.effect(
     }
     const openUrl = (event: Event, url: string) => {
       event.preventDefault()
-      runFork(Effect.logInfo("deep link received via open-url", { url }))
+      runFork(Effect.logInfo("deep link received via open-url"))
       emitDeepLinks([url])
     }
     const beforeQuit = (event: Event) => {
@@ -108,6 +108,7 @@ const runtime = Layer.effect(
     app.on("will-quit", willQuit)
     app.on("child-process-gone", childProcessGone)
     app.on("render-process-gone", renderProcessGone)
+    emitDeepLinks(process.argv.filter((arg) => arg.startsWith("opencode://")))
     process.on("SIGINT", signal)
     process.on("SIGTERM", signal)
     yield* Effect.addFinalizer(() =>
