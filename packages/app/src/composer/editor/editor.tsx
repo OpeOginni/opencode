@@ -91,7 +91,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
           event.currentTarget.value = ""
         }}
       />
-      <Show when={state.popover.type !== "closed"}>
+      <Show when={!view.draftOnly && state.popover.type !== "closed"}>
         <ComposerEditorPopover
           emptyLabel={i18n.t("ui.promptInput.noMatchingItems")}
           items={props.controller.suggestions()}
@@ -114,10 +114,8 @@ export function ComposerEditor(props: ComposerEditorProps) {
       <form
         data-component="composer"
         data-dock-border-underlay={props.borderUnderlay ? "true" : undefined}
-        class="group/composer relative min-h-[96px] w-full overflow-clip rounded-xl"
+        class="group/composer relative min-h-[96px] w-full overflow-clip rounded-xl bg-v2-background-bg-base"
         classList={{
-          "bg-v2-background-bg-layer-01": props.borderUnderlay,
-          "bg-v2-background-bg-base": !props.borderUnderlay,
           "shadow-[var(--v2-elevation-raised)]": !props.borderUnderlay,
           "border border-v2-icon-icon-info border-dashed": state.drag === "active",
         }}
@@ -187,7 +185,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
               props.controller.onInput(prompt.map((part) => part.content).join(""), [...prompt, ...images], cursor)
             }}
             onKeyDown={(event) => {
-              if (props.controller.onKeyDown(event)) return
+              if (!view.draftOnly && props.controller.onKeyDown(event)) return
               const mod = event.metaKey || event.ctrlKey
               if (mod && event.key === "ArrowUp" && !event.shiftKey && !event.altKey) {
                 if (view.submit.queue?.editFirst()) event.preventDefault()
@@ -240,7 +238,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
             style={buttons()}
           >
             <ComposerEditorAddMenu
-              disabled={state.mode === "shell"}
+              disabled={view.draftOnly || state.mode === "shell"}
               title={i18n.t("ui.promptInput.add")}
               keybind={props.attachKeybind ?? ["Mod", "U"]}
               attachLabel={i18n.t("ui.promptInput.attachments")}
@@ -557,7 +555,10 @@ export function ComposerEditorAddMenu(props: {
           aria-label={props.title}
         />
         <Menu.Portal>
-          <Menu.Content style={{ "min-width": "180px" }}>
+          <Menu.Content
+            class="[&_[data-slot=menu-v2-item-shortcut]]:w-8 [&_[data-slot=menu-v2-item-shortcut]]:justify-center"
+            style={{ "min-width": "180px" }}
+          >
             <Menu.Item onSelect={props.onAttach} shortcut={props.attachShortcut}>
               {props.attachLabel}
             </Menu.Item>
