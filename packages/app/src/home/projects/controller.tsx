@@ -14,6 +14,7 @@ import { Schema } from "effect"
 import { Persistence } from "@/runtime/persistence/schema"
 import type { HomeController } from "../model"
 import { useGlobal } from "@/runtime/server/runtime"
+import { SessionTransfer } from "@opencode-ai/schema/session-transfer"
 
 export const HomeServersSchema = Schema.Struct({
   collapsed: Persistence.record(Persistence.fallback(Schema.Boolean, () => false)),
@@ -90,9 +91,9 @@ export function createHomeProjectsController(home: HomeController) {
               extensions: ["json"],
             },
             async (file) => {
-              const { SessionTransfer } = await import("@opencode-ai/schema/session-transfer")
-              const { Schema } = await import("effect")
-              const data = await Schema.decodeUnknownPromise(Schema.fromJsonString(SessionTransfer.Data))(await file.text())
+              const data = await Schema.decodeUnknownPromise(Schema.fromJsonString(SessionTransfer.Data))(
+                await file.text(),
+              )
               const api = home.server.context(conn).sdk.api.session
               const imported = await api.import({
                 ...Schema.encodeSync(SessionTransfer.Data)(data),
