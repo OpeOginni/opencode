@@ -118,6 +118,39 @@ it.live("serves the HttpApi and enforces Basic auth like the Node server", () =>
   }),
 )
 
+it.live("issues authenticated single-use pairing tickets", () =>
+  Effect.gen(function* () {
+    const handler = yield* ServerFetch.make({ ...options, password: "secret" })
+    const issue = (authorization?: string) =>
+      handler(
+        new Request("http://opencode.local/api/server/pairing", {
+          method: "POST",
+          headers: authorization ? { authorization } : undefined,
+        }),
+      )
+
+    expect((yield* Effect.promise(() => issue())).status).toBe(401)
+    const response = yield* Effect.promise(() => issue(`Basic ${btoa("opencode:secret")}`))
+    expect(response.status).toBe(200)
+    const body = (yield* Effect.promise(() => response.json())) as { ticket: string; expiresAt: number }
+    expect(body.ticket.length).toBeGreaterThan(32)
+    expect(body.expiresAt).toBeGreaterThan(Date.now())
+
+    const redeem = () =>
+      handler(
+        new Request("http://opencode.local/api/server/pairing/redeem", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ticket: body.ticket }),
+        }),
+      )
+    const redeemed = yield* Effect.promise(redeem)
+    expect(redeemed.status).toBe(200)
+    expect(yield* Effect.promise(() => redeemed.json())).toEqual({ username: "opencode", password: "secret" })
+    expect((yield* Effect.promise(redeem)).status).toBe(401)
+  }),
+)
+
 it.live("activates credentials through the HttpApi", () =>
   Effect.gen(function* () {
     const handler = yield* ServerFetch.make(options)

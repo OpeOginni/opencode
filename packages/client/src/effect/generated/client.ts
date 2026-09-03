@@ -7,6 +7,9 @@ import { ClientApi } from "../../contract"
 import type {
   HealthGetOutput,
   ServerGetOutput,
+  ServerPairingCreateOutput,
+  ServerPairingRedeemInput,
+  ServerPairingRedeemOutput,
   LocationGetInput,
   LocationGetOutput,
   AgentListInput,
@@ -297,7 +300,18 @@ const adaptGroupHealth = (raw: RawClient["server.health"]) => ({ get: EndpointHe
 const EndpointServerGet = (raw: RawClient["server.server"]) => () =>
   preserveEffect<ServerGetOutput>()(raw["server.get"]({}).pipe(Effect.mapError(mapClientError)))
 
-const adaptGroupServer = (raw: RawClient["server.server"]) => ({ get: EndpointServerGet(raw) })
+const EndpointServerPairingCreate = (raw: RawClient["server.server"]) => () =>
+  preserveEffect<ServerPairingCreateOutput>()(raw["server.pairing.create"]({}).pipe(Effect.mapError(mapClientError)))
+
+const EndpointServerPairingRedeem = (raw: RawClient["server.server"]) => (input: ServerPairingRedeemInput) =>
+  preserveEffect<ServerPairingRedeemOutput>()(
+    raw["server.pairing.redeem"]({ payload: { ticket: input["ticket"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const adaptGroupServer = (raw: RawClient["server.server"]) => ({
+  get: EndpointServerGet(raw),
+  pairing: { create: EndpointServerPairingCreate(raw), redeem: EndpointServerPairingRedeem(raw) },
+})
 
 const EndpointLocationGet = (raw: RawClient["server.location"]) => (input?: LocationGetInput) =>
   preserveEffect<LocationGetOutput>()(

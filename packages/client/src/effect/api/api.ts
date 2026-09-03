@@ -50,8 +50,21 @@ export interface HealthApi<E = never> {
 export type ServerGetOutput = { readonly urls: ReadonlyArray<string> }
 export type ServerGetOperation<E = never> = () => Effect.Effect<ServerGetOutput, E>
 
+export type ServerPairingCreateOutput = { readonly ticket: string; readonly expiresAt: number }
+export type ServerPairingCreateOperation<E = never> = () => Effect.Effect<ServerPairingCreateOutput, E>
+
+export type ServerPairingRedeemInput = { readonly ticket: string }
+export type ServerPairingRedeemOutput = { readonly username: string; readonly password: string }
+export type ServerPairingRedeemOperation<E = never> = (
+  input: ServerPairingRedeemInput,
+) => Effect.Effect<ServerPairingRedeemOutput, E>
+
 export interface ServerApi<E = never> {
   readonly get: ServerGetOperation<E>
+  readonly pairing: {
+    readonly create: ServerPairingCreateOperation<E>
+    readonly redeem: ServerPairingRedeemOperation<E>
+  }
 }
 
 export type LocationGetInput = {

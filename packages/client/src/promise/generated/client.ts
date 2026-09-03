@@ -1,6 +1,9 @@
 import type {
   HealthGetOutput,
   ServerGetOutput,
+  ServerPairingCreateOutput,
+  ServerPairingRedeemInput,
+  ServerPairingRedeemOutput,
   LocationGetInput,
   LocationGetOutput,
   AgentListInput,
@@ -418,6 +421,31 @@ export function make(options: ClientOptions) {
           { method: "GET", path: `/api/server`, successStatus: 200, declaredStatuses: [400, 401], empty: false },
           requestOptions,
         ),
+      pairing: {
+        create: (requestOptions?: RequestOptions) =>
+          request<ServerPairingCreateOutput>(
+            {
+              method: "POST",
+              path: `/api/server/pairing`,
+              successStatus: 200,
+              declaredStatuses: [400, 401],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        redeem: (input: ServerPairingRedeemInput, requestOptions?: RequestOptions) =>
+          request<ServerPairingRedeemOutput>(
+            {
+              method: "POST",
+              path: `/api/server/pairing/redeem`,
+              body: { ticket: input["ticket"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401],
+              empty: false,
+            },
+            requestOptions,
+          ),
+      },
     },
     location: {
       get: (input?: LocationGetInput, requestOptions?: RequestOptions) =>
