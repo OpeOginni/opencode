@@ -631,6 +631,58 @@ test("restores an in-progress text answer after the form remounts", async () => 
   }
 })
 
+test("restores prior choices and the active question after the form remounts", async () => {
+  await using tmp = await tmpdir()
+  const prompt = await mountForm(tmp.path, 80, [
+    {
+      key: "environment",
+      title: "Environment",
+      type: "string",
+      options: [
+        { value: "staging", label: "Staging" },
+        { value: "production", label: "Production" },
+      ],
+    },
+    {
+      key: "priority",
+      title: "Priority",
+      type: "string",
+      options: [
+        { value: "normal", label: "Normal" },
+        { value: "urgent", label: "Urgent" },
+      ],
+    },
+    {
+      key: "region",
+      title: "Region",
+      type: "string",
+      options: [
+        { value: "east", label: "US East" },
+        { value: "west", label: "US West" },
+      ],
+    },
+  ])
+  try {
+    prompt.app.mockInput.pressEnter()
+    prompt.app.mockInput.pressArrow("down")
+    prompt.app.mockInput.pressEnter()
+    await prompt.app.waitForFrame((frame) => frame.includes("US East"))
+
+    prompt.setVisible(false)
+    await prompt.app.waitForFrame((frame) => frame.includes("Other session"))
+    prompt.setVisible(true)
+    await prompt.app.waitForFrame((frame) => frame.includes("US East"))
+
+    prompt.app.mockInput.pressEnter()
+    prompt.app.mockInput.pressEnter()
+    await prompt.app.waitFor(() => prompt.replies.length === 1)
+
+    expect(prompt.replies).toEqual([{ answer: { environment: "staging", priority: "urgent", region: "east" } }])
+  } finally {
+    prompt.app.renderer.destroy()
+  }
+})
+
 test("ctrl+c clears a text field before cancelling its form", async () => {
   await using tmp = await tmpdir()
   const prompt = await mountForm(tmp.path, 80, [{ key: "notes", type: "string" }])
