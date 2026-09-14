@@ -3,7 +3,7 @@ import { testRender } from "@opentui/solid"
 import { expect, test } from "bun:test"
 import { mkdir } from "node:fs/promises"
 import path from "node:path"
-import { onMount, Show } from "solid-js"
+import { createSignal, onMount, Show } from "solid-js"
 import { DataProvider, useData, type FormWithLocation } from "../../../src/context/data"
 import { ClientProvider } from "../../../src/context/client"
 import { ThemeProvider } from "../../../src/context/theme"
@@ -14,6 +14,8 @@ import { emptyThemeSource, tmpdir } from "../../fixture/fixture"
 import { TestTuiContexts } from "../../fixture/tui-environment"
 import { createTuiResolvedConfig } from "../../fixture/tui-runtime"
 import { createApi, createEventStream, createFetch, json } from "../../fixture/tui-client"
+
+let formSequence = 0
 
 async function mountForm(
   root: string,
@@ -34,7 +36,7 @@ async function mountForm(
   const events = createEventStream()
   const config = createTuiResolvedConfig()
   const form = {
-    id: "frm_test",
+    id: `frm_test_${formSequence++}`,
     sessionID: "ses_test",
     title: "Authorization required",
     fields: fields ?? [
@@ -62,17 +64,18 @@ async function mountForm(
       return response?.syncFailure && formLists++ > 0
         ? json({ message: "Could not refresh forms" }, { status: 500 })
         : json({ data: terminal ? [] : [form] })
-    if (url.pathname === "/api/session/ses_test/form/frm_test/reply")
+    if (url.pathname === `/api/session/ses_test/form/${form.id}/reply`)
       return request.json().then((answer) => {
         replies.push(answer)
         return response?.reply ? failure(response.reply) : new Response(null, { status: 204 })
       })
-    if (url.pathname === "/api/session/ses_test/form/frm_test/cancel") {
+    if (url.pathname === `/api/session/ses_test/form/${form.id}/cancel`) {
       cancellations.push(true)
       return response?.cancel ? failure(response.cancel) : new Response(null, { status: 204 })
     }
   }, events)
   const { FormPrompt } = await import("../../../src/routes/session/form")
+  const [visible, setVisible] = createSignal(true)
 
   function CurrentForm() {
     const data = useData()
@@ -108,7 +111,11 @@ async function mountForm(
             <ClientProvider api={createApi(transport.fetch)}>
               <DataProvider directory={process.cwd()}>
                 <ThemeProvider mode="dark" source={emptyThemeSource}>
-                  <ToastProvider>{response ? <CurrentForm /> : <FormPrompt form={form} />}</ToastProvider>
+                  <ToastProvider>
+                    <Show when={visible()} fallback={<text>Other session</text>}>
+                      {response ? <CurrentForm /> : <FormPrompt form={form} />}
+                    </Show>
+                  </ToastProvider>
                 </ThemeProvider>
               </DataProvider>
             </ClientProvider>
@@ -121,7 +128,7 @@ async function mountForm(
   const app = await testRender(() => <Harness />, { width, height, kittyKeyboard: true })
   app.renderer.start()
   await app.waitForFrame((frame) => frame.includes("Authorization required"))
-  return { app, cancellations, copied, replies }
+  return { app, cancellations, copied, replies, setVisible }
 }
 
 function mountRecoveringForm(root: string, response: { reply?: 404 | 409; cancel?: 404 | 409; syncFailure?: boolean }) {
@@ -600,6 +607,24 @@ test("text fields retain default paste behavior", async () => {
     await prompt.app.mockInput.pasteBracketedText("normal paste")
 
     expect(prompt.app.renderer.currentFocusedEditor?.plainText).toBe("normal paste")
+    expect(prompt.replies).toEqual([])
+  } finally {
+    prompt.app.renderer.destroy()
+  }
+})
+
+test("restores an in-progress text answer after the form remounts", async () => {
+  await using tmp = await tmpdir()
+  const prompt = await mountForm(tmp.path, 80, [{ key: "notes", type: "string" }])
+  try {
+    await prompt.app.mockInput.typeText("draft answer")
+    await prompt.app.waitFor(() => prompt.app.renderer.currentFocusedEditor?.plainText === "draft answer")
+
+    prompt.setVisible(false)
+    await prompt.app.waitForFrame((frame) => frame.includes("Other session"))
+    prompt.setVisible(true)
+
+    await prompt.app.waitFor(() => prompt.app.renderer.currentFocusedEditor?.plainText === "draft answer")
     expect(prompt.replies).toEqual([])
   } finally {
     prompt.app.renderer.destroy()

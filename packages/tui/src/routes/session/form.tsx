@@ -37,6 +37,19 @@ import type { FormAnswerField } from "../../util/form"
 
 export const FORM_MODE = "form"
 
+type FormDraft = {
+  tab: number
+  answers: Record<string, FormValue | undefined>
+  custom: Record<string, string | undefined>
+  externalReady: Record<string, boolean>
+  selected: number
+  editing: boolean
+  error: string
+  cursor?: number
+}
+
+const drafts = new Map<string, FormDraft>()
+
 function truncate(label: string, max: number) {
   return label.length > max ? label.slice(0, max - 1).trimEnd() + "…" : label
 }
@@ -56,22 +69,26 @@ export function FormPrompt(props: { form: FormWithLocation }) {
   const toast = useToast()
   const configuredFields = props.form.fields.filter(isFormAnswerField)
   const initial = formInitialValues(props.form.fields)
+  const draft = drafts.get(props.form.id)
+  drafts.delete(props.form.id)
 
   const [tabHover, setTabHover] = createSignal<number | "confirm" | null>(null)
   const [reviewHeight, setReviewHeight] = createSignal(1)
   const [reviewScrollable, setReviewScrollable] = createSignal(false)
   const [store, setStore] = createStore({
-    tab: 0,
-    answers: initial.answers,
-    custom: initial.custom,
-    externalReady: {} as Record<string, boolean>,
-    selected: formSelected(configuredFields[0], configuredFields[0]?.default),
-    editing: false,
-    error: "",
+    tab: draft?.tab ?? 0,
+    answers: draft?.answers ?? initial.answers,
+    custom: draft?.custom ?? initial.custom,
+    externalReady: draft?.externalReady ?? ({} as Record<string, boolean>),
+    selected: draft?.selected ?? formSelected(configuredFields[0], configuredFields[0]?.default),
+    editing: draft?.editing ?? false,
+    error: draft?.error ?? "",
   })
 
   let textarea: TextareaRenderable | undefined
   const [inputTarget, setInputTarget] = createSignal<TextareaRenderable>()
+  let restoreCursor = draft?.cursor
+  let settled = false
   let review: ScrollBoxRenderable | undefined
   let measureReview: (() => void) | undefined
 
@@ -218,6 +235,22 @@ export function FormPrompt(props: { form: FormWithLocation }) {
 
   onCleanup(() => {
     if (measureReview) renderer.off(CliRenderEvents.FRAME, measureReview)
+    if (settled) {
+      drafts.delete(props.form.id)
+      return
+    }
+    const current = answerField()
+    const value = current && textarea && !textarea.isDestroyed ? textarea.plainText : undefined
+    drafts.set(props.form.id, {
+      tab: store.tab,
+      answers: { ...store.answers },
+      custom: value === undefined || !current ? { ...store.custom } : { ...store.custom, [current.key]: value },
+      externalReady: { ...store.externalReady },
+      selected: store.selected,
+      editing: store.editing,
+      error: store.error,
+      cursor: value === undefined ? undefined : textarea?.cursorOffset,
+    })
   })
 
   // Refs publish after initialization so burst typing stays with the interceptor until the editor is ready.
@@ -262,6 +295,10 @@ export function FormPrompt(props: { form: FormWithLocation }) {
   function reply(answer: FormAnswer) {
     void data.session.form
       .reply({ sessionID: props.form.sessionID, formID: props.form.id, answer }, props.form.location)
+      .then(() => {
+        settled = true
+        drafts.delete(props.form.id)
+      })
       .catch(showError)
   }
 
@@ -460,6 +497,10 @@ export function FormPrompt(props: { form: FormWithLocation }) {
   function cancel() {
     void data.session.form
       .cancel({ sessionID: props.form.sessionID, formID: props.form.id }, props.form.location)
+      .then(() => {
+        settled = true
+        drafts.delete(props.form.id)
+      })
       .catch(showError)
   }
 
@@ -896,7 +937,9 @@ export function FormPrompt(props: { form: FormWithLocation }) {
                     val.traits = { status: "ANSWER" }
                     queueMicrotask(() => {
                       if (val.isDestroyed) return
-                      val.gotoLineEnd()
+                      if (restoreCursor === undefined) val.gotoLineEnd()
+                      if (restoreCursor !== undefined) val.cursorOffset = restoreCursor
+                      restoreCursor = undefined
                       setInputTarget(val)
                     })
                   }}
@@ -1037,7 +1080,9 @@ export function FormPrompt(props: { form: FormWithLocation }) {
                               queueMicrotask(() => {
                                 if (val.isDestroyed) return
                                 val.setText(input())
-                                val.gotoLineEnd()
+                                if (restoreCursor === undefined) val.gotoLineEnd()
+                                if (restoreCursor !== undefined) val.cursorOffset = restoreCursor
+                                restoreCursor = undefined
                                 setInputTarget(val)
                               })
                             }}
