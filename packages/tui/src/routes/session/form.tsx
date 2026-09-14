@@ -1,4 +1,4 @@
-import { createStore } from "solid-js/store"
+import { createStore, unwrap } from "solid-js/store"
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js"
 import { usePaste, useRenderer, useTerminalDimensions } from "@opentui/solid"
 import {
@@ -18,7 +18,6 @@ import { SplitBorder } from "../../ui/border"
 import { useToast } from "../../ui/toast"
 import { Keymap } from "../../context/keymap"
 import { useInteractivity } from "../../context/interactivity"
-import { useFormDrafts } from "../../context/form-draft"
 import { useConfig } from "../../config"
 import { errorMessage } from "../../util/error"
 import {
@@ -42,6 +41,21 @@ function truncate(label: string, max: number) {
   return label.length > max ? label.slice(0, max - 1).trimEnd() + "…" : label
 }
 
+type FormDraft = {
+  tab: number
+  answers: Record<string, FormValue | undefined>
+  custom: Record<string, string | undefined>
+  externalReady: Record<string, boolean>
+  selected: number
+  editing: boolean
+  error: string
+}
+
+// Holds in-progress answers per form across FormPrompt remounts, since the
+// session route is keyed by sessionID and unmounts on tab switch. Mirrors
+// component/prompt/draft-stash.ts: a draft is consumed on take.
+const drafts = new Map<string, FormDraft>()
+
 export function FormPrompt(props: { form: FormWithLocation }) {
   const data = useData()
   const themes = useThemes()
@@ -55,28 +69,28 @@ export function FormPrompt(props: { form: FormWithLocation }) {
   const config = useConfig().data
   const clipboard = useClipboard()
   const toast = useToast()
-  const drafts = useFormDrafts()
   const configuredFields = props.form.fields.filter(isFormAnswerField)
   const initial = formInitialValues(props.form.fields)
-  const draft = drafts.take(props.form.id)
+  const draft = drafts.get(props.form.id)
+  drafts.delete(props.form.id)
 
   const [tabHover, setTabHover] = createSignal<number | "confirm" | null>(null)
   const [reviewHeight, setReviewHeight] = createSignal(1)
   const [reviewScrollable, setReviewScrollable] = createSignal(false)
-  const [store, setStore] = createStore({
-    tab: draft?.tab ?? 0,
-    answers: draft?.answers ?? initial.answers,
-    custom: draft?.custom ?? initial.custom,
-    externalReady: draft?.externalReady ?? ({} as Record<string, boolean>),
-    selected: draft?.selected ?? formSelected(configuredFields[0], configuredFields[0]?.default),
-    editing: draft?.editing ?? false,
-    error: draft?.error ?? "",
-  })
+  const [store, setStore] = createStore<FormDraft>(
+    draft ?? {
+      tab: 0,
+      answers: initial.answers,
+      custom: initial.custom,
+      externalReady: {},
+      selected: formSelected(configuredFields[0], configuredFields[0]?.default),
+      editing: false,
+      error: "",
+    },
+  )
 
   let textarea: TextareaRenderable | undefined
   const [inputTarget, setInputTarget] = createSignal<TextareaRenderable>()
-  let restoreCursor = draft?.cursor
-  let settled = false
   let review: ScrollBoxRenderable | undefined
   let measureReview: (() => void) | undefined
 
@@ -223,21 +237,21 @@ export function FormPrompt(props: { form: FormWithLocation }) {
 
   onCleanup(() => {
     if (measureReview) renderer.off(CliRenderEvents.FRAME, measureReview)
-    if (settled) {
-      drafts.settle(props.form.id)
-      return
-    }
+    // A reply or cancel removes the form from data before this unmount runs, so a
+    // form still listed here is only hidden by navigation and worth restoring.
+    const pending = data.session.form
+      .list(props.form.sessionID, props.form.location)
+      ?.some((item) => item.id === props.form.id)
+    if (!pending) return
+    // Textual answers live in the editor until committed, so capture them here.
     const current = answerField()
-    const value = current && textarea && !textarea.isDestroyed ? textarea.plainText : undefined
-    drafts.save(props.form.id, {
-      tab: store.tab,
-      answers: { ...store.answers },
-      custom: value === undefined || !current ? { ...store.custom } : { ...store.custom, [current.key]: value },
-      externalReady: { ...store.externalReady },
-      selected: store.selected,
-      editing: store.editing,
-      error: store.error,
-      cursor: value === undefined ? undefined : textarea?.cursorOffset,
+    const snapshot = unwrap(store)
+    drafts.set(props.form.id, {
+      ...snapshot,
+      custom:
+        current && textarea && !textarea.isDestroyed
+          ? { ...snapshot.custom, [current.key]: textarea.plainText }
+          : snapshot.custom,
     })
   })
 
@@ -283,13 +297,7 @@ export function FormPrompt(props: { form: FormWithLocation }) {
   function reply(answer: FormAnswer) {
     void data.session.form
       .reply({ sessionID: props.form.sessionID, formID: props.form.id, answer }, props.form.location)
-      .then(settle)
       .catch(showError)
-  }
-
-  function settle() {
-    settled = true
-    drafts.settle(props.form.id)
   }
 
   function replySingle(field: FormAnswerField, value: FormValue) {
@@ -487,7 +495,6 @@ export function FormPrompt(props: { form: FormWithLocation }) {
   function cancel() {
     void data.session.form
       .cancel({ sessionID: props.form.sessionID, formID: props.form.id }, props.form.location)
-      .then(settle)
       .catch(showError)
   }
 
@@ -924,9 +931,7 @@ export function FormPrompt(props: { form: FormWithLocation }) {
                     val.traits = { status: "ANSWER" }
                     queueMicrotask(() => {
                       if (val.isDestroyed) return
-                      if (restoreCursor === undefined) val.gotoLineEnd()
-                      if (restoreCursor !== undefined) val.cursorOffset = restoreCursor
-                      restoreCursor = undefined
+                      val.gotoLineEnd()
                       setInputTarget(val)
                     })
                   }}
@@ -1067,9 +1072,7 @@ export function FormPrompt(props: { form: FormWithLocation }) {
                               queueMicrotask(() => {
                                 if (val.isDestroyed) return
                                 val.setText(input())
-                                if (restoreCursor === undefined) val.gotoLineEnd()
-                                if (restoreCursor !== undefined) val.cursorOffset = restoreCursor
-                                restoreCursor = undefined
+                                val.gotoLineEnd()
                                 setInputTarget(val)
                               })
                             }}

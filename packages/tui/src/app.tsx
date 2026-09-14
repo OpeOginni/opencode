@@ -85,7 +85,6 @@ import * as Model from "./util/model"
 import { ArgsProvider, useArgs, type Args } from "./context/args"
 import open from "open"
 import { PromptRefProvider, usePromptRef } from "./context/prompt"
-import { FormDraftProvider } from "./context/form-draft"
 import { Config, ConfigProvider, useConfig } from "./config"
 import { newSessionLocation } from "./config/new-session-location"
 import { UpdateNotificationProvider, useUpdateNotification, type UpdateSource } from "./context/update-notification"
@@ -402,18 +401,16 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
                                                                                 packages={input.packages}
                                                                                 directories={pluginDirectories}
                                                                               >
-                                                                                <FormDraftProvider>
-                                                                                  <App
-                                                                                    pair={
-                                                                                      input.server.endpoint.auth
-                                                                                        ? input.server.endpoint.auth
-                                                                                        : {
-                                                                                            username: "opencode",
-                                                                                            password: "",
-                                                                                          }
-                                                                                    }
-                                                                                  />
-                                                                                </FormDraftProvider>
+                                                                                <App
+                                                                                  pair={
+                                                                                    input.server.endpoint.auth
+                                                                                      ? input.server.endpoint.auth
+                                                                                      : {
+                                                                                          username: "opencode",
+                                                                                          password: "",
+                                                                                        }
+                                                                                  }
+                                                                                />
                                                                               </PluginProvider>
                                                                             </PanelProvider>
                                                                           </UpdateNotificationProvider>
