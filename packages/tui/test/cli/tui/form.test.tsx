@@ -10,6 +10,7 @@ import { ThemeProvider } from "../../../src/context/theme"
 import { Keymap } from "../../../src/context/keymap"
 import { ConfigProvider } from "../../../src/config"
 import { ToastProvider } from "../../../src/ui/toast"
+import { FormDraftProvider } from "../../../src/context/form-draft"
 import { emptyThemeSource, tmpdir } from "../../fixture/fixture"
 import { TestTuiContexts } from "../../fixture/tui-environment"
 import { createTuiResolvedConfig } from "../../fixture/tui-runtime"
@@ -110,13 +111,15 @@ async function mountForm(
           <Keymap.Provider>
             <ClientProvider api={createApi(transport.fetch)}>
               <DataProvider directory={process.cwd()}>
-                <ThemeProvider mode="dark" source={emptyThemeSource}>
-                  <ToastProvider>
-                    <Show when={visible()} fallback={<text>Other session</text>}>
-                      {response ? <CurrentForm /> : <FormPrompt form={form} />}
-                    </Show>
-                  </ToastProvider>
-                </ThemeProvider>
+                <FormDraftProvider>
+                  <ThemeProvider mode="dark" source={emptyThemeSource}>
+                    <ToastProvider>
+                      <Show when={visible()} fallback={<text>Other session</text>}>
+                        {response ? <CurrentForm /> : <FormPrompt form={form} />}
+                      </Show>
+                    </ToastProvider>
+                  </ThemeProvider>
+                </FormDraftProvider>
               </DataProvider>
             </ClientProvider>
           </Keymap.Provider>
@@ -128,7 +131,7 @@ async function mountForm(
   const app = await testRender(() => <Harness />, { width, height, kittyKeyboard: true })
   app.renderer.start()
   await app.waitForFrame((frame) => frame.includes("Authorization required"))
-  return { app, cancellations, copied, replies, setVisible }
+  return { app, cancellations, copied, events, form, replies, setVisible }
 }
 
 function mountRecoveringForm(root: string, response: { reply?: 404 | 409; cancel?: 404 | 409; syncFailure?: boolean }) {
@@ -678,6 +681,30 @@ test("restores prior choices and the active question after the form remounts", a
     await prompt.app.waitFor(() => prompt.replies.length === 1)
 
     expect(prompt.replies).toEqual([{ answer: { environment: "staging", priority: "urgent", region: "east" } }])
+  } finally {
+    prompt.app.renderer.destroy()
+  }
+})
+
+test("does not restore a draft after the form is settled elsewhere", async () => {
+  await using tmp = await tmpdir()
+  const prompt = await mountForm(tmp.path, 80, [{ key: "notes", type: "string" }])
+  try {
+    await prompt.app.mockInput.typeText("stale answer")
+    await prompt.app.waitFor(() => prompt.app.renderer.currentFocusedEditor?.plainText === "stale answer")
+    prompt.setVisible(false)
+    await prompt.app.waitForFrame((frame) => frame.includes("Other session"))
+
+    prompt.events.emit({
+      id: "evt_form_replied_elsewhere",
+      created: 1,
+      type: "form.replied",
+      data: { id: prompt.form.id, sessionID: prompt.form.sessionID, answer: {} },
+    })
+    await Bun.sleep(20)
+    prompt.setVisible(true)
+
+    await prompt.app.waitFor(() => prompt.app.renderer.currentFocusedEditor?.plainText === "")
   } finally {
     prompt.app.renderer.destroy()
   }

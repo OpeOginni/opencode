@@ -18,6 +18,7 @@ import { SplitBorder } from "../../ui/border"
 import { useToast } from "../../ui/toast"
 import { Keymap } from "../../context/keymap"
 import { useInteractivity } from "../../context/interactivity"
+import { useFormDrafts } from "../../context/form-draft"
 import { useConfig } from "../../config"
 import { errorMessage } from "../../util/error"
 import {
@@ -37,19 +38,6 @@ import type { FormAnswerField } from "../../util/form"
 
 export const FORM_MODE = "form"
 
-type FormDraft = {
-  tab: number
-  answers: Record<string, FormValue | undefined>
-  custom: Record<string, string | undefined>
-  externalReady: Record<string, boolean>
-  selected: number
-  editing: boolean
-  error: string
-  cursor?: number
-}
-
-const drafts = new Map<string, FormDraft>()
-
 function truncate(label: string, max: number) {
   return label.length > max ? label.slice(0, max - 1).trimEnd() + "…" : label
 }
@@ -67,10 +55,10 @@ export function FormPrompt(props: { form: FormWithLocation }) {
   const config = useConfig().data
   const clipboard = useClipboard()
   const toast = useToast()
+  const drafts = useFormDrafts()
   const configuredFields = props.form.fields.filter(isFormAnswerField)
   const initial = formInitialValues(props.form.fields)
-  const draft = drafts.get(props.form.id)
-  drafts.delete(props.form.id)
+  const draft = drafts.take(props.form.id)
 
   const [tabHover, setTabHover] = createSignal<number | "confirm" | null>(null)
   const [reviewHeight, setReviewHeight] = createSignal(1)
@@ -236,12 +224,12 @@ export function FormPrompt(props: { form: FormWithLocation }) {
   onCleanup(() => {
     if (measureReview) renderer.off(CliRenderEvents.FRAME, measureReview)
     if (settled) {
-      drafts.delete(props.form.id)
+      drafts.settle(props.form.id)
       return
     }
     const current = answerField()
     const value = current && textarea && !textarea.isDestroyed ? textarea.plainText : undefined
-    drafts.set(props.form.id, {
+    drafts.save(props.form.id, {
       tab: store.tab,
       answers: { ...store.answers },
       custom: value === undefined || !current ? { ...store.custom } : { ...store.custom, [current.key]: value },
@@ -295,11 +283,13 @@ export function FormPrompt(props: { form: FormWithLocation }) {
   function reply(answer: FormAnswer) {
     void data.session.form
       .reply({ sessionID: props.form.sessionID, formID: props.form.id, answer }, props.form.location)
-      .then(() => {
-        settled = true
-        drafts.delete(props.form.id)
-      })
+      .then(settle)
       .catch(showError)
+  }
+
+  function settle() {
+    settled = true
+    drafts.settle(props.form.id)
   }
 
   function replySingle(field: FormAnswerField, value: FormValue) {
@@ -497,10 +487,7 @@ export function FormPrompt(props: { form: FormWithLocation }) {
   function cancel() {
     void data.session.form
       .cancel({ sessionID: props.form.sessionID, formID: props.form.id }, props.form.location)
-      .then(() => {
-        settled = true
-        drafts.delete(props.form.id)
-      })
+      .then(settle)
       .catch(showError)
   }
 
