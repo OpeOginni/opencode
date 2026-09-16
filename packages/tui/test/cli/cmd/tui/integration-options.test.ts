@@ -5,6 +5,7 @@ import {
   connectMethods,
   credentialConnections,
   integrationOptions,
+  integrationSummary,
 } from "../../../../src/component/dialog-integration"
 
 const integration = (value: Partial<IntegrationInfo> & Pick<IntegrationInfo, "id" | "name">): IntegrationInfo => ({
@@ -89,5 +90,28 @@ describe("connectionSummary", () => {
         }),
       ),
     ).toBe("Work, $EXAMPLE_KEY")
+  })
+})
+
+describe("integrationSummary", () => {
+  test("identifies configured providers without a credential connection", () => {
+    expect(integrationSummary(integration({ id: "custom", name: "Custom" }), true)).toBe("Configured")
+  })
+
+  test("prefers connection details for connected providers", () => {
+    expect(
+      integrationSummary(
+        integration({
+          id: "custom",
+          name: "Custom",
+          connections: [{ type: "credential", id: "cred_1", label: "Work" }],
+        }),
+        true,
+      ),
+    ).toBe("Work")
+  })
+
+  test("leaves unavailable providers without a summary", () => {
+    expect(integrationSummary(integration({ id: "custom", name: "Custom" }), false)).toBeUndefined()
   })
 })
