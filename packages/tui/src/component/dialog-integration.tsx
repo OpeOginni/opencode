@@ -72,8 +72,8 @@ export function connectionSummary(integration: IntegrationInfo) {
     .join(", ")
 }
 
-export function integrationSummary(integration: IntegrationInfo, configured: boolean) {
-  return connectionSummary(integration) || (configured ? "Configured" : undefined)
+export function integrationSummary(integration: IntegrationInfo) {
+  return connectionSummary(integration) || (integration.configured ? "Configured" : undefined)
 }
 
 export function DialogIntegration(
@@ -89,7 +89,6 @@ export function DialogIntegration(
       (integration) => props.integrationID === undefined || integration.id === props.integrationID,
     ),
   )
-  const providers = createMemo(() => new Set((data.location.provider.list(location) ?? []).map((provider) => provider.id)))
 
   createEffect(() => {
     if (!props.autoConnect) return
@@ -107,7 +106,6 @@ export function DialogIntegration(
     return integrations().map((integration) => {
       const methods = connectMethods(integration)
       const credentials = credentialConnections(integration)
-      const configured = providers().has(integration.id)
       let category = "Services"
       if (integration.id in INTEGRATION_PRIORITY) category = "Popular"
       if (integration.metadata?.source === "mcp") category = "MCP"
@@ -115,11 +113,11 @@ export function DialogIntegration(
         title: integration.name,
         value: integration.id,
         description: methods.length === 0 ? "Environment only" : undefined,
-        footer: integrationSummary(integration, configured),
+        footer: integrationSummary(integration),
         category,
         disabled: methods.length === 0 && credentials.length === 0,
         gutter:
-          integration.connections.length > 0 || configured
+          integration.connections.length > 0 || integration.configured
             ? () => <text fg={theme.text.feedback.success.default}>✓</text>
             : undefined,
         onSelect: () => {

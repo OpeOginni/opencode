@@ -95,7 +95,7 @@ describe("connectionSummary", () => {
 
 describe("integrationSummary", () => {
   test("identifies configured providers without a credential connection", () => {
-    expect(integrationSummary(integration({ id: "custom", name: "Custom" }), true)).toBe("Configured")
+    expect(integrationSummary(integration({ id: "custom", name: "Custom", configured: true }))).toBe("Configured")
   })
 
   test("prefers connection details for connected providers", () => {
@@ -104,14 +104,14 @@ describe("integrationSummary", () => {
         integration({
           id: "custom",
           name: "Custom",
+          configured: true,
           connections: [{ type: "credential", id: "cred_1", label: "Work" }],
         }),
-        true,
       ),
     ).toBe("Work")
   })
 
   test("leaves unavailable providers without a summary", () => {
-    expect(integrationSummary(integration({ id: "custom", name: "Custom" }), false)).toBeUndefined()
+    expect(integrationSummary(integration({ id: "custom", name: "Custom" }))).toBeUndefined()
   })
 })
