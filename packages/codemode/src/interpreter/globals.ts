@@ -1,4 +1,5 @@
 import { Effect } from "effect"
+import type { Value } from "./objects.js"
 import { arrayGlobal } from "../stdlib/array.js"
 import { textDecoderGlobal, textEncoderGlobal, uint8ArrayGlobal } from "../stdlib/bytes.js"
 import { mapGlobal, setGlobal } from "../stdlib/collections.js"
@@ -11,6 +12,8 @@ import { objectGlobal } from "../stdlib/object.js"
 import { regexpGlobal } from "../stdlib/regexp.js"
 import { stringGlobal } from "../stdlib/string.js"
 import { uriGlobal, urlGlobal, urlSearchParamsGlobal } from "../stdlib/url.js"
+import { headersGlobal } from "../stdlib/headers.js"
+import { iteratorGlobals } from "../stdlib/iterator.js"
 import { coercion } from "../stdlib/value.js"
 import { base64Global, cryptoGlobal } from "../stdlib/web.js"
 import { ToolReference } from "../tool-runtime.js"
@@ -49,7 +52,7 @@ const symbolGlobal = <R>(ctx: Interpreter<R>) => {
   return symbol
 }
 
-type Factory = <R>(ctx: Interpreter<R>) => unknown
+type Factory = <R>(ctx: Interpreter<R>) => Value
 
 // A table rather than a list so the names are known before any runtime exists.
 const table: Record<string, Factory> = {
@@ -80,6 +83,7 @@ const table: Record<string, Factory> = {
   Set: (ctx) => setGlobal(ctx),
   URL: (ctx) => urlGlobal(ctx),
   URLSearchParams: (ctx) => urlSearchParamsGlobal(ctx),
+  Headers: (ctx) => headersGlobal(ctx),
   Uint8Array: (ctx) => uint8ArrayGlobal(ctx),
   TextEncoder: (ctx) => textEncoderGlobal(ctx),
   TextDecoder: (ctx) => textDecoderGlobal(ctx),
@@ -97,7 +101,8 @@ const table: Record<string, Factory> = {
 export const globalNames: ReadonlySet<string> = new Set(Object.keys(table))
 
 /** The immutable global bindings of every program, in declaration order. */
-export const globals = <R>(ctx: Interpreter<R>): ReadonlyArray<readonly [string, unknown]> => {
+export const globals = <R>(ctx: Interpreter<R>): ReadonlyArray<readonly [string, Value]> => {
   generatorGlobals(ctx)
+  iteratorGlobals(ctx)
   return Object.entries(table).map(([name, factory]) => [name, factory(ctx)] as const)
 }

@@ -163,7 +163,7 @@
           }
         },
         "description": "Shut down and rebuild every loaded location. Pending permissions and forms are cancelled; running sessions continue with fresh services at the next step boundary. Emits location.shutdown for client recovery and responds once all replacement builds settle.",
-        "summary": "Reload locations"
+        "summary": "Reload configuration"
       }
     },
     "/api/agent": {
@@ -8440,6 +8440,109 @@
         "summary": "Find files"
       }
     },
+    "/api/experimental/fs/write": {
+      "post": {
+        "tags": ["filesystem"],
+        "operationId": "experimental.fs.write",
+        "parameters": [
+          {
+            "name": "location",
+            "in": "query",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "directory": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "required": false,
+            "style": "deepObject",
+            "explode": true
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "description": "An absolute path or a path relative to the requested location. Missing parent directories are created."
+            },
+            "required": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "location": {
+                      "$ref": "#/components/schemas/Location.PublicRef"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/FileSystem.Write"
+                    }
+                  },
+                  "required": ["location", "data"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "description": "Write the raw request body to an absolute path or a path relative to the requested location, creating parent directories, and return the resolved absolute path. Unlike read, the target is not confined to the location. Experimental: may change without compatibility guarantees.",
+        "summary": "Write file",
+        "requestBody": {
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
     "/api/command": {
       "get": {
         "tags": ["command"],
@@ -13058,7 +13161,7 @@
                   "properties": {
                     "action": {
                       "type": "string",
-                      "enum": ["provider.use"]
+                      "enum": ["provider.use", "permission"]
                     },
                     "resource": {
                       "type": "string"
@@ -13148,15 +13251,30 @@
         "required": ["input", "output"],
         "additionalProperties": false
       },
-      "Config.ModelEncoded": {
+      "Config.Model.Settings": {
         "type": "object",
         "properties": {
           "compaction": {
             "$ref": "#/components/schemas/Provider.Compaction"
-          },
-          "transport": {
-            "$ref": "#/components/schemas/Provider.Transport"
-          },
+          }
+        },
+        "allOf": [
+          {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "Config.ModelEncoded": {
+        "type": "object",
+        "properties": {
           "modelID": {
             "type": "string"
           },
@@ -13173,7 +13291,7 @@
             "type": "string"
           },
           "settings": {
-            "type": "object"
+            "$ref": "#/components/schemas/Config.Model.Settings"
           },
           "headers": {
             "type": "object",
@@ -13196,7 +13314,7 @@
                   "type": "string"
                 },
                 "settings": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/Config.Model.Settings"
                 },
                 "headers": {
                   "type": "object",
@@ -13276,15 +13394,47 @@
         "required": ["package"],
         "additionalProperties": false
       },
-      "Config.ProviderEncoded": {
+      "Config.Provider.Settings": {
         "type": "object",
         "properties": {
+          "timeout": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean",
+                "enum": [false]
+              }
+            ]
+          },
+          "chunkTimeout": {
+            "type": "number"
+          },
           "compaction": {
             "$ref": "#/components/schemas/Provider.Compaction"
           },
           "transport": {
             "$ref": "#/components/schemas/Provider.Transport"
-          },
+          }
+        },
+        "allOf": [
+          {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "Config.ProviderEncoded": {
+        "type": "object",
+        "properties": {
           "canonical": {
             "type": "string"
           },
@@ -13301,7 +13451,7 @@
             "type": "string"
           },
           "settings": {
-            "type": "object"
+            "$ref": "#/components/schemas/Config.Provider.Settings"
           },
           "headers": {
             "type": "object",
@@ -13537,6 +13687,16 @@
         "required": ["path", "type"],
         "additionalProperties": false
       },
+      "FileSystem.Write": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": ["path"],
+        "additionalProperties": false
+      },
       "ForbiddenErrorEncoded": {
         "type": "object",
         "properties": {
@@ -13570,6 +13730,9 @@
             "type": "string"
           },
           "required": {
+            "type": "boolean"
+          },
+          "hidden": {
             "type": "boolean"
           },
           "when": {
@@ -13761,6 +13924,9 @@
           "required": {
             "type": "boolean"
           },
+          "hidden": {
+            "type": "boolean"
+          },
           "when": {
             "type": "array",
             "items": {
@@ -13826,6 +13992,9 @@
           "required": {
             "type": "boolean"
           },
+          "hidden": {
+            "type": "boolean"
+          },
           "when": {
             "type": "array",
             "items": {
@@ -13876,6 +14045,9 @@
             "type": "string"
           },
           "required": {
+            "type": "boolean"
+          },
+          "hidden": {
             "type": "boolean"
           },
           "when": {
@@ -14004,6 +14176,9 @@
             "type": "string"
           },
           "required": {
+            "type": "boolean"
+          },
+          "hidden": {
             "type": "boolean"
           },
           "when": {
@@ -15353,14 +15528,8 @@
           "package": {
             "type": "string"
           },
-          "compaction": {
-            "$ref": "#/components/schemas/Provider.Compaction"
-          },
-          "transport": {
-            "$ref": "#/components/schemas/Provider.Transport"
-          },
           "settings": {
-            "type": "object"
+            "$ref": "#/components/schemas/Model.Settings"
           },
           "headers": {
             "type": "object",
@@ -15466,6 +15635,20 @@
         "required": ["id", "providerID"],
         "additionalProperties": false
       },
+      "Model.Settings": {
+        "type": "object",
+        "properties": {
+          "compaction": {
+            "$ref": "#/components/schemas/Provider.Compaction"
+          }
+        },
+        "allOf": [
+          {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        ]
+      },
       "Model.Variant": {
         "type": "object",
         "properties": {
@@ -15473,7 +15656,7 @@
             "type": "string"
           },
           "settings": {
-            "type": "object"
+            "$ref": "#/components/schemas/Model.Settings"
           },
           "headers": {
             "type": "object",
@@ -16290,27 +16473,23 @@
           {
             "type": "object",
             "properties": {
-              "mode": {
+              "type": {
                 "type": "string",
-                "enum": ["local"]
+                "enum": ["summary"]
               }
             },
-            "required": ["mode"],
+            "required": ["type"],
             "additionalProperties": false
           },
           {
             "type": "object",
             "properties": {
-              "mode": {
+              "type": {
                 "type": "string",
-                "enum": ["provider"]
-              },
-              "threshold": {
-                "type": "integer",
-                "exclusiveMinimum": 0
+                "enum": ["native"]
               }
             },
-            "required": ["mode"],
+            "required": ["type"],
             "additionalProperties": false
           }
         ]
@@ -16337,14 +16516,8 @@
           "package": {
             "type": "string"
           },
-          "compaction": {
-            "$ref": "#/components/schemas/Provider.Compaction"
-          },
-          "transport": {
-            "$ref": "#/components/schemas/Provider.Transport"
-          },
           "settings": {
-            "type": "object"
+            "$ref": "#/components/schemas/Provider.Settings"
           },
           "headers": {
             "type": "object",
@@ -16379,7 +16552,35 @@
         "additionalProperties": false
       },
       "Provider.Settings": {
-        "type": "object"
+        "type": "object",
+        "properties": {
+          "timeout": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean",
+                "enum": [false]
+              }
+            ]
+          },
+          "chunkTimeout": {
+            "type": "number"
+          },
+          "compaction": {
+            "$ref": "#/components/schemas/Provider.Compaction"
+          },
+          "transport": {
+            "$ref": "#/components/schemas/Provider.Transport"
+          }
+        },
+        "allOf": [
+          {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        ]
       },
       "Provider.Transport": {
         "type": "string",

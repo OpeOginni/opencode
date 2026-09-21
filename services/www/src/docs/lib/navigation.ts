@@ -25,6 +25,8 @@ export const docsSections: DocsSection[] = [
         items: [
           { title: "Intro", slug: "index" },
           { title: "Config", slug: "config" },
+          { title: "Migrate from V1", slug: "migrate-v1" },
+          { title: "Troubleshooting", slug: "troubleshooting" },
         ],
       },
       {
@@ -47,15 +49,10 @@ export const docsSections: DocsSection[] = [
           { title: "Tools", slug: "tools" },
           { title: "MCP servers", slug: "mcp-servers" },
           { title: "Permissions", slug: "permissions" },
+          { title: "Policies", slug: "policies" },
           { title: "Instructions", slug: "instructions" },
           { title: "Sharing", slug: "sharing" },
           { title: "Warming", slug: "warming" },
-        ],
-      },
-      {
-        items: [
-          { title: "Migrate from V1", slug: "migrate-v1" },
-          { title: "Troubleshooting", slug: "troubleshooting" },
         ],
       },
     ],
