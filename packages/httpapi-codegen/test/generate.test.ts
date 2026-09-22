@@ -64,7 +64,13 @@ describe("HttpApiCodegen.generate", () => {
     const effect = emitEffect(contract)
 
     expect(promise.operations).toEqual(effect.operations)
-    expect(promise.files.map((file) => file.path)).toEqual(["types.ts", "client-error.ts", "client.ts", "index.ts"])
+    expect(promise.files.map((file) => file.path)).toEqual([
+      "types.ts",
+      "client-error.ts",
+      "url.ts",
+      "client.ts",
+      "index.ts",
+    ])
     const promiseClient = promise.files.find((file) => file.path === "client.ts")?.content
     expect(promiseClient).toContain('"get": (input: SessionGetInput, requestOptions?: RequestOptions)')
     expect(promiseClient).toContain("`/session/${encodeURIComponent(input.sessionID)}`")
@@ -885,7 +891,7 @@ describe("HttpApiCodegen.generate", () => {
     await using emitted = await emittedModule(output)
     let request: Request | undefined
     const client = emitted.module.OpenCode.make({
-      baseUrl: "https://example.com",
+      baseUrl: "https://example.com/base?tenant=one#fragment",
       fetch: async (input: RequestInfo | URL) => {
         request = input instanceof Request ? input : new Request(input)
         return Response.json({ data: "hello" })
@@ -894,7 +900,7 @@ describe("HttpApiCodegen.generate", () => {
 
     expect(await client.session.get({ sessionID: "a/b" })).toBe("hello")
     expect(request?.method).toBe("GET")
-    expect(request?.url).toBe("https://example.com/session/a%2Fb")
+    expect(request?.url).toBe("https://example.com/base/session/a%2Fb")
   })
 
   test("maps an emitted no-content response to undefined", async () => {
