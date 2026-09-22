@@ -259,7 +259,6 @@ import type {
   ConfigUpdateOutput,
 } from "./types.js"
 import { ClientError } from "./client-error.js"
-import { resolveUrl } from "./url.js"
 
 export interface ClientOptions {
   readonly baseUrl: string
@@ -294,7 +293,9 @@ export function make(options: ClientOptions) {
 
   const prepare = (descriptor: RequestDescriptor, requestOptions?: RequestOptions) => {
     // A leading slash would replace any path prefix on baseUrl, so join relative to it.
-    const url = resolveUrl(options.baseUrl, descriptor.path)
+    const baseUrl = new URL(options.baseUrl)
+    if (!baseUrl.pathname.endsWith("/")) baseUrl.pathname += "/"
+    const url = new URL(descriptor.path.slice(1), baseUrl)
     for (const [key, value] of Object.entries(descriptor.query ?? {})) appendQuery(url.searchParams, key, value)
     const headers = new Headers(options.headers)
     for (const [key, value] of Object.entries(descriptor.headers ?? {})) {

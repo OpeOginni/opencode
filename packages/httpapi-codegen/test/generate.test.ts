@@ -64,13 +64,7 @@ describe("HttpApiCodegen.generate", () => {
     const effect = emitEffect(contract)
 
     expect(promise.operations).toEqual(effect.operations)
-    expect(promise.files.map((file) => file.path)).toEqual([
-      "types.ts",
-      "client-error.ts",
-      "url.ts",
-      "client.ts",
-      "index.ts",
-    ])
+    expect(promise.files.map((file) => file.path)).toEqual(["types.ts", "client-error.ts", "client.ts", "index.ts"])
     const promiseClient = promise.files.find((file) => file.path === "client.ts")?.content
     expect(promiseClient).toContain('"get": (input: SessionGetInput, requestOptions?: RequestOptions)')
     expect(promiseClient).toContain("`/session/${encodeURIComponent(input.sessionID)}`")

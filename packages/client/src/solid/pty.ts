@@ -1,5 +1,4 @@
 import type { ExperimentalPersistentPtyConnectTokenInput, OpenCodeClient, PtyConnectTokenInput } from "../promise"
-import { resolveUrl } from "../promise/generated/url"
 
 export type PtyClientOptions = {
   readonly url: string
@@ -27,7 +26,9 @@ export function createPtyClient(api: OpenCodeClient, options: PtyClientOptions) 
         location: input.location,
         "x-opencode-ticket": "1",
       })
-      const url = resolveUrl(options.url, `api/pty/${encodeURIComponent(input.ptyID)}/connect`)
+      const baseUrl = new URL(options.url)
+      if (!baseUrl.pathname.endsWith("/")) baseUrl.pathname += "/"
+      const url = new URL(`api/pty/${encodeURIComponent(input.ptyID)}/connect`, baseUrl)
       if (input.location?.directory) url.searchParams.set("location[directory]", input.location.directory)
       if (input.cursor !== undefined) url.searchParams.set("cursor", String(input.cursor))
       url.searchParams.set("ticket", result.data.ticket)
@@ -47,7 +48,9 @@ export function createPersistentPtyClient(api: OpenCodeClient, options: PtyClien
         ptyID: input.ptyID,
         "x-opencode-ticket": "1",
       })
-      const url = resolveUrl(options.url, `api/experimental/persistent-pty/${encodeURIComponent(input.ptyID)}/connect`)
+      const baseUrl = new URL(options.url)
+      if (!baseUrl.pathname.endsWith("/")) baseUrl.pathname += "/"
+      const url = new URL(`api/experimental/persistent-pty/${encodeURIComponent(input.ptyID)}/connect`, baseUrl)
       url.searchParams.set("ticket", token.ticket)
       url.searchParams.set("cursor", String(input.cursor))
       url.searchParams.set("attachment_id", input.attachmentID)
