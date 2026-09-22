@@ -26,7 +26,10 @@ export function createPtyClient(api: OpenCodeClient, options: PtyClientOptions) 
         location: input.location,
         "x-opencode-ticket": "1",
       })
-      const url = new URL(`/api/pty/${encodeURIComponent(input.ptyID)}/connect`, options.url)
+      const url = new URL(
+        `api/pty/${encodeURIComponent(input.ptyID)}/connect`,
+        options.url.endsWith("/") ? options.url : options.url + "/",
+      )
       if (input.location?.directory) url.searchParams.set("location[directory]", input.location.directory)
       if (input.cursor !== undefined) url.searchParams.set("cursor", String(input.cursor))
       url.searchParams.set("ticket", result.data.ticket)
@@ -46,7 +49,10 @@ export function createPersistentPtyClient(api: OpenCodeClient, options: PtyClien
         ptyID: input.ptyID,
         "x-opencode-ticket": "1",
       })
-      const url = new URL(`/api/experimental/persistent-pty/${encodeURIComponent(input.ptyID)}/connect`, options.url)
+      const url = new URL(
+        `api/experimental/persistent-pty/${encodeURIComponent(input.ptyID)}/connect`,
+        options.url.endsWith("/") ? options.url : options.url + "/",
+      )
       url.searchParams.set("ticket", token.ticket)
       url.searchParams.set("cursor", String(input.cursor))
       url.searchParams.set("attachment_id", input.attachmentID)
