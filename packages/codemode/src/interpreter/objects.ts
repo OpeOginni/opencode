@@ -1,5 +1,5 @@
 import type { BlockStatement, Expression, Pattern } from "acorn"
-import type { Effect, Fiber } from "effect"
+import { Effect, type Fiber } from "effect"
 import { ToolReference } from "../tool-runtime.js"
 import type { Builtins } from "./intrinsics.js"
 import { checkArrayLength } from "./limits.js"
@@ -159,7 +159,7 @@ export class Fn extends Callable {
     name: string,
     readonly parameters: ReadonlyArray<Pattern>,
     readonly body: BlockStatement | Expression,
-    readonly capturedScopes: ReadonlyArray<Map<string, Binding>>,
+    readonly capturedScopes: Array<Map<string, Binding>>,
     readonly async: boolean,
     readonly generator: boolean,
   ) {
@@ -224,22 +224,41 @@ export class GeneratorObj extends Opaque {
   }
 }
 
-/** A built-in collection iterator: live over the host collection, yielding program values. */
+/** One pull from an iterator, as `for...of` sees it. */
+export type Step = { readonly done: boolean; readonly value: Value }
+
+/** How the interpreter drives any iterator: pull the next step, or close it early. */
+export type Cursor<R = unknown> = {
+  readonly next: Effect.Effect<Step, unknown, R>
+  readonly close: Effect.Effect<void, unknown, R>
+}
+
+/** A cursor over a host iterator; there is nothing to close. */
+export const hostCursor = (iterator: Iterator<Value, undefined>): Cursor<never> => ({
+  next: Effect.sync(() => {
+    const step = iterator.next()
+    return { done: Boolean(step.done), value: step.value }
+  }),
+  close: Effect.void,
+})
+
+/** A built-in iterator: a live cursor over a host collection or an iterator helper, yielding program values. */
 export class IteratorObj extends Opaque {
   override readonly tag = "Iterator"
   constructor(
     proto: Obj,
-    readonly source: IteratorObject<Value, undefined>,
+    readonly cursor: Cursor,
   ) {
     super(proto)
   }
   override get describe() {
     return "an iterator"
   }
-  override iterator() {
-    return this.source
-  }
 }
+
+/** A built-in iterator over a host iterator, e.g. `array.values()`. */
+export const hostIterator = (builtins: Builtins, iterator: Iterator<Value, undefined>): IteratorObj =>
+  new IteratorObj(builtins.Iterator, hostCursor(iterator))
 
 /** A built-in object around a host value: data-like, so it prints as itself and crosses to extensions as a copy. */
 export abstract class Wrapper extends Obj {
@@ -401,6 +420,12 @@ export const coerceToString = (value: Value): string => (value instanceof Obj ? 
 export const coerceToNumber = (value: Value): number => {
   if (value instanceof Obj) return value.toNumber()
   return value instanceof ToolReference ? Number.NaN : Number(value)
+}
+
+/** ToIntegerOrInfinity: NaN is 0, fractions truncate. */
+export const coerceToInteger = (value: Value): number => {
+  const number = coerceToNumber(value)
+  return Number.isNaN(number) ? 0 : Math.trunc(number)
 }
 
 /** Values that cannot cross the data boundary: opaque machinery and host-backed wrappers. */
