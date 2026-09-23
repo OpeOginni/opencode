@@ -17,6 +17,8 @@ import type { HomeController } from "../model"
 import { useGlobal } from "@/runtime/server/runtime"
 import { SessionTransfer } from "@opencode/schema/session-transfer"
 import { useSshAuthenticate } from "@/servers/ssh/authenticate"
+import { formatServerError, isLocationPermissionDeniedError } from "@/runtime/server/errors"
+import { getFilename } from "@opencode/util/path"
 
 export const HomeServersSchema = Schema.Struct({
   collapsed: Persistence.record(Persistence.fallback(Schema.Boolean, () => false)),
@@ -46,12 +48,44 @@ export function createHomeProjectsController(home: HomeController) {
     return platform.platform === "desktop" && !!platform.openPath && ServerConnection.local(conn)
   }
 
+  function accessible(conn: ServerConnection.Any, directory: string) {
+    if (!ServerConnection.local(conn) || platform.platform !== "desktop") return Promise.resolve(true)
+    return home.server
+      .context(conn)
+      .sdk.api.location.get({ location: { directory } })
+      .then(
+        () => true,
+        (error: unknown) => {
+          showToast({
+            variant: "error",
+            title: language.t(
+              isLocationPermissionDeniedError(error)
+                ? "toast.project.accessDenied.title"
+                : "toast.project.reloadFailed.title",
+              { project: getFilename(directory) },
+            ),
+            description: formatServerError(error, language.t),
+          })
+          return false
+        },
+      )
+  }
+
+  function add(conn: ServerConnection.Any, directories: string[]) {
+    void Promise.all(directories.map(async (directory) => ({ directory, ok: await accessible(conn, directory) }))).then(
+      (items) => {
+        const available = items.filter((item) => item.ok).map((item) => item.directory)
+        if (available.length) home.project.add(conn, available)
+      },
+    )
+  }
+
   function choose(conn: ServerConnection.Any) {
     pickDirectory({
       server: conn,
       title: language.t("command.project.open"),
       multiple: true,
-      onSelect: (result) => home.project.add(conn, homeProjectDirectories(result)),
+      onSelect: (result) => add(conn, homeProjectDirectories(result)),
     })
   }
 
@@ -95,13 +129,24 @@ export function createHomeProjectsController(home: HomeController) {
       recentlyClosed: home.project.recentlyClosed,
       homedir: home.project.homedir,
       select: (conn: ServerConnection.Any, directory: string) => {
-        if (authenticate(conn, () => home.project.select(conn, directory))) return
-        home.project.select(conn, directory)
+        const select = () => {
+          if (home.selection.value().directory === directory) return home.project.select(conn, directory)
+          void accessible(conn, directory).then((ok) => {
+            if (ok) home.project.select(conn, directory)
+          })
+        }
+        if (authenticate(conn, select)) return
+        select()
       },
-      add: home.project.add,
+      add,
       openNewSession: (conn: ServerConnection.Any, directory: string) => {
-        if (authenticate(conn, () => home.project.openProjectNewSession(conn, directory))) return
-        home.project.openProjectNewSession(conn, directory)
+        const open = () => {
+          void accessible(conn, directory).then((ok) => {
+            if (ok) home.project.openProjectNewSession(conn, directory)
+          })
+        }
+        if (authenticate(conn, open)) return
+        open()
       },
       canImportSession: !!platform.openAttachmentPickerDialog,
       importSession: (conn: ServerConnection.Any, project: LocalProject) => {
@@ -133,9 +178,12 @@ export function createHomeProjectsController(home: HomeController) {
           })
       },
       edit: (conn: ServerConnection.Any, project: LocalProject) => {
-        settings.openProject({
-          server: ServerConnection.key(conn),
-          project: project.worktree,
+        void accessible(conn, project.worktree).then((ok) => {
+          if (!ok) return
+          settings.openProject({
+            server: ServerConnection.key(conn),
+            project: project.worktree,
+          })
         })
       },
       unseenCount: (conn: ServerConnection.Any, project: LocalProject) => {

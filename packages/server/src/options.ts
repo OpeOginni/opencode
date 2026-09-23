@@ -41,6 +41,8 @@ export const ServerOptions = Schema.Struct({
     Schema.Struct({
       filewatcher: Schema.optional(Schema.Boolean),
       fff: Schema.optional(Schema.Boolean),
+      // Remote runtimes have no host project filesystem to probe.
+      permissionCheck: Schema.optional(Schema.Boolean),
     }),
   ),
 })

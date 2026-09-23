@@ -688,6 +688,9 @@ export const dict = {
 
   "toast.session.listFailed.title": "Failed to load sessions for {{project}}",
   "toast.project.reloadFailed.title": "Failed to reload {{project}}",
+  "toast.project.accessDenied.title": "Cannot open {{project}}",
+  "error.project.permissionDenied":
+    "OpenCode can't access {{directory}}. Allow access to this folder in your system's privacy settings, then try again or choose another project.",
   "toast.migration.failed.title": "Data migration failed",
 
   "toast.update.title": "Update available",
@@ -697,11 +700,13 @@ export const dict = {
 
   "error.page.title": "Something went wrong",
   "error.page.title.status": "Server request failed",
+  "error.page.title.permissionDenied": "Cannot access project folder",
   "error.page.description": "An error occurred while loading the application.",
   "error.page.description.status": "The server returned an HTTP {{status}} response.",
   "error.page.description.localServerStartup": "An error occurred while starting the local server.",
   "error.page.details.label": "Error Details",
   "error.page.action.restart": "Restart",
+  "error.page.action.goHome": "Go to projects",
   "error.page.action.reload": "Reload",
   "error.page.action.report": "Report Error",
   "error.page.action.reported": "Error Reported",

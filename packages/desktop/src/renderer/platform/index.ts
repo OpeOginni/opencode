@@ -7,6 +7,7 @@ import { createDesktopFiles } from "./files"
 import { createDesktopMenuAction } from "./menu"
 import { createDesktopNotify } from "./notifications"
 import { createDesktopStorage } from "./storage"
+import { setLastActiveUrl } from "../window/route-storage"
 
 export type DesktopWindowState = {
   id: string
@@ -60,6 +61,10 @@ export function createDesktopPlatform(
     setForceFocus: (enabled) => api.setForceFocus(enabled),
     recordFatalRendererError: (error) => api.recordFatalRendererError(error),
     restart: async () => api.relaunch(),
+    recoverToHome: () => {
+      setLastActiveUrl(windowState.id, "/")
+      window.location.reload()
+    },
     notify: createDesktopNotify(api),
     fetch: (input, init) => {
       if (input instanceof Request) return fetch(input)

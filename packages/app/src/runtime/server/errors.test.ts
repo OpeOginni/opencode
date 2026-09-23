@@ -1,7 +1,12 @@
 import { describe, expect, test } from "bun:test"
 import type { FileNotFoundError, SessionNotFoundError } from "@opencode/client/promise"
 import type { ConfigInvalidError, ProviderModelNotFoundError } from "./errors"
-import { formatServerError, isSessionNotFoundError, parseReadableConfigInvalidError } from "./errors"
+import {
+  formatServerError,
+  isLocationPermissionDeniedError,
+  isSessionNotFoundError,
+  parseReadableConfigInvalidError,
+} from "./errors"
 
 function fill(text: string, vars?: Record<string, string | number>) {
   if (!vars) return text
@@ -95,6 +100,25 @@ describe("formatServerError", () => {
     } satisfies FileNotFoundError
 
     expect(formatServerError(error, language.t)).toBe("File not found: deleted.txt")
+  })
+
+  test("explains a denied project folder and identifies its SDK error", () => {
+    const directory = "/Users/example/Documents/Projects/private-project"
+    const error = new Error("Request failed with status 403", {
+      cause: {
+        body: {
+          _tag: "LocationPermissionDeniedError",
+          directory,
+          message: `Cannot access project directory: ${directory}`,
+        },
+        status: 403,
+      },
+    })
+
+    expect(isLocationPermissionDeniedError(error)).toBe(true)
+    expect(formatServerError(error)).toBe(
+      `OpenCode can't access ${directory}. Allow access to this folder in your system's privacy settings, then try again or choose another project.`,
+    )
   })
 
   test("returns provided string errors", () => {

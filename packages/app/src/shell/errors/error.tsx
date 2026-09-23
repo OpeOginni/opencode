@@ -8,6 +8,7 @@ import { usePlatform } from "@/runtime/platform/platform"
 import { useLanguage } from "@/runtime/i18n/language"
 import { Icon } from "@opencode/ui/icon"
 import { errorDescriptionKey, errorStatus } from "./description"
+import { formatServerError, isLocationPermissionDeniedError } from "@/runtime/server/errors"
 
 export type InitError = {
   name: string
@@ -290,12 +291,20 @@ export const ErrorPage: Component<ErrorPageProps> = (props) => {
         <Logo class="w-48 sm:w-58.5 opacity-12 shrink-0" />
         <div class="flex flex-col items-center gap-2 text-center">
           <h1 class="text-lg font-medium text-text-strong">
-            {language.t(status() ? "error.page.title.status" : "error.page.title")}
+            {language.t(
+              isLocationPermissionDeniedError(props.error)
+                ? "error.page.title.permissionDenied"
+                : status()
+                  ? "error.page.title.status"
+                  : "error.page.title",
+            )}
           </h1>
           <p class="text-sm text-text-weak">
-            {status()
-              ? language.t("error.page.description.status", { status: status()! })
-              : language.t(errorDescriptionKey(props.error))}
+            {isLocationPermissionDeniedError(props.error)
+              ? formatServerError(props.error, language.t)
+              : status()
+                ? language.t("error.page.description.status", { status: status()! })
+                : language.t(errorDescriptionKey(props.error))}
           </p>
         </div>
         <TextField
@@ -308,6 +317,17 @@ export const ErrorPage: Component<ErrorPageProps> = (props) => {
           hideLabel
         />
         <div class="flex flex-row items-center justify-center gap-3 flex-wrap max-w-64">
+          <Show when={isLocationPermissionDeniedError(props.error)}>
+            <Button
+              size="large"
+              onClick={() => {
+                if (platform.recoverToHome) return platform.recoverToHome()
+                window.location.assign("/")
+              }}
+            >
+              {language.t("error.page.action.goHome")}
+            </Button>
+          </Show>
           <Button size="large" onClick={platform.restart}>
             {language.t(platform.platform === "web" ? "error.page.action.reload" : "error.page.action.restart")}
           </Button>

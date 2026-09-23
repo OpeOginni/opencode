@@ -31,6 +31,7 @@ import { PluginUpdate } from "@opencode/core/plugin/update"
 import { SdkPlugins } from "@opencode/core/plugin/sdk"
 import { WellKnown } from "@opencode/core/wellknown"
 import { Workspace } from "@opencode/core/workspace"
+import { FSUtil } from "@opencode/util/fs-util"
 import { Watcher } from "@opencode/core/filesystem/watcher"
 import { HttpRouter } from "effect/unstable/http"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
@@ -50,6 +51,7 @@ import type { ServerOptions } from "./options"
 
 const applicationServiceNodes = [
   Global.node,
+  FSUtil.node,
   Database.node,
   Bus.node,
   EventLogger.node,
@@ -175,7 +177,7 @@ function makeRoutes<AuthError, AuthServices>(
         Layer.provide(handlers.pipe(Layer.provide(services), Layer.provide(Layer.succeed(CorsConfig, options)))),
         Layer.provide(formLocationLayer),
         Layer.provide(sessionLocationLayer),
-        Layer.provide(layer),
+        Layer.provide(layer(options.fs?.permissionCheck !== false && !options.simulation)),
         Layer.provide(authorizationLayer),
         Layer.provide(schemaErrorLayer),
         Layer.provide(auth),

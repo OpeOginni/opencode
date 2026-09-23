@@ -1,3 +1,5 @@
+import type { LocationPermissionDeniedError } from "@opencode/client/promise"
+
 export type ConfigInvalidError = {
   name: "ConfigInvalidError"
   data: {
@@ -27,6 +29,7 @@ function tr(translator: Translator | undefined, key: string, text: string, vars?
 
 export function formatServerError(error: unknown, translate?: Translator, fallback?: string) {
   const unwrapped = unwrapNamedError(error)
+  if (isLocationPermissionDeniedErrorLike(unwrapped)) return parseReadableLocationPermissionDeniedError(unwrapped, translate)
   if (isConfigInvalidErrorLike(unwrapped)) return parseReadableConfigInvalidError(unwrapped, translate)
   if (isProviderModelNotFoundErrorLike(unwrapped)) return parseReadableProviderModelNotFoundError(unwrapped, translate)
   if (
@@ -41,6 +44,16 @@ export function formatServerError(error: unknown, translate?: Translator, fallba
   if (typeof error === "string" && error) return error
   if (fallback) return fallback
   return tr(translate, "error.chain.unknown", "Unknown error")
+}
+
+export function isLocationPermissionDeniedError(error: unknown) {
+  return isLocationPermissionDeniedErrorLike(unwrapNamedError(error))
+}
+
+function isLocationPermissionDeniedErrorLike(error: unknown): error is LocationPermissionDeniedError {
+  if (typeof error !== "object" || error === null) return false
+  if (!("_tag" in error) || error._tag !== "LocationPermissionDeniedError") return false
+  return "directory" in error && typeof error.directory === "string"
 }
 
 function unwrapNamedError(error: unknown): unknown {
@@ -79,6 +92,15 @@ function isProviderModelNotFoundErrorLike(error: unknown): error is ProviderMode
   if (typeof error !== "object" || error === null) return false
   const o = error as Record<string, unknown>
   return o.name === "ProviderModelNotFoundError" && typeof o.data === "object" && o.data !== null
+}
+
+function parseReadableLocationPermissionDeniedError(errorInput: LocationPermissionDeniedError, translator?: Translator) {
+  return tr(
+    translator,
+    "error.project.permissionDenied",
+    `OpenCode can't access ${errorInput.directory}. Allow access to this folder in your system's privacy settings, then try again or choose another project.`,
+    { directory: errorInput.directory },
+  )
 }
 
 export function parseReadableConfigInvalidError(errorInput: ConfigInvalidError, translator?: Translator) {

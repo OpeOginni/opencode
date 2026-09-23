@@ -55,6 +55,9 @@ type PlatformBase = {
   /** Restart the app  */
   restart(): Promise<void>
 
+  /** Return to the project list when a route fails before the router can recover. */
+  recoverToHome?(): void
+
   /** Send a system notification */
   notify(title: string, description?: string, onClick?: () => void): Promise<void>
 
