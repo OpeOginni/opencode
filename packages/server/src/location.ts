@@ -99,14 +99,16 @@ export const layer = (directoryCheck = true) =>
     }),
   )
 
-// macOS can report EPERM as a PlatformError with reason Unknown instead of PermissionDenied.
+// Effect maps EACCES to PermissionDenied but leaves EPERM as Unknown, which is how macOS reports a
+// folder blocked by privacy settings (e.g. `EPERM: operation not permitted, lstat '/Users/<user>/Documents'`).
 export function isPermissionDenied(error: PlatformError) {
   if (error.reason._tag === "PermissionDenied") return true
   const cause = error.cause
   return (
+    error.reason._tag === "Unknown" &&
     typeof cause === "object" &&
     cause !== null &&
     "code" in cause &&
-    (cause.code === "EPERM" || cause.code === "EACCES")
+    cause.code === "EPERM"
   )
 }
