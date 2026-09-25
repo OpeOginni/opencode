@@ -148,7 +148,9 @@ function makeRoutes<AuthError, AuthServices>(
       ...(instances ? [Instance.node.replace(instances(() => replacements))] : []),
       ...overrides,
     ]
-    return AppNodeBuilder.build(applicationServices, replacements)
+    return AppNodeBuilder.build(applicationServices, replacements, {
+      directoryCheck: options.fs?.directoryCheck !== false && !options.simulation,
+    })
   }
   const serviceLayer = options.simulation
     ? Layer.unwrap(
@@ -179,7 +181,7 @@ function makeRoutes<AuthError, AuthServices>(
         Layer.provide(handlers.pipe(Layer.provide(services), Layer.provide(Layer.succeed(CorsConfig, options)))),
         Layer.provide(formLocationLayer),
         Layer.provide(sessionLocationLayer),
-        Layer.provide(layer(options.fs?.directoryCheck !== false && !options.simulation)),
+        Layer.provide(layer),
         Layer.provide(authorizationLayer),
         Layer.provide(schemaErrorLayer),
         Layer.provide(auth),
