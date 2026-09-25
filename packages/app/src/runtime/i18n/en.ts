@@ -737,6 +737,9 @@ export const dict = {
   "toast.project.defaultUnavailable.title": "Cannot open default project",
   "toast.project.missing.title": "Project folder not found",
   "toast.project.missing.remove": "Remove project",
+  "session.location.move": "Move session",
+  "session.location.retry": "Try again",
+  "session.location.closeProject": "Close project",
   "toast.project.permissionDenied.title": "OpenCode can't access this folder",
   "error.project.missing":
     "{{directory}} was moved, renamed, or deleted. Restore the folder at that path, or remove this project from OpenCode and open it from its new location.",
