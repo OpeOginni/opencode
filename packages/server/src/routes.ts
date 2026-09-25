@@ -148,9 +148,7 @@ function makeRoutes<AuthError, AuthServices>(
       ...(instances ? [Instance.node.replace(instances(() => replacements))] : []),
       ...overrides,
     ]
-    return AppNodeBuilder.build(applicationServices, replacements, {
-      directoryCheck: options.fs?.directoryCheck !== false && !options.simulation,
-    })
+    return AppNodeBuilder.build(applicationServices, replacements)
   }
   const serviceLayer = options.simulation
     ? Layer.unwrap(

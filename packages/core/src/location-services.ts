@@ -26,14 +26,12 @@ export class PermissionDeniedError extends Error {
 
 export function buildLocationServiceMap(
   replacements: LayerNode.Replacements = [],
-  options: { directoryCheck?: boolean } = {},
 ): Layer.Layer<LocationServiceMap.Service> {
   return Layer.effect(
     LocationServiceMap.Service,
     Effect.gen(function* () {
       const owner = yield* Effect.scope
-      const fs = options.directoryCheck ? yield* Effect.serviceOption(FSUtil.Service) : Option.none<FSUtil.Interface>()
-      if (options.directoryCheck && Option.isNone(fs)) return yield* Effect.die("Directory check requires FSUtil")
+      const fs = yield* Effect.serviceOption(FSUtil.Service)
       const builds = MutableHashMap.empty<Location.Ref, { close?: Effect.Effect<void> }>()
       const inner: LayerMap.LayerMap<Location.Ref, LocationServices> = yield* LayerMap.make(
         (ref: Location.Ref) => {
@@ -41,10 +39,7 @@ export function buildLocationServiceMap(
           MutableHashMap.set(builds, ref, build)
           return Layer.fromBuild((memoMap, scope) =>
             Effect.suspend(() =>
-              (!options.directoryCheck || ref.workspaceID || Option.isNone(fs)
-                ? Effect.void
-                : checkDirectory(fs.value, ref)
-              ).pipe(
+              (ref.workspaceID || Option.isNone(fs) ? Effect.void : checkDirectory(fs.value, ref)).pipe(
                 Effect.orDie,
                 Effect.andThen(Layer.buildWithMemoMap(Instance.layer(ref, { replacements: bindings }), memoMap, scope)),
               ),
