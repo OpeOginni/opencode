@@ -179,17 +179,103 @@ it.live("checks a directory once per location boot, not on every request", () =>
         }),
       )
 
-    expect((yield* Effect.promise(() => request("/api/location"))).status).toBe(200)
+    expect((yield* Effect.promise(() => request("/api/integration"))).status).toBe(200)
     const afterBoot = checked.length
     expect(afterBoot).toBeGreaterThan(0)
-    expect((yield* Effect.promise(() => request("/api/location"))).status).toBe(200)
+    expect((yield* Effect.promise(() => request("/api/integration"))).status).toBe(200)
     expect(checked).toHaveLength(afterBoot)
+    expect((yield* Effect.promise(() => request("/api/location"))).status).toBe(200)
+    expect(checked).toHaveLength(afterBoot + 1)
 
     expect((yield* Effect.promise(() => request("/api/location/reload", "POST"))).status).toBe(204)
     const afterReload = checked.length
     expect(afterReload).toBeGreaterThan(afterBoot)
-    expect((yield* Effect.promise(() => request("/api/location"))).status).toBe(200)
+    expect((yield* Effect.promise(() => request("/api/integration"))).status).toBe(200)
     expect(checked).toHaveLength(afterReload)
+  }),
+)
+
+it.live("re-checks a booted project directory on location.get", () =>
+  Effect.gen(function* () {
+    const handler = yield* ServerFetch.make(options)
+    const root = yield* tmpdirScoped()
+    const directory = path.join(root.path, "project")
+    yield* Effect.promise(() => fs.mkdir(directory))
+    const request = (endpoint: string) =>
+      handler(
+        new Request(`http://opencode.local${endpoint}`, {
+          headers: { "x-opencode-directory": encodeURIComponent(directory) },
+        }),
+      )
+    expect((yield* Effect.promise(() => request("/api/integration"))).status).toBe(200)
+
+    yield* Effect.promise(() => fs.rm(directory, { recursive: true }))
+    // Warm requests reuse the booted Location without probing the directory.
+    expect((yield* Effect.promise(() => request("/api/integration"))).status).toBe(200)
+    const response = yield* Effect.promise(() => request("/api/location"))
+    expect(response.status).toBe(400)
+    expect(yield* Effect.promise(() => response.json())).toMatchObject({
+      _tag: "LocationDirectoryNotFoundError",
+      directory,
+    })
+  }),
+)
+
+it.live("reports a missing session directory and still moves the session", () =>
+  Effect.gen(function* () {
+    const handler = yield* ServerFetch.make(options)
+    const root = yield* tmpdirScoped()
+    const source = path.join(root.path, "source")
+    const destination = path.join(root.path, "destination")
+    yield* Effect.promise(() => Promise.all([fs.mkdir(source), fs.mkdir(destination)]))
+    const created = (yield* Effect.promise(() =>
+      handler(
+        new Request("http://opencode.local/api/session", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ location: { directory: source } }),
+        }),
+      ).then((response) => response.json()),
+    )) as { data: { id: string } }
+    const forms = () =>
+      Effect.promise(() => handler(new Request(`http://opencode.local/api/session/${created.data.id}/form`)))
+
+    yield* Effect.promise(() => fs.rm(source, { recursive: true }))
+    const response = yield* forms()
+    expect(response.status).toBe(400)
+    expect(yield* Effect.promise(() => response.json())).toMatchObject({
+      _tag: "LocationDirectoryNotFoundError",
+      directory: source,
+    })
+    // Session execution routes use a different middleware from form routes.
+    const action = yield* Effect.promise(() =>
+      handler(new Request(`http://opencode.local/api/session/${created.data.id}/background`, { method: "POST" })),
+    )
+    expect(action.status).toBe(400)
+    expect(yield* Effect.promise(() => action.json())).toMatchObject({
+      _tag: "LocationDirectoryNotFoundError",
+      directory: source,
+    })
+    const pending = yield* Effect.promise(() =>
+      handler(new Request(`http://opencode.local/api/session/${created.data.id}/permission`)),
+    )
+    expect(pending.status).toBe(400)
+    expect(yield* Effect.promise(() => pending.json())).toMatchObject({
+      _tag: "LocationDirectoryNotFoundError",
+      directory: source,
+    })
+
+    const moved = yield* Effect.promise(() =>
+      handler(
+        new Request(`http://opencode.local/api/session/${created.data.id}/move`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ directory: destination }),
+        }),
+      ),
+    )
+    expect(moved.status).toBe(204)
+    expect((yield* forms()).status).toBe(200)
   }),
 )
 

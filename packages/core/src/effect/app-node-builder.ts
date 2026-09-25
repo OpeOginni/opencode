@@ -20,14 +20,18 @@ const instances = makeGlobalNode({
   deps: [LocationServiceMap.node],
 })
 
-export function build<A, E>(root: LayerNode.Graph<A, E>, replacements: LayerNode.Replacements = []) {
+export function build<A, E>(
+  root: LayerNode.Graph<A, E>,
+  replacements: LayerNode.Replacements = [],
+  options: { readonly directoryCheck?: boolean } = {},
+) {
   const bindings = [Instance.node.replace(instances), ...replacements]
   return LayerNode.compile(root, {
     replacements: [
       LocationServiceMap.node.replace(
         makeGlobalNode({
           service: LocationServiceMap.Service,
-          layer: buildLocationServiceMap(bindings),
+          layer: buildLocationServiceMap(bindings, options),
           deps: [FSUtil.node],
         }),
       ),

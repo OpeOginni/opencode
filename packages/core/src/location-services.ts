@@ -26,6 +26,7 @@ export class PermissionDeniedError extends Error {
 
 export function buildLocationServiceMap(
   replacements: LayerNode.Replacements = [],
+  options: { readonly directoryCheck?: boolean } = {},
 ): Layer.Layer<LocationServiceMap.Service> {
   return Layer.effect(
     LocationServiceMap.Service,
@@ -39,7 +40,10 @@ export function buildLocationServiceMap(
           MutableHashMap.set(builds, ref, build)
           return Layer.fromBuild((memoMap, scope) =>
             Effect.suspend(() =>
-              (ref.workspaceID || Option.isNone(fs) ? Effect.void : checkDirectory(fs.value, ref)).pipe(
+              (options.directoryCheck === false || ref.workspaceID || Option.isNone(fs)
+                ? Effect.void
+                : checkDirectory(fs.value, ref)
+              ).pipe(
                 Effect.orDie,
                 Effect.andThen(Layer.buildWithMemoMap(Instance.layer(ref, { replacements: bindings }), memoMap, scope)),
               ),
@@ -104,7 +108,7 @@ export function buildLocationServiceMap(
   )
 }
 
-function checkDirectory(fs: FSUtil.Interface, ref: Location.Ref) {
+export function checkDirectory(fs: FSUtil.Interface, ref: Location.Ref) {
   return fs.realPath(ref.directory).pipe(
     Effect.asVoid,
     Effect.catchReason("PlatformError", "NotFound", () => Effect.fail(new DirectoryNotFoundError(ref.directory))),

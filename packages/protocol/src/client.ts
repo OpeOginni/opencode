@@ -17,7 +17,7 @@ class LocationMiddleware extends HttpApiMiddleware.Service<LocationMiddleware>()
 
 class SessionLocationMiddleware extends HttpApiMiddleware.Service<SessionLocationMiddleware>()(
   "@opencode/client/SessionLocationMiddleware",
-  { error: [InvalidRequestError, SessionNotFoundError] },
+  { error: [InvalidRequestError, SessionNotFoundError, LocationDirectoryNotFoundError, LocationPermissionDeniedError] },
 ) {}
 
 type ClientApiShape = Api<
