@@ -3,8 +3,8 @@ import { homedir } from "node:os"
 import { join } from "node:path"
 import type { DiscoverOptions, Endpoint, EnsureOptions, StopOptions } from "../service.js"
 import {
-  contenderFailure,
   contenderFinished,
+  finishedFailure,
   type ServiceContender,
   spawnServiceContender,
 } from "../service-contender.js"
@@ -55,6 +55,7 @@ export const ensure = Effect.fn("service.ensure")(function* (options: EnsureOpti
   const timing = ensureTiming(options)
   const contenders = new Set<ServiceContender>()
   let timeouts: { readonly info: Info; readonly count: number } | undefined
+  let lastFailure: Error | undefined
   let announced = false
   let lastSpawn = 0
   let spawnDelay = timing.spawnDelay
@@ -115,12 +116,14 @@ export const ensure = Effect.fn("service.ensure")(function* (options: EnsureOpti
     } else if (lastSpawn === 0 && info !== undefined) lastSpawn = Date.now()
 
     const finished = [...contenders].filter(contenderFinished)
-    const failure = finished.map(contenderFailure).find((error): error is Error => error !== undefined)
+    const failure = finishedFailure(finished)
     if (finished.some((item) => item.child.exitCode === 0)) {
       spawnDelay = Math.min(spawnDelay * 2, timing.maxSpawnDelay)
     }
     finished.forEach((item) => contenders.delete(item))
-    if (failure !== undefined && contenders.size === 0) return yield* Effect.fail(failure)
+    if (failure !== undefined) lastFailure = failure.error
+    if (failure !== undefined && (failure.unrecoverable || contenders.size === 0))
+      return yield* Effect.fail(failure.error)
     // Keep one candidate plus one lock probe so a pre-lock stall cannot block recovery.
     if (contenders.size < 2 && Date.now() - lastSpawn >= spawnDelay) {
       yield* announce("missing")
@@ -138,7 +141,9 @@ export const ensure = Effect.fn("service.ensure")(function* (options: EnsureOpti
     Effect.ensuring(Effect.sync(() => contenders.forEach((contender) => contender.release()))),
   )
   if (Option.isNone(found))
-    return yield* Effect.fail(new Error("Timed out waiting for the background service to start"))
+    return yield* Effect.fail(
+      new Error("Timed out waiting for the background service to start", { cause: lastFailure }),
+    )
   return found.value.endpoint
 })
 

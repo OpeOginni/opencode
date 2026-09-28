@@ -1,13 +1,13 @@
 export * as ServerProcess from "./server-process"
 
 import { NodeServices } from "@effect/platform-node"
-import { Service, type DiscoverOptions } from "@opencode/client/effect/service"
+import { Service, unrecoverableExitCode, type DiscoverOptions } from "@opencode/client/effect/service"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Global } from "@opencode/util/global"
 import { OPENCODE_ARTIFACT, OPENCODE_CHANNEL, OPENCODE_VERSION } from "./version"
 import { AppProcess } from "@opencode/util/process"
 import { randomBytes, randomUUID } from "node:crypto"
-import { Effect, Option, Redacted, Schedule, Schema } from "effect"
+import { Effect, Option, Redacted, Runtime, Schedule, Schema } from "effect"
 import { PersistentPty } from "@opencode/schema/persistent-pty"
 import { HttpServer } from "effect/unstable/http"
 import { Env } from "./env"
@@ -148,7 +148,7 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
               found
                 ? Effect.void
                 : Effect.fail(
-                    new Error(
+                    new PortUnavailableError(
                       `Managed service port ${port} on ${hostname} is already in use by another process. ` +
                         "Configure another port with `opencode service set port <port>` and start the service again.",
                       { cause: error },
@@ -170,6 +170,12 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
     }).pipe(Effect.annotateLogs({ role: "server" })),
   )
 })
+
+// Starting another service process cannot free a port that another program holds. The exit code tells clients to
+// report this error instead of spawning replacements until they time out.
+class PortUnavailableError extends Error {
+  override readonly [Runtime.errorExitCode] = unrecoverableExitCode
+}
 
 const recognizeIncumbent = Effect.fnUntraced(function* (options: DiscoverOptions, hostname: string, port: number) {
   const found = yield* Service.incumbent({ ...options, url: serviceURL(hostname, port) }).pipe(

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { errorDescriptionKey, errorStatus } from "./description"
+import { errorDescriptionKey, errorStatus, localServerStartupReason } from "./description"
 
 describe("error description", () => {
   test("describes local server startup errors", () => {
@@ -13,6 +13,28 @@ describe("error description", () => {
     expect(errorDescriptionKey(Object.assign(new Error("unknown"), { localServerStartup: false }))).toBe(
       "error.page.description",
     )
+  })
+})
+
+describe("local server startup reason", () => {
+  test("finds the reason the service wrote to stderr", () => {
+    const exited = new Error(
+      "Server process exited with code 78\nError: Managed service port 49374 on 127.0.0.1 is already in use.\n    at start (server.js:1:1)",
+    )
+    const error = Object.assign(
+      new Error("Desktop IPC handler failed", {
+        cause: new Error("Timed out waiting for the background service to start", { cause: exited }),
+      }),
+      { localServerStartup: true },
+    )
+    expect(localServerStartupReason(error)).toBe("Managed service port 49374 on 127.0.0.1 is already in use.")
+  })
+
+  test("ignores other errors and startup errors without a reported reason", () => {
+    expect(localServerStartupReason(new Error("x", { cause: new Error("exited\nError: reason") }))).toBeUndefined()
+    expect(
+      localServerStartupReason(Object.assign(new Error("Timed out waiting"), { localServerStartup: true })),
+    ).toBeUndefined()
   })
 })
 

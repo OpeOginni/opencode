@@ -55,3 +55,9 @@ export type Info = {
   /** Private service password, when authentication is enabled. */
   readonly password?: string
 }
+
+/**
+ * Exit code a service process uses when starting it again cannot help, such as when another program holds
+ * its configured port. Clients stop spawning replacements and report that process's error.
+ */
+export const unrecoverableExitCode = 78

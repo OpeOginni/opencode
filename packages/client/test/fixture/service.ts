@@ -7,6 +7,15 @@ if (mode === "stderr-failed") {
   process.stderr.write("x".repeat(16_384) + "\nactionable startup failure\n")
   process.exit(1)
 }
+// The first contender stalls without registering; the next reports a failure that respawning cannot fix.
+if (mode === "unrecoverable") {
+  const owner = await writeFile(registration + ".owner", String(process.pid), { flag: "wx" })
+    .then(() => true)
+    .catch(() => false)
+  if (owner) await Bun.sleep(10_000)
+  process.stderr.write("port held by another program\n")
+  process.exit(78)
+}
 if (mode === "record-start") {
   await writeFile(registration + ".started", "")
   process.exit(1)

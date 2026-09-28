@@ -1,5 +1,5 @@
 import { NodeFileSystem } from "@effect/platform-node"
-import { Service, type Info } from "@opencode/client/effect/service"
+import { Service, unrecoverableExitCode, type Info } from "@opencode/client/effect/service"
 import { Global } from "@opencode/util/global"
 import { OPENCODE_VERSION } from "../src/version"
 import { expect, test } from "bun:test"
@@ -421,7 +421,7 @@ test("unresponsive managed port occupancy reports a bounded conflict", async () 
   try {
     expect(await Promise.race([recognizing.promise.then(() => true), Bun.sleep(20_000).then(() => false)])).toBe(true)
     const exitCode = await Promise.race([contender.exited, Bun.sleep(20_000).then(() => undefined)])
-    expect(exitCode).toBe(1)
+    expect(exitCode).toBe(unrecoverableExitCode)
     const output = (await new Response(contender.stdout).text()) + (await new Response(contender.stderr).text())
     expect(output).toContain(`Managed service port ${listener.port} on 127.0.0.1 is already in use by another process`)
     expect(await Bun.file(registration).json()).toEqual(stale)

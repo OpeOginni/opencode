@@ -3,8 +3,8 @@ import { homedir } from "node:os"
 import { join } from "node:path"
 import type { DiscoverOptions, Endpoint, Info, EnsureOptions, StopOptions } from "../service.js"
 import {
-  contenderFailure,
   contenderFinished,
+  finishedFailure,
   type ServiceContender,
   spawnServiceContender,
 } from "../service-contender.js"
@@ -35,6 +35,7 @@ export async function ensure(options: EnsureOptions = {}): Promise<Endpoint> {
   const deadline = Date.now() + timing.promiseTimeout
   const contenders = new Set<ServiceContender>()
   let timeouts: { readonly info: Info; readonly count: number } | undefined
+  let lastFailure: Error | undefined
   let announced = false
   let lastSpawn = 0
   let spawnDelay = timing.spawnDelay
@@ -56,7 +57,8 @@ export async function ensure(options: EnsureOptions = {}): Promise<Endpoint> {
 
   try {
     while (true) {
-      if (Date.now() >= deadline) throw new Error("Timed out waiting for the background service to start")
+      if (Date.now() >= deadline)
+        throw new Error("Timed out waiting for the background service to start", { cause: lastFailure })
       const registration = await registered(options.file, timing.requestTimeout)
       if (registration.timedOut && registration.info !== undefined) {
         timeouts = {
@@ -95,12 +97,13 @@ export async function ensure(options: EnsureOptions = {}): Promise<Endpoint> {
       } else {
         if (lastSpawn === 0 && registration.info !== undefined) lastSpawn = Date.now()
         const finished = [...contenders].filter(contenderFinished)
-        const failure = finished.map(contenderFailure).find((error) => error !== undefined)
+        const failure = finishedFailure(finished)
         if (finished.some((item) => item.child.exitCode === 0)) {
           spawnDelay = Math.min(spawnDelay * 2, timing.maxSpawnDelay)
         }
         finished.forEach((item) => contenders.delete(item))
-        if (failure !== undefined && contenders.size === 0) throw failure
+        if (failure !== undefined) lastFailure = failure.error
+        if (failure !== undefined && (failure.unrecoverable || contenders.size === 0)) throw failure.error
         // Keep one candidate plus one lock probe so a pre-lock stall cannot block recovery.
         if (contenders.size < 2 && Date.now() - lastSpawn >= spawnDelay) {
           announce("missing")

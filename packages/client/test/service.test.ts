@@ -245,6 +245,25 @@ test("reports a bounded contender stderr tail", async () => {
   expect(error.message.length).toBeLessThan(9_000)
 }, 10_000)
 
+test("reports an unrecoverable contender failure without waiting for the timeout", async () => {
+  await using fixture = await serviceFixture()
+  const registration = fixture.registration
+  const started = Date.now()
+  const error = await run(
+    ensure({
+      file: registration,
+      version: "test",
+      command: fixture.command("unrecoverable"),
+    }),
+  ).catch((error: unknown) => error)
+  fixture.track(Number(await Bun.file(registration + ".owner").text()))
+
+  expect(error).toBeInstanceOf(Error)
+  if (!(error instanceof Error)) throw error
+  expect(error.message).toContain("port held by another program")
+  expect(Date.now() - started).toBeLessThan(2_000)
+})
+
 test("reports a contender terminated by a signal", async () => {
   await using fixture = await serviceFixture()
   const registration = fixture.registration

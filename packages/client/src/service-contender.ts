@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process"
+import { unrecoverableExitCode } from "./service.js"
 
 export type ServiceContender = {
   readonly child: ChildProcess
@@ -52,7 +53,7 @@ export function spawnServiceContender(
   }
 }
 
-export function contenderFailure(contender: ServiceContender) {
+function contenderFailure(contender: ServiceContender) {
   const error = contender.error()
   if (error !== undefined) return error
   if (contender.child.exitCode !== null && contender.child.exitCode !== 0)
@@ -60,6 +61,15 @@ export function contenderFailure(contender: ServiceContender) {
   if (contender.child.signalCode !== null)
     return startupError(`Server process terminated by ${contender.child.signalCode}`, contender.stderr())
   return undefined
+}
+
+// The error to report for contenders that just finished, preferring one that says a respawn cannot help.
+export function finishedFailure(finished: ReadonlyArray<ServiceContender>) {
+  const failures = finished.flatMap((contender) => {
+    const error = contenderFailure(contender)
+    return error === undefined ? [] : [{ error, unrecoverable: contender.child.exitCode === unrecoverableExitCode }]
+  })
+  return failures.find((failure) => failure.unrecoverable) ?? failures[0]
 }
 
 export function contenderFinished(contender: ServiceContender) {

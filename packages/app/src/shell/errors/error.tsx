@@ -7,7 +7,7 @@ import { createStore } from "solid-js/store"
 import { usePlatform } from "@/runtime/platform/platform"
 import { useLanguage } from "@/runtime/i18n/language"
 import { Icon } from "@opencode/ui/icon"
-import { errorDescriptionKey, errorStatus } from "./description"
+import { errorDescriptionKey, errorStatus, localServerStartupReason } from "./description"
 
 export type InitError = {
   name: string
@@ -298,6 +298,9 @@ export const ErrorPage: Component<ErrorPageProps> = (props) => {
               : language.t(errorDescriptionKey(props.error))}
           </p>
         </div>
+        <Show when={localServerStartupReason(props.error)}>
+          {(reason) => <p class="-mt-4 text-sm text-text-strong text-center max-w-xl break-words">{reason()}</p>}
+        </Show>
         <TextField
           value={formattedError()}
           readOnly
