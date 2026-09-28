@@ -7,7 +7,7 @@ import { Integration } from "@opencode/schema/integration"
 import { ServerInfo } from "@opencode/protocol/groups/server"
 import { FSUtil } from "@opencode/util/fs-util"
 import { NodeFileSystem } from "@effect/platform-node"
-import { Context, Effect, Layer, Schedule, Schema } from "effect"
+import { Context, Effect, Layer, PlatformError, Schedule, Schema } from "effect"
 import { tmpdir, tmpdirScoped } from "../../core/test/fixture/tmpdir"
 import { it } from "../../core/test/lib/effect"
 import { ServerFetch } from "../src/fetch"
@@ -305,6 +305,47 @@ it.live("reports denied project access without breaking other locations", () =>
 
     yield* Effect.promise(() => fs.chmod(parent, 0o700))
     expect((yield* Effect.promise(request)).status).toBe(200)
+  }),
+)
+
+it.live("reports a folder denied after the boot check as permission denied", () =>
+  Effect.gen(function* () {
+    const directory = yield* tmpdirScoped()
+    // macOS privacy blocks can let the boot check through and still fail the boot's own reads of the folder.
+    const denied = PlatformError.systemError({
+      _tag: "Unknown",
+      module: "FileSystem",
+      method: "realPath",
+      pathOrDescriptor: directory.path,
+      cause: Object.assign(new Error(`EPERM: operation not permitted, lstat '${directory.path}'`), { code: "EPERM" }),
+    })
+    const filesystem = FSUtil.layer.pipe(
+      Layer.provide(NodeFileSystem.layer),
+      Layer.flatMap((context) => {
+        const fs = Context.get(context, FSUtil.Service)
+        return Layer.succeed(
+          FSUtil.Service,
+          FSUtil.Service.of({
+            ...fs,
+            resolve: (input) => (input === directory.path ? Effect.die(denied) : fs.resolve(input)),
+          }),
+        )
+      }),
+    )
+    const handler = yield* ServerFetch.make(options, { overrides: [FSUtil.node.replace(filesystem)] })
+    const response = yield* Effect.promise(() =>
+      handler(
+        new Request("http://opencode.local/api/location", {
+          headers: { "x-opencode-directory": encodeURIComponent(directory.path) },
+        }),
+      ),
+    )
+
+    expect(response.status).toBe(403)
+    expect(yield* Effect.promise(() => response.json())).toMatchObject({
+      _tag: "LocationPermissionDeniedError",
+      directory: directory.path,
+    })
   }),
 )
 

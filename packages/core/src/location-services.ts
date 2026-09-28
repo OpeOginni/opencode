@@ -1,4 +1,4 @@
-import { Context, Duration, Effect, Exit, Layer, LayerMap, MutableHashMap, Option } from "effect"
+import { Cause, Context, Duration, Effect, Exit, Layer, LayerMap, MutableHashMap, Option, PlatformError } from "effect"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Instance } from "./instance.js"
 import { Location } from "./location.js"
@@ -38,15 +38,19 @@ export function buildLocationServiceMap(
           const build: { close?: Effect.Effect<void> } = {}
           MutableHashMap.set(builds, ref, build)
           return Layer.fromBuild((memoMap, scope) =>
-            Effect.suspend(() =>
-              (options.directoryCheck === false || ref.workspaceID || Option.isNone(fs)
-                ? Effect.void
-                : checkDirectory(fs.value, ref.directory)
-              ).pipe(
+            Effect.suspend(() => {
+              const local = options.directoryCheck !== false && !ref.workspaceID && Option.isSome(fs)
+              return (local ? checkDirectory(fs.value, ref.directory) : Effect.void).pipe(
                 Effect.orDie,
                 Effect.andThen(Layer.buildWithMemoMap(Instance.layer(ref, { replacements: bindings }), memoMap, scope)),
-              ),
-            ).pipe(
+                // The check can pass while a macOS privacy block still fails the boot's own reads of the
+                // folder, so a boot that fails on the folder (or a parent) reports it as unavailable too.
+                Effect.catchCauseIf(
+                  (cause) => local && unavailableBoot(ref.directory, cause) !== undefined,
+                  (cause) => Effect.die(unavailableBoot(ref.directory, cause)),
+                ),
+              )
+            }).pipe(
               Effect.onExit((exit) => {
                 const finish = Effect.suspend(() => {
                   if (Exit.isSuccess(exit)) {
@@ -115,4 +119,13 @@ export function checkDirectory(fs: FSUtil.Interface, directory: string) {
       isPermissionDenied(error) ? Effect.fail(new PermissionDeniedError(directory)) : Effect.die(error),
     ),
   )
+}
+
+function unavailableBoot(directory: string, cause: Cause.Cause<unknown>) {
+  const error = Cause.squash(cause)
+  if (!(error instanceof PlatformError.PlatformError) || error.reason._tag === "BadArgument") return
+  const path = error.reason.pathOrDescriptor
+  if (typeof path !== "string") return
+  if (error.reason._tag === "NotFound" && path === directory) return new DirectoryNotFoundError(directory)
+  if (isPermissionDenied(error) && FSUtil.contains(path, directory)) return new PermissionDeniedError(directory)
 }
