@@ -425,6 +425,7 @@
         "@opencode/plugin-browser": "workspace:*",
         "@opencode/schema": "workspace:*",
         "@opencode/ui": "workspace:*",
+        "@opencode/util": "workspace:*",
         "@sentry/solid": "catalog:",
         "@sentry/vite-plugin": "catalog:",
         "@solid-primitives/storage": "catalog:",

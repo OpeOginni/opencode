@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import type { FileNotFoundError, SessionNotFoundError } from "@opencode/client/promise"
 import type { ConfigInvalidError, ProviderModelNotFoundError } from "./errors"
 import {
+  formatProjectLocationError,
   formatServerError,
   isSessionNotFoundError,
   parseReadableConfigInvalidError,
@@ -121,7 +122,9 @@ describe("formatServerError", () => {
     })
     expect(formatServerError(missing)).toContain("C:\\Users\\Test User\\Projects\\moved-project was moved")
     expect(projectLocationError(denied)?.type).toBe("denied")
-    expect(formatServerError(denied)).toContain("Privacy & Security")
+    expect(formatServerError(denied)).toContain("permission to open /Users/example/Documents/private-project")
+    expect(formatServerError(denied)).not.toContain("Privacy & Security")
+    expect(formatProjectLocationError(projectLocationError(denied)!, undefined, true)).toContain("Privacy & Security")
     expect(projectLocationError(new Error("Request failed"))).toBeUndefined()
   })
 

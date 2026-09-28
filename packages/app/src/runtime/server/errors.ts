@@ -34,11 +34,18 @@ export function projectLocationError(error: unknown) {
   if (isLocationPermissionDeniedError(unwrapped)) return { type: "denied" as const, directory: unwrapped.directory }
 }
 
+// Pass `macos` only when the server runs on this Mac; its privacy settings then explain the denial.
 export function formatProjectLocationError(
   info: NonNullable<ReturnType<typeof projectLocationError>>,
   translate?: Translator,
+  macos?: boolean,
 ) {
-  const key = info.type === "missing" ? "error.project.missing" : "error.project.permissionDenied"
+  const key =
+    info.type === "missing"
+      ? "error.project.missing"
+      : macos
+        ? "error.project.permissionDenied.macos"
+        : "error.project.permissionDenied"
   return tr(translate, key, dict[key].replace("{{directory}}", info.directory), { directory: info.directory })
 }
 

@@ -17,7 +17,6 @@ import type { HomeController } from "../model"
 import { useGlobal } from "@/runtime/server/runtime"
 import { SessionTransfer } from "@opencode/schema/session-transfer"
 import { useSshAuthenticate } from "@/servers/ssh/authenticate"
-import { getFilename } from "@opencode/util/path"
 import { formatProjectLocationError, projectLocationError } from "@/runtime/server/errors"
 import { useRevealProject } from "./reveal"
 
@@ -56,55 +55,30 @@ export function createHomeProjectsController(home: HomeController) {
     if (next) home.selection.set(next)
   }
 
-  function accessible(conn: ServerConnection.Any, directory: string) {
-    return home.server
-      .context(conn)
-      .sdk.api.location.get({ location: { directory } })
-      .then(
-        () => true,
-        (error: unknown) => {
-          showUnavailable(conn, directory, error)
-          return false
-        },
-      )
-  }
-
+  // Only a typed folder error is actionable here; other failures keep the existing quiet behavior.
   function showUnavailable(conn: ServerConnection.Any, directory: string, error: unknown) {
     const location = projectLocationError(error)
-    if (!location) {
-      showToast({
-        variant: "error",
-        title: language.t("toast.project.reloadFailed.title", { project: getFilename(directory) }),
-        description: language.t("error.project.unavailable", { directory }),
-      })
-      return
-    }
-    const saved = home.server
-      .context(conn)
-      .projects.list()
-      .some((project) => project.worktree === directory)
+    if (!location) return
     showToast({
       variant: "error",
       persistent: true,
       title: language.t(
-        location.type === "missing" ? "toast.project.missing.title" : "toast.project.permissionDenied.title",
+        location.type === "missing" ? "home.project.missing.title" : "toast.project.permissionDenied.title",
       ),
-      description: formatProjectLocationError(location, language.t),
+      description: formatProjectLocationError(
+        location,
+        language.t,
+        ServerConnection.local(conn) && platform.platform === "desktop" && platform.os === "macos",
+      ),
       actions:
-        location.type === "missing" && saved
+        location.type === "missing"
           ? [{ label: language.t("toast.project.missing.remove"), onClick: () => closeProject(conn, directory) }]
           : undefined,
     })
   }
 
   function add(conn: ServerConnection.Any, directories: string[]) {
-    if (platform.platform !== "desktop" || !ServerConnection.local(conn)) return home.project.add(conn, directories)
-    void Promise.all(directories.map((directory) => accessible(conn, directory))).then((available) =>
-      home.project.add(
-        conn,
-        directories.filter((_, index) => available[index]),
-      ),
-    )
+    home.project.add(conn, directories, (directory, error) => showUnavailable(conn, directory, error))
   }
 
   function choose(conn: ServerConnection.Any) {
@@ -156,29 +130,13 @@ export function createHomeProjectsController(home: HomeController) {
       recentlyClosed: home.project.recentlyClosed,
       homedir: home.project.homedir,
       select: (conn: ServerConnection.Any, directory: string) => {
-        const select = () => {
-          const selected = home.selection.value()
-          if (selected.server === ServerConnection.key(conn) && selected.directory === directory)
-            return home.project.select(conn, directory)
-          if (platform.platform !== "desktop" || !ServerConnection.local(conn)) return home.project.select(conn, directory)
-          void accessible(conn, directory).then((ok) => {
-            if (ok) home.project.select(conn, directory)
-          })
-        }
-        if (authenticate(conn, select)) return
-        select()
+        if (authenticate(conn, () => home.project.select(conn, directory))) return
+        home.project.select(conn, directory)
       },
       add,
       openNewSession: (conn: ServerConnection.Any, directory: string) => {
-        const open = () => {
-          if (platform.platform !== "desktop" || !ServerConnection.local(conn))
-            return home.project.openProjectNewSession(conn, directory)
-          void accessible(conn, directory).then((ok) => {
-            if (ok) home.project.openProjectNewSession(conn, directory)
-          })
-        }
-        if (authenticate(conn, open)) return
-        open()
+        if (authenticate(conn, () => home.project.openProjectNewSession(conn, directory))) return
+        home.project.openProjectNewSession(conn, directory)
       },
       canImportSession: !!platform.openAttachmentPickerDialog,
       importSession: (conn: ServerConnection.Any, project: LocalProject) => {
@@ -210,11 +168,9 @@ export function createHomeProjectsController(home: HomeController) {
           })
       },
       edit: (conn: ServerConnection.Any, project: LocalProject) => {
-        if (platform.platform !== "desktop" || !ServerConnection.local(conn))
-          return settings.openProject({ server: ServerConnection.key(conn), project: project.worktree })
-        void accessible(conn, project.worktree).then((ok) => {
-          if (!ok) return
-          settings.openProject({ server: ServerConnection.key(conn), project: project.worktree })
+        settings.openProject({
+          server: ServerConnection.key(conn),
+          project: project.worktree,
         })
       },
       unseenCount: (conn: ServerConnection.Any, project: LocalProject) => {

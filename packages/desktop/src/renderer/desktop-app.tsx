@@ -7,6 +7,7 @@ import {
   currentRoute,
   PlatformProvider,
   preloadRoute,
+  projectLocationError,
   ServerConnection,
   useCommand,
   useCurrentRoute,
@@ -148,7 +149,10 @@ export function DesktopApp(props: { api: ElectronAPI; updater: UpdaterPlatform; 
   return (
     <PlatformProvider value={platform}>
       <AppBaseProviders
-        onError={() => setLastActiveUrl(windowState.id, "/")}
+        // A saved route into an unavailable folder would fail again on restart; send Restart home instead.
+        onError={(error) => {
+          if (projectLocationError(error)) setLastActiveUrl(windowState.id, "/")
+        }}
         locale={locale.latest}
         onNativeTranslations={(bundle) => void props.api.setNativeTranslations(bundle).catch(() => undefined)}
         onThemeApplied={(mode, scheme) => {

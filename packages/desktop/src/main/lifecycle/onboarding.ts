@@ -44,8 +44,8 @@ export const finishFirstLaunchOnboarding = Effect.fn("Onboarding.finish")(functi
   const defaultProject = createDefaultProject
     ? path.join(app.getPath("documents"), nativeT("desktop.onboarding.defaultProject"))
     : null
+  // A denied default project still completes onboarding, so a refused privacy prompt is not repeated every launch.
   const result = defaultProject ? yield* makeDefaultProject(defaultProject) : null
-  if (result && typeof result !== "string") return result
 
   getStore().set(FIRST_LAUNCH_ONBOARDING_COMPLETE_KEY, true)
   yield* scoped(

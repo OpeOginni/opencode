@@ -735,7 +735,6 @@ export const dict = {
   "toast.session.listFailed.title": "Failed to load sessions for {{project}}",
   "toast.project.reloadFailed.title": "Failed to reload {{project}}",
   "toast.project.defaultUnavailable.title": "Cannot open default project",
-  "toast.project.missing.title": "Project folder not found",
   "toast.project.missing.remove": "Remove project",
   "session.location.move": "Move session",
   "session.location.retry": "Try again",
@@ -744,7 +743,9 @@ export const dict = {
   "error.project.missing":
     "{{directory}} was moved, renamed, or deleted. Restore the folder at that path, or remove this project from OpenCode and open it from its new location.",
   "error.project.permissionDenied":
-    "OpenCode doesn't have permission to open {{directory}}. On macOS, open System Settings > Privacy & Security > Files & Folders (or Full Disk Access) and allow OpenCode, then try again.",
+    "OpenCode doesn't have permission to open {{directory}}. Make sure your user account can read the folder, then try again.",
+  "error.project.permissionDenied.macos":
+    "macOS is blocking OpenCode from opening {{directory}}. In System Settings > Privacy & Security > Files & Folders (or Full Disk Access), allow OpenCode. If you started OpenCode from a terminal, allow that terminal app instead. If it still fails, run `opencode service restart` or restart your Mac.",
   "error.project.unavailable":
     "Couldn't open the project at {{directory}}. Check that the folder exists and OpenCode has access to it.",
   "toast.migration.failed.title": "Data migration failed",

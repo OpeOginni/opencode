@@ -5,10 +5,10 @@ import { Button } from "@opencode/ui/button"
 import { Component, createSignal, onMount, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { usePlatform } from "@/runtime/platform/platform"
+import { formatProjectLocationError, projectLocationError } from "@/runtime/server/errors"
 import { useLanguage } from "@/runtime/i18n/language"
 import { Icon } from "@opencode/ui/icon"
 import { errorDescriptionKey, errorStatus } from "./description"
-import { formatProjectLocationError, projectLocationError } from "@/runtime/server/errors"
 
 export type InitError = {
   name: string

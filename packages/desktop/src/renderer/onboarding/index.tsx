@@ -1,9 +1,12 @@
 import {
+  formatProjectLocationError,
   formatServerError,
+  projectLocationError,
   ServerConnection,
   useCurrentRoute,
   useGlobal,
   useLanguage,
+  usePlatform,
   useServers,
   useTabs,
 } from "@opencode/app/desktop"
@@ -23,6 +26,7 @@ export function DesktopFirstLaunchOnboarding(props: {
   const tabs = useTabs()
   const route = useCurrentRoute()
   const language = useLanguage()
+  const macos = usePlatform().os === "macos"
 
   const [completed] = createResource(async () => {
     await runFirstLaunchOnboarding()
@@ -55,7 +59,11 @@ export function DesktopFirstLaunchOnboarding(props: {
           variant: "error",
           persistent: true,
           title: language.t("toast.project.defaultUnavailable.title"),
-          description: language.t("error.project.permissionDenied", { directory: directory.permissionDenied }),
+          description: formatProjectLocationError(
+            { type: "denied", directory: directory.permissionDenied },
+            language.t,
+            macos,
+          ),
         })
         return
       }
@@ -70,15 +78,14 @@ export function DesktopFirstLaunchOnboarding(props: {
           (error: unknown) => ({ error }),
         )
         if (failure) {
+          const unavailable = projectLocationError(failure.error)
           showToast({
             variant: "error",
             persistent: true,
             title: language.t("toast.project.defaultUnavailable.title"),
-            description: formatServerError(
-              failure.error,
-              language.t,
-              language.t("error.project.unavailable", { directory }),
-            ),
+            description: unavailable
+              ? formatProjectLocationError(unavailable, language.t, macos)
+              : formatServerError(failure.error, language.t, language.t("error.project.unavailable", { directory })),
           })
           return
         }
