@@ -1,7 +1,7 @@
 import { Location } from "@opencode/schema/location"
 import { Context, Schema } from "effect"
 import { HttpApiEndpoint, HttpApiGroup, HttpApiMiddleware, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
-import { ServiceUnavailableError } from "../errors.js"
+import { LocationDirectoryNotFoundError, LocationPermissionDeniedError, ServiceUnavailableError } from "../errors.js"
 
 export const LocationQuery = Schema.Struct({
   location: Schema.optional(
@@ -36,6 +36,7 @@ export const makeLocationGroup = <LocationId extends HttpApiMiddleware.AnyId, Lo
       HttpApiEndpoint.get("location.get", "/api/location", {
         query: LocationQuery,
         success: Location.PublicInfo,
+        error: [LocationDirectoryNotFoundError, LocationPermissionDeniedError],
       })
         .middleware(locationMiddleware)
         .annotateMerge(locationQueryOpenApi)

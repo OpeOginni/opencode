@@ -1,10 +1,5 @@
 import { Location } from "@opencode/core/location"
-import {
-  checkDirectory,
-  DirectoryNotFoundError,
-  LocationServiceMap,
-  PermissionDeniedError,
-} from "@opencode/core/location-services"
+import { DirectoryNotFoundError, LocationServiceMap, PermissionDeniedError } from "@opencode/core/location-services"
 import { AbsolutePath } from "@opencode/core/schema"
 import { Session } from "@opencode/core/session"
 import {
@@ -12,8 +7,7 @@ import {
   LocationDirectoryNotFoundError,
   LocationPermissionDeniedError,
 } from "@opencode/protocol/errors"
-import { FSUtil } from "@opencode/util/fs-util"
-import { Effect, Layer, Schema } from "effect"
+import { Cause, Context, Effect, Layer, Result, Schema } from "effect"
 import { HttpServerRequest } from "effect/unstable/http"
 import { HttpApiMiddleware } from "effect/unstable/httpapi"
 import { missingSession } from "./handlers/session-error"
@@ -65,32 +59,41 @@ function decode(input: string) {
   }
 }
 
-export const layer = (directoryCheck = true) =>
-  Layer.effect(
-    LocationMiddleware,
-    Effect.gen(function* () {
-      const locations = yield* LocationServiceMap.Service
-      const fs = yield* FSUtil.Service
-      return LocationMiddleware.of((effect, options) =>
-        Effect.gen(function* () {
-          const request = yield* HttpServerRequest.HttpServerRequest
-          const ref = requestRef(request)
-          // An explicit location.get is the client's access check. A Location may have booted
-          // before the directory was removed; cached Location services do not probe again.
-          if (directoryCheck && !ref.workspaceID && options.endpoint.identifier === "location.get")
-            yield* checkDirectory(fs, ref).pipe(Effect.catch(locationFailure))
-          return yield* effect.pipe(Effect.provide(locations.get(ref)), Effect.catchDefect(locationFailure))
-        }),
-      )
-    }),
-  )
+// Hosts without a local project filesystem (workerd, simulation) opt out of folder checks.
+export const DirectoryCheck = Context.Reference<boolean>("@opencode/ServerDirectoryCheck", {
+  defaultValue: () => true,
+})
 
-export function locationFailure(
-  defect: unknown,
-): Effect.Effect<never, LocationDirectoryNotFoundError | LocationPermissionDeniedError> {
-  if (defect instanceof DirectoryNotFoundError)
-    return Effect.fail(new LocationDirectoryNotFoundError({ directory: defect.directory, message: defect.message }))
-  if (defect instanceof PermissionDeniedError)
-    return Effect.fail(new LocationPermissionDeniedError({ directory: defect.directory, message: defect.message }))
-  return Effect.die(defect)
+export const layer = Layer.effect(
+  LocationMiddleware,
+  Effect.gen(function* () {
+    const locations = yield* LocationServiceMap.Service
+    return LocationMiddleware.of((effect) =>
+      Effect.gen(function* () {
+        const request = yield* HttpServerRequest.HttpServerRequest
+        return yield* effect.pipe(Effect.provide(locations.get(requestRef(request))), catchUnavailable)
+      }),
+    )
+  }),
+)
+
+// Location boots report unavailable folders as defects. Translate only those and keep every other cause intact.
+export function catchUnavailable<A, E, R>(effect: Effect.Effect<A, E, R>) {
+  return effect.pipe(
+    Effect.catchCauseIf(
+      (cause) => unavailable(cause) !== undefined,
+      (cause) => Effect.fail(locationError(unavailable(cause)!)),
+    ),
+  )
+}
+
+export function locationError(error: DirectoryNotFoundError | PermissionDeniedError) {
+  if (error instanceof DirectoryNotFoundError)
+    return new LocationDirectoryNotFoundError({ directory: error.directory, message: error.message })
+  return new LocationPermissionDeniedError({ directory: error.directory, message: error.message })
+}
+
+function unavailable(cause: Cause.Cause<unknown>) {
+  const defect = Result.getOrUndefined(Cause.findDefect(cause))
+  if (defect instanceof DirectoryNotFoundError || defect instanceof PermissionDeniedError) return defect
 }

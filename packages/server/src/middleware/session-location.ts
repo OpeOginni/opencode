@@ -9,7 +9,7 @@ import {
   LocationPermissionDeniedError,
   SessionNotFoundError,
 } from "@opencode/protocol/errors"
-import { locationFailure, sessionInfo, type LocationServices } from "../location"
+import { catchUnavailable, sessionInfo, type LocationServices } from "../location"
 
 export class SessionLocationMiddleware extends HttpApiMiddleware.Service<
   SessionLocationMiddleware,
@@ -29,7 +29,7 @@ export const sessionLocationLayer = Layer.effect(
         const route = yield* HttpRouter.RouteContext
         const session = yield* sessionInfo(sessions, route.params.sessionID)
         return yield* effect.pipe(instances.provide(session))
-      }).pipe(Effect.catchDefect(locationFailure)),
+      }).pipe(catchUnavailable),
     )
   }),
 )

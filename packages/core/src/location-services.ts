@@ -5,7 +5,7 @@ import { Location } from "./location.js"
 import { LocationLifecycle } from "./location-lifecycle.js"
 import { LocationServiceMap } from "./location-service-map.js"
 import { FSUtil } from "@opencode/util/fs-util"
-import type { PlatformError } from "effect/PlatformError"
+import { isPermissionDenied } from "@opencode/util/platform-error"
 
 export { LocationServiceMap } from "./location-service-map.js"
 
@@ -42,7 +42,7 @@ export function buildLocationServiceMap(
             Effect.suspend(() =>
               (options.directoryCheck === false || ref.workspaceID || Option.isNone(fs)
                 ? Effect.void
-                : checkDirectory(fs.value, ref)
+                : checkDirectory(fs.value, ref.directory)
               ).pipe(
                 Effect.orDie,
                 Effect.andThen(Layer.buildWithMemoMap(Instance.layer(ref, { replacements: bindings }), memoMap, scope)),
@@ -108,25 +108,12 @@ export function buildLocationServiceMap(
   )
 }
 
-export function checkDirectory(fs: FSUtil.Interface, ref: Location.Ref) {
-  return fs.realPath(ref.directory).pipe(
+export function checkDirectory(fs: FSUtil.Interface, directory: string) {
+  return fs.realPath(directory).pipe(
     Effect.asVoid,
-    Effect.catchReason("PlatformError", "NotFound", () => Effect.fail(new DirectoryNotFoundError(ref.directory))),
+    Effect.catchReason("PlatformError", "NotFound", () => Effect.fail(new DirectoryNotFoundError(directory))),
     Effect.catchTag("PlatformError", (error) =>
-      isPermissionDenied(error) ? Effect.fail(new PermissionDeniedError(ref.directory)) : Effect.die(error),
+      isPermissionDenied(error) ? Effect.fail(new PermissionDeniedError(directory)) : Effect.die(error),
     ),
-  )
-}
-
-// Effect maps EACCES to PermissionDenied, but macOS privacy blocks report EPERM as Unknown.
-export function isPermissionDenied(error: PlatformError) {
-  if (error.reason._tag === "PermissionDenied") return true
-  const cause = error.cause
-  return (
-    error.reason._tag === "Unknown" &&
-    typeof cause === "object" &&
-    cause !== null &&
-    "code" in cause &&
-    cause.code === "EPERM"
   )
 }

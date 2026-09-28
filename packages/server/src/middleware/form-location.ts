@@ -10,7 +10,7 @@ import {
 import { Effect, Layer } from "effect"
 import { HttpRouter, HttpServerRequest } from "effect/unstable/http"
 import { HttpApiMiddleware } from "effect/unstable/httpapi"
-import { locationFailure, requestRef, sessionInfo, type LocationServices } from "../location"
+import { catchUnavailable, requestRef, sessionInfo, type LocationServices } from "../location"
 
 export class FormLocationMiddleware extends HttpApiMiddleware.Service<
   FormLocationMiddleware,
@@ -39,7 +39,7 @@ export const formLocationLayer = Layer.effect(
 
         const session = yield* sessionInfo(sessions, route.params.sessionID)
         return yield* effect.pipe(instances.provide(session))
-      }).pipe(Effect.catchDefect(locationFailure)),
+      }).pipe(catchUnavailable),
     )
   }),
 )
