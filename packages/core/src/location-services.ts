@@ -10,7 +10,6 @@ import { isPermissionDenied } from "@opencode/util/platform-error"
 export { LocationServiceMap } from "./location-service-map.js"
 
 export type LocationServices = Instance.Services
-export type LocationError = Instance.Error
 
 export class DirectoryNotFoundError extends Error {
   constructor(readonly directory: string) {
