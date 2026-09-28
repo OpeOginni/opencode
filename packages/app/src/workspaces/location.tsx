@@ -41,8 +41,15 @@ const context = createSimpleContext({
       if (failed?.ref.directory !== location.directory || failed.ref.workspaceID !== location.workspaceID) return
       return failed.error
     })
+    const load = async (location: LocationRef) => {
+      // The client data sync can be cached after an earlier successful load. Always ask the server again
+      // when entering a location so a folder that became unavailable is detected by location.get.
+      if (!location.workspaceID && data.location.info(location))
+        await serverSDK.api.location.get({ location: { directory: location.directory } })
+      await data.location.sync(location)
+    }
     const sync = (location: LocationRef) =>
-      data.location.sync(location).then(
+      load(location).then(
         () => setFailure(undefined),
         (cause: unknown) => {
           const unavailable = projectLocationError(cause)
@@ -59,7 +66,7 @@ const context = createSimpleContext({
       if (serverSDK.connection.status() !== "connected") return
       // Only a typed directory failure proves this Location is unavailable. Transient failures
       // keep their existing retries; a successful retry or a session move clears the state.
-      void retry(() => (stale ? Promise.resolve() : data.location.sync(location)), {
+      void retry(() => (stale ? Promise.resolve() : load(location)), {
         retryIf: (cause) => !stale && !projectLocationError(cause),
       }).then(
         () => {
