@@ -65,6 +65,13 @@ const STATUS = {
   expired: "expired",
 } as const satisfies Record<string, Status>
 
+// Documented video error codes; `service_unavailable`, `internal_error`, and unknown codes are provider-side.
+const FAILURE = {
+  invalid_argument: "InvalidRequest",
+  failed_precondition: "InvalidRequest",
+  permission_denied: "Authentication",
+} as const satisfies Record<string, MediaProtocol.Failure>
+
 // ---------------------------------------------------------------------------
 // 5. Request body construction
 // ---------------------------------------------------------------------------
@@ -136,14 +143,14 @@ const decodeResult = Effect.fn("XAIVideo.decodeResult")(function* (
   const output = yield* decodeVideoStatus(response)
   const decoded = output.value
   const status = yield* MediaProtocol.status(STATUS, decoded.status, output)
-  if (status === "running")
-    return yield* output.invalid(`${route.name} request ${context.token.requestID} has not finished`)
+  if (status === "running") return yield* output.pending(context.token.requestID)
   if (status === "failed") {
     const code = decoded.error?.code ?? undefined
     const message = decoded.error?.message ?? undefined
     return yield* output.ended(
       "failed",
       `${route.name} generation failed${code === undefined ? "" : ` (${code})`}${message === undefined ? "" : `: ${message}`}`,
+      MediaProtocol.failure(FAILURE, code),
     )
   }
   if (status !== "completed")

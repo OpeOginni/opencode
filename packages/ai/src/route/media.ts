@@ -1,12 +1,13 @@
-import { Effect, Schema, Stream } from "effect"
+import { Duration, Effect, Schedule, Schema, Stream } from "effect"
 import { Headers, HttpClientRequest, type HttpClientResponse } from "effect/unstable/http"
 import { Auth, type AuthInput } from "./auth.js"
 import { Endpoint } from "./endpoint.js"
 import { RequestExecutorService, type Interface } from "./executor-service.js"
 import { RequestExecutor } from "./executor.js"
 import { MediaProtocol } from "./media-protocol.js"
-import { Generation, resultEvents, type AwaitOptions, type Observation } from "../generation.js"
+import { Generation, isTerminal } from "../generation.js"
 import type { Media } from "../media.js"
+import { isRetryable } from "../provider-error.js"
 import {
   AIError,
   AIErrorReason,
@@ -52,7 +53,7 @@ export const deployment = (
 // ---------------------------------------------------------------------------
 
 /** One request, one response. */
-export interface Route<Request extends MediaRequest, Response> {
+export interface InlineRoute<Request extends MediaRequest, Response> {
   readonly kind: "inline"
   readonly id: string
   readonly provider: ProviderID
@@ -86,7 +87,7 @@ export interface StreamRoute<Request extends MediaRequest, Event, Response> {
 }
 
 export type AnyRoute<Request extends MediaRequest, Event, Response> =
-  | Route<Request, Response>
+  | InlineRoute<Request, Response>
   | StreamRoute<Request, Event, Response>
   | QueuedRoute<Request, Response>
 
@@ -119,7 +120,7 @@ export interface StreamInput<Request extends MediaRequest, Event, Response, Fram
  */
 export const inline = <Request extends MediaRequest, Response>(
   input: InlineInput<Request, Response>,
-): Route<Request, Response> => {
+): InlineRoute<Request, Response> => {
   const transport = makeTransport(input)
   return {
     kind: "inline",
@@ -136,6 +137,32 @@ export const inline = <Request extends MediaRequest, Response>(
     }),
   }
 }
+
+const READ_RETRY_MAX_DELAY = Duration.seconds(30)
+
+/**
+ * Status and result reads retry transient failures; `start` and `cancel` never do. Gaps grow exponentially from 1s,
+ * jittered, up to 30s each, for at most 8 retries (about two minutes when every attempt fails), so a direct
+ * `Generation.result()` stays bounded; `await` and `events` also cut retries off at `poll.timeout`. A provider
+ * `retryAfterMs` raises the gap, still capped at 30s.
+ */
+const READ_RETRY = Schedule.max([
+  Schedule.min([Schedule.exponential("1 second"), Schedule.spaced(READ_RETRY_MAX_DELAY)]),
+  Schedule.recurs(8),
+]).pipe(
+  Schedule.jittered,
+  Schedule.setInputType<AIError>(),
+  Schedule.modifyDelay(({ input, duration }) =>
+    Effect.succeed(
+      Duration.min(
+        input.reason._tag === "RateLimit" || input.reason._tag === "ProviderInternal"
+          ? Duration.max(duration, Duration.millis(input.reason.retryAfterMs ?? 0))
+          : duration,
+        READ_RETRY_MAX_DELAY,
+      ),
+    ),
+  ),
+)
 
 /**
  * Compose a queued media protocol the same way, adding `start`/`resume` handles whose polls reuse the route's auth,
@@ -154,6 +181,8 @@ export const queued = <Request extends MediaRequest, Response, Token>(
   const generationRoute = (token: Token, http: HttpOptions | undefined, execute: Execute) => {
     const materialize = (asset: Media.Asset) =>
       asset.materialize().pipe(Effect.provideService(RequestExecutorService, { execute }))
+    // Only the GET exchange retries: a decoded terminal failure (`output.ended`) can be a `ProviderInternal` too, and
+    // re-reading it would spin until the caller's deadline.
     const poll = <A>(operation: {
       readonly path: (token: Token) => string
       readonly decode: (
@@ -161,17 +190,23 @@ export const queued = <Request extends MediaRequest, Response, Token>(
         context: MediaProtocol.PollContext<Token>,
       ) => Effect.Effect<A, AIError>
     }) =>
-      transport
-        .call("GET", operation.path(token), http, execute)
-        .pipe(Effect.flatMap((sent) => operation.decode(sent.response, { token, auth: sent.auth, materialize })))
+      transport.call("GET", operation.path(token), http, execute).pipe(
+        Effect.retry({ schedule: READ_RETRY, while: isRetryable }),
+        Effect.flatMap((sent) => operation.decode(sent.response, { token, auth: sent.auth, materialize })),
+      )
+    const status = poll(protocol.status)
     const cancel = protocol.cancel
+    const send =
+      cancel === undefined
+        ? undefined
+        : transport.call(cancel.method, cancel.path(token), http, execute).pipe(Effect.asVoid)
     return {
-      status: poll(protocol.status),
+      status,
       result: poll(protocol.result),
       cancel:
-        cancel === undefined
-          ? undefined
-          : transport.call(cancel.method, cancel.path(token), http, execute).pipe(Effect.asVoid),
+        send !== undefined && cancel?.activeOnly
+          ? status.pipe(Effect.flatMap((snapshot) => (isTerminal(snapshot.status) ? Effect.void : send)))
+          : send,
     }
   }
 
@@ -264,59 +299,6 @@ export const stream = <Request extends MediaRequest, Event, Response, Frame, Sta
     stream: (request, execute) => events(request, execute, "stream"),
     generate: (request, execute) =>
       events(request, execute, "generate").pipe(Stream.runCollect, Effect.flatMap(input.collect)),
-  }
-}
-
-export const dispatch = <Event, Response>(input: {
-  readonly modality: string
-  readonly execute: Execute
-  readonly responseEvents: (response: Response) => ReadonlyArray<Event>
-}) => {
-  const notQueued = (route: { readonly provider: ProviderID; readonly id: string }, operation: string) =>
-    new AIError({
-      reason: new UnsupportedOperationError({
-        operation: `${input.modality}.${operation}`,
-        provider: route.provider,
-        route: route.id,
-        message: `${route.provider}/${route.id} is not a queued route; use generate or stream`,
-      }),
-    })
-  const start = <Request extends MediaRequest>(route: AnyRoute<Request, Event, Response>, request: Request) => {
-    if (route.kind !== "queued") return Effect.fail(notQueued(route, "start"))
-    return route.start(request, input.execute)
-  }
-  return {
-    start,
-    resume: <Request extends MediaRequest>(
-      route: AnyRoute<Request, Event, Response>,
-      model: MediaRequest["model"],
-      token: unknown,
-    ) => {
-      if (route.kind !== "queued") return Effect.fail(notQueued(route, "resume"))
-      return route.resume(model, token, input.execute)
-    },
-    generate: <Request extends MediaRequest>(
-      route: AnyRoute<Request, Event, Response>,
-      request: Request,
-      options?: AwaitOptions,
-    ) => {
-      if (route.kind !== "queued") return route.generate(request, input.execute)
-      return start(route, request).pipe(Effect.flatMap((generation) => generation.await(options)))
-    },
-    stream: <Request extends MediaRequest>(
-      route: AnyRoute<Request, Event, Response>,
-      request: Request,
-      options?: AwaitOptions,
-    ): Stream.Stream<Event | Observation, AIError> => {
-      if (route.kind === "stream") return route.stream(request, input.execute)
-      if (route.kind === "queued")
-        return Stream.unwrap(
-          start(route, request).pipe(
-            Effect.map((generation) => resultEvents(generation, input.responseEvents, options)),
-          ),
-        )
-      return Stream.fromIterableEffect(Effect.map(route.generate(request, input.execute), input.responseEvents))
-    },
   }
 }
 
@@ -433,7 +415,11 @@ const encode = (body: MediaProtocol.Body | undefined, headers: Headers.Headers) 
   }
 }
 
-/** Common fields are never silently dropped: a present field the protocol declared unsupported fails typed. */
+/**
+ * Common fields are never silently dropped: a present field the protocol declared unsupported fails typed. `false`
+ * counts as present because some booleans mean something when false (video `audio`); protocols reject opt-in
+ * booleans such as speech `timestamps` with `=== true` in `body.from` instead of listing them.
+ */
 const rejectUnsupported = <Request extends object>(
   route: string,
   provider: ProviderID,

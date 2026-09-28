@@ -36,7 +36,9 @@ const StartResponse = Schema.Struct({ name: Schema.String })
 
 const Operation = Schema.Struct({
   done: Schema.optional(Schema.Boolean),
-  error: Schema.optional(Schema.Struct({ message: Schema.optional(Schema.String) })),
+  error: Schema.optional(
+    Schema.Struct({ code: Schema.optional(Schema.Number), message: Schema.optional(Schema.String) }),
+  ),
   response: Schema.optional(
     Schema.Struct({
       generateVideoResponse: Schema.optional(
@@ -59,6 +61,16 @@ const Operation = Schema.Struct({
   ),
   metadata: Schema.optional(Schema.Unknown),
 })
+
+// Operation errors are `google.rpc.Status`; unlisted codes (INTERNAL, UNAVAILABLE, ...) are provider-side.
+const FAILURE = {
+  3: "InvalidRequest", // INVALID_ARGUMENT
+  7: "Authentication", // PERMISSION_DENIED
+  8: "RateLimit", // RESOURCE_EXHAUSTED
+  9: "InvalidRequest", // FAILED_PRECONDITION
+  11: "InvalidRequest", // OUT_OF_RANGE
+  16: "Authentication", // UNAUTHENTICATED
+} as const satisfies Record<number, MediaProtocol.Failure>
 
 // ---------------------------------------------------------------------------
 // 5. Request body construction
@@ -149,12 +161,12 @@ const decodeResult = Effect.fn("GoogleVideo.decodeResult")(function* (
   const output = yield* decodeOperation(response)
   const operation = output.value
   const status = statusOf(operation)
-  if (status === "running")
-    return yield* output.invalid(`${route.name} operation ${context.token.operation} has not finished`)
+  if (status === "running") return yield* output.pending(context.token.operation)
   if (status === "failed")
     return yield* output.ended(
       "failed",
       `${route.name} operation failed${operation.error?.message === undefined ? "" : `: ${operation.error.message}`}`,
+      MediaProtocol.failure(FAILURE, operation.error?.code),
     )
   const generated = operation.response?.generateVideoResponse
   // Downloads require the same API key as the poll; the asset carries it transiently and follows the redirect.
