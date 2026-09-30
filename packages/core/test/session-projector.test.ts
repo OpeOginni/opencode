@@ -23,7 +23,12 @@ import { fromRow } from "@opencode/core/session/info"
 import { SessionInbox } from "@opencode/core/session/inbox"
 import { SessionStore } from "@opencode/core/session/store"
 import { Shell } from "@opencode/schema/shell"
-import { InstructionStateTable, SessionInboxTable, SessionMessageTable, SessionTable } from "@opencode/core/session/sql"
+import {
+  InstructionStateTable,
+  SessionInboxTable,
+  SessionMessageTable,
+  SessionTable,
+} from "@opencode/core/session/sql"
 import { testEffect } from "./lib/effect"
 import { Snapshot } from "@opencode/core/snapshot"
 
@@ -121,16 +126,12 @@ describe("SessionProjector", () => {
         id: "call-linked",
         metadata: { internal: "live-only" },
       })
-      expect(yield* store.context(sessionID)).toMatchObject([
-        {
-          content: [
-            {
-              id: "call-linked",
-              state: { status: "running", metadata: { sessionID: childSessionID, status: "running" } },
-            },
-          ],
-        },
-      ])
+      const assistant = (yield* store.context(sessionID)).find((message) => message.type === "assistant")
+      expect(assistant?.content.find((part) => part.type === "tool")?.state).toEqual({
+        status: "running",
+        input: { agent: "general" },
+        metadata: { sessionID: childSessionID, status: "running" },
+      })
       expect(
         (yield* db.select().from(EventTable).where(eq(EventTable.aggregate_id, sessionID)).all()).map(
           (event) => event.type,
