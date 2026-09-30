@@ -23,12 +23,7 @@ import { fromRow } from "@opencode/core/session/info"
 import { SessionInbox } from "@opencode/core/session/inbox"
 import { SessionStore } from "@opencode/core/session/store"
 import { Shell } from "@opencode/schema/shell"
-import {
-  InstructionStateTable,
-  SessionInboxTable,
-  SessionMessageTable,
-  SessionTable,
-} from "@opencode/core/session/sql"
+import { InstructionStateTable, SessionInboxTable, SessionMessageTable, SessionTable } from "@opencode/core/session/sql"
 import { testEffect } from "./lib/effect"
 import { Snapshot } from "@opencode/core/snapshot"
 
@@ -85,6 +80,65 @@ const seedSession = (overrides?: Partial<typeof SessionTable.$inferInsert>) =>
   })
 
 describe("SessionProjector", () => {
+  it.effect("replays child session links without persisting ephemeral progress", () =>
+    Effect.gen(function* () {
+      const db = yield* seedSession()
+      const bus = yield* Bus.Service
+      const store = yield* SessionStore.Service
+      const assistantMessageID = SessionMessage.ID.make("msg_linked_subagent")
+      const childSessionID = Session.ID.make("ses_linked_child")
+      yield* bus.publish(SessionEvent.Step.Started, {
+        sessionID,
+        assistantMessageID,
+        agent: build,
+        model,
+        started: 0,
+      })
+      yield* bus.publish(SessionEvent.Tool.Input.Started, {
+        sessionID,
+        assistantMessageID,
+        id: "call-linked",
+        name: "subagent",
+      })
+      yield* bus.publish(SessionEvent.Tool.Called, {
+        sessionID,
+        assistantMessageID,
+        id: "call-linked",
+        input: { agent: "general" },
+        executed: false,
+      })
+      yield* bus.replay({
+        id: Event.ID.create(),
+        created: 0,
+        aggregateID: sessionID,
+        seq: 3,
+        type: Bus.versionedType(SessionEvent.Tool.SessionLinked.type, 1),
+        data: { sessionID, assistantMessageID, id: "call-linked", childSessionID },
+      })
+      yield* bus.publish(SessionEvent.Tool.Progress, {
+        sessionID,
+        assistantMessageID,
+        id: "call-linked",
+        metadata: { internal: "live-only" },
+      })
+      expect(yield* store.context(sessionID)).toMatchObject([
+        {
+          content: [
+            {
+              id: "call-linked",
+              state: { status: "running", metadata: { sessionID: childSessionID, status: "running" } },
+            },
+          ],
+        },
+      ])
+      expect(
+        (yield* db.select().from(EventTable).where(eq(EventTable.aggregate_id, sessionID)).all()).map(
+          (event) => event.type,
+        ),
+      ).toContain("session.tool.session.linked.1")
+    }),
+  )
+
   it.effect("does not settle a pending manual compaction on an auto failure", () =>
     Effect.gen(function* () {
       const db = yield* seedSession()
