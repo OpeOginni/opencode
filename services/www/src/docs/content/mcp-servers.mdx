@@ -391,15 +391,16 @@ opencode mcp auth sentry
 opencode mcp logout sentry
 ```
 
-To remove a server, delete its entry from the project or global configuration where it was added:
+Remove a server from the current project's configuration, or use `--global` to remove it for all projects:
 
-```jsonc
-{
-  "mcp": {
-    "servers": {},
-  },
-}
+```sh
+opencode mcp remove paper
+opencode mcp remove paper --global
 ```
+
+Removal works for local and remote servers, with or without OAuth. It preserves unrelated settings and saved OAuth credentials; use `opencode mcp logout <name>` to clear credentials separately.
+
+Project removal edits configuration files in the current directory and its `.opencode` directory, not ancestor directories. Global removal leaves project-specific definitions untouched.
 
 Edit configuration directly for OAuth client settings, timeouts, working directories, or persistent enablement:
 

@@ -234,6 +234,18 @@ Add a remote server with a header.
 $ opencode mcp add context7 --url https://mcp.context7.com/mcp --header CONTEXT7_API_KEY=secret
 ```
 
+Remove a server from the current project's configuration, without deleting saved OAuth credentials.
+
+```bash
+$ opencode mcp remove paper
+```
+
+Remove a server from the global configuration instead.
+
+```bash
+$ opencode mcp remove paper --global
+```
+
 Authenticate with an OAuth-capable remote server.
 
 ```bash
