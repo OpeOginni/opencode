@@ -74,7 +74,7 @@ it.live("returns LocationNotFoundError for a missing folder and recovers once it
 )
 
 if (process.platform !== "win32")
-  it.live("returns LocationPermissionDeniedError for a denied folder and recovers once access returns", () =>
+  it.live("reports denied Location boot, recovers, and does not recheck cached access", () =>
     Effect.gen(function* () {
       const config = yield* Effect.acquireDisposable(Effect.promise(() => tmpdir("opencode-directory-denied-")))
       const parent = path.join(config.path, "protected")
@@ -85,43 +85,34 @@ if (process.platform !== "win32")
         () => Effect.promise(() => fs.chmod(parent, 0o700)),
       )
       const handler = yield* ServerFetch.make({ ...options, config: { directory: config.path } })
-      const request = () =>
+      const request = (endpoint = "/api/model") =>
         handler(
-          new Request("http://opencode.local/api/model", {
+          new Request(`http://opencode.local${endpoint}`, {
             headers: { "x-opencode-directory": encodeURIComponent(directory) },
           }),
         )
-      const denied = yield* Effect.promise(request)
-      expect(denied.status).toBe(403)
-      expect(yield* Effect.promise(() => denied.json())).toEqual({
-        _tag: "LocationPermissionDeniedError",
-        location: { directory },
-        message: `Location access denied: ${directory}`,
-      })
-      yield* Effect.promise(() => fs.chmod(parent, 0o700))
-      expect((yield* Effect.promise(request)).status).toBe(200)
-    }),
-  )
-
-it.live("location.get reports a folder removed after its Location booted", () =>
-  Effect.gen(function* () {
-    const config = yield* Effect.acquireDisposable(Effect.promise(() => tmpdir("opencode-directory-removed-")))
-    const directory = path.join(config.path, "project")
-    yield* Effect.promise(() => fs.mkdir(directory))
-    const handler = yield* ServerFetch.make({ ...options, config: { directory: config.path } })
-    const request = () =>
-      handler(
-        new Request("http://opencode.local/api/location", {
-          headers: { "x-opencode-directory": encodeURIComponent(directory) },
+      yield* Effect.forEach(["/api/model", "/api/location"], (endpoint) =>
+        Effect.gen(function* () {
+          const denied = yield* Effect.promise(() => request(endpoint))
+          expect(denied.status).toBe(403)
+          expect(yield* Effect.promise(() => denied.json())).toEqual({
+            _tag: "LocationPermissionDeniedError",
+            location: { directory },
+            message: `Location access denied: ${directory}`,
+          })
         }),
       )
-    expect((yield* Effect.promise(request)).status).toBe(200)
-    yield* Effect.promise(() => fs.rm(directory, { recursive: true }))
-    const removed = yield* Effect.promise(request)
-    expect(removed.status).toBe(404)
-    expect(yield* Effect.promise(() => removed.json())).toMatchObject({ _tag: "LocationNotFoundError" })
-  }),
-)
+      yield* Effect.promise(() => fs.chmod(parent, 0o700))
+      expect((yield* Effect.promise(() => request())).status).toBe(200)
+      const readable = yield* Effect.promise(() => request("/api/location"))
+      expect(readable.status).toBe(200)
+      const cached = yield* Effect.promise(() => readable.json())
+      yield* Effect.promise(() => fs.chmod(parent, 0o000))
+      const deniedAfterBoot = yield* Effect.promise(() => request("/api/location"))
+      expect(deniedAfterBoot.status).toBe(200)
+      expect(yield* Effect.promise(() => deniedAfterBoot.json())).toEqual(cached)
+    }),
+  )
 
 type Handler = (request: Request) => Promise<Response>
 
