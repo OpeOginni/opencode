@@ -49,6 +49,10 @@ const macTrafficLightsBaseWidth = 68
 
 const macTrafficLightsTopClearance = 28
 
+// iOS blurs page content just below the status bar in Home Screen web apps, so with a top safe area the phone
+// titlebar row stays 16px clear of it, as ChatGPT's phone header does. Without one, 8px matches the content gap below.
+const mobileTopClearance = "max(8px, min(16px, env(safe-area-inset-top, 0px) * 1000))"
+
 export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
   const platform = usePlatform()
   const command = useCommand()
@@ -59,6 +63,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
   const location = useLocation()
   const mobile = createMediaQuery("(max-width: 767px)")
   const bottom = createMemo(() => mobile() && settings.general.mobileTitlebarPosition() === "bottom")
+  const mobileTop = createMemo(() => platform.platform === "web" && mobile() && !bottom())
 
   const mac = createMemo(() => platform.platform === "desktop" && platform.os === "macos")
   const windows = createMemo(() => platform.platform === "desktop" && platform.os === "windows")
@@ -150,9 +155,15 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
           platform.platform === "web"
             ? bottom()
               ? "calc(28px + max(8px, var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))))"
-              : "calc(28px + max(8px, env(safe-area-inset-top, 0px)))"
+              : mobileTop()
+                ? `calc(28px + ${mobileTopClearance} + env(safe-area-inset-top, 0px))`
+                : "calc(28px + max(8px, env(safe-area-inset-top, 0px)))"
             : undefined,
-        "padding-top": bottom() ? "0px" : "env(safe-area-inset-top, 0px)",
+        "padding-top": bottom()
+          ? "0px"
+          : mobileTop()
+            ? `calc(${mobileTopClearance} + env(safe-area-inset-top, 0px))`
+            : "env(safe-area-inset-top, 0px)",
         "padding-bottom": bottom() ? "var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))" : "0px",
         "min-height": minHeight(),
         // Keep native macOS traffic lights clear even when the desktop window is narrow.
@@ -512,7 +523,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
               <div
                 class="h-full flex-1 overflow-hidden flex flex-row items-center gap-1.5 px-2 md:pe-3"
                 classList={{
-                  "pt-[max(0px,calc(8px-env(safe-area-inset-top,0px)))]": !bottom() && !windows(),
+                  "pt-[max(0px,calc(8px-env(safe-area-inset-top,0px)))]": !bottom() && !windows() && !mobileTop(),
                   "pb-[max(0px,calc(8px-var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px))))]": bottom(),
                   "pl-4": macTrafficLights(),
                   // Center the 20px app icon over the sidebar's 16px icon column.

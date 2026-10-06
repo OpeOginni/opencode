@@ -139,7 +139,7 @@ function ResolvedTargetSessionRoute() {
     >
       <Show when={directory()} fallback={<PendingSessionState sessionID={params.id} />}>
         {(value) => (
-          <LocationProvider directory={value}>
+          <LocationProvider directory={value()}>
             <SessionUIProvider directory={value()} server={server.key}>
               <TargetSessionPage />
             </SessionUIProvider>
@@ -160,7 +160,7 @@ function PendingSessionState(props: { sessionID: string }) {
 
 function SessionStatePanel(props: ParentProps) {
   return (
-    <div class="flex min-h-0 flex-1 px-2 pb-[var(--shell-bottom-inset,8px)] pt-[var(--shell-top-inset,8px)]">
+    <div class="flex min-h-0 flex-1 px-[var(--shell-inline-inset,8px)] pb-[var(--shell-bottom-inset,8px)] pt-[var(--shell-top-inset,8px)]">
       <SessionPanelFrame raised>{props.children}</SessionPanelFrame>
     </div>
   )
