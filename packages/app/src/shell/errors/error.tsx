@@ -10,7 +10,7 @@ import { usePlatform } from "@/runtime/platform/platform"
 import { useLanguage } from "@/runtime/i18n/language"
 import { createIpcClients } from "@/runtime/extension/ipc"
 import { Icon } from "@opencode/ui/icon"
-import { errorDescriptionKey, errorPortConflict, errorStatus } from "./description"
+import { errorDescriptionKey, errorPortConflict, errorPortConflictDetails, errorStatus } from "./description"
 
 export type InitError = {
   name: unknown
@@ -174,16 +174,6 @@ function formatInitError(error: InitError, t: Translator): string {
 function formatErrorChain(cause: unknown, t: Translator, depth = 0, parentMessage?: string): string {
   if (!cause) return t("error.chain.unknown")
 
-  if (
-    Predicate.isTagged(cause, "LocalServerPortConflict") &&
-    Predicate.hasProperty(cause, "details") &&
-    Predicate.isString(cause.details)
-  ) {
-    const indent = depth > 0 ? `\n${CHAIN_SEPARATOR}${t("error.chain.causedBy")}\n` : ""
-
-    return indent + cause.details
-  }
-
   if (isInitError(cause)) {
     const message = formatInitError(cause, t)
 
@@ -265,7 +255,7 @@ interface ErrorPageProps {
 export const ErrorPage: Component<ErrorPageProps> = (props) => {
   const platform = usePlatform()
   const language = useLanguage()
-  const formattedError = () => formatError(props.error, language.t)
+  const formattedError = () => errorPortConflictDetails(props.error) ?? formatError(props.error, language.t)
   const status = () => errorStatus(props.error)
   const conflictPort = () => (platform.setLocalServerPort ? errorPortConflict(props.error) : undefined)
   let recordedFatalError: Promise<void> | undefined

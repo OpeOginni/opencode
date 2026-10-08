@@ -42,3 +42,10 @@ export function errorPortConflict(error: unknown) {
 
   return cause.port
 }
+
+export function errorPortConflictDetails(error: unknown) {
+  if (errorPortConflict(error) === undefined || !Predicate.hasProperty(error, "cause")) return
+  if (!Predicate.hasProperty(error.cause, "details") || !Predicate.isString(error.cause.details)) return
+
+  return error.cause.details
+}
