@@ -1,3 +1,5 @@
+import { Predicate } from "effect"
+
 export function errorDescriptionKey(error: unknown) {
   if (
     typeof error === "object" &&
@@ -29,4 +31,14 @@ export function errorStatus(error: unknown) {
   }
 
   return visit(error)
+}
+
+export function errorPortConflict(error: unknown) {
+  if (errorDescriptionKey(error) !== "error.page.description.localServerStartup") return
+
+  const cause = Predicate.hasProperty(error, "cause") ? error.cause : undefined
+  if (!Predicate.isTagged(cause, "LocalServerPortConflict") || !Predicate.hasProperty(cause, "port")) return
+  if (!Predicate.isNumber(cause.port) || !Number.isInteger(cause.port) || cause.port < 1 || cause.port > 65535) return
+
+  return cause.port
 }

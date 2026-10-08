@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { createSidecarResolver, initializationData } from "./initialization"
+import { createSidecarResolver, initializationData, initializationError } from "./initialization"
 
 function failure(error: unknown) {
   try {
@@ -21,6 +21,11 @@ describe("desktop renderer initialization", () => {
     expect(empty).toBeInstanceOf(Error)
     expect(empty).toHaveProperty("message", "")
     expect(empty).toHaveProperty("localServerStartup", true)
+    const conflict = { _tag: "LocalServerPortConflict", hostname: "127.0.0.1", port: 49374, message: "port occupied" }
+    const typed = initializationError(conflict)
+    expect(typed).toHaveProperty("cause", conflict)
+    expect(typed).toHaveProperty("message", "port occupied")
+    expect(failure(typed)).toBe(typed)
     const sidecar = { url: "http://127.0.0.1:1234" }
     expect(initializationData(Object.assign(() => sidecar, { error: undefined }))).toBe(sidecar)
   })

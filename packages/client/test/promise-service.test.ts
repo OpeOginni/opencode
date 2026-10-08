@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { Service, type EnsureReason } from "../src/promise/service"
+import { PortConflictError, Service, type EnsureReason } from "../src/promise/service"
 import { expectPortAvailable, serviceFixture } from "./fixture/service-fixture"
 import { accelerate } from "./fixture/service-timing"
 
@@ -192,6 +192,7 @@ test("reports a bounded contender stderr tail with native promises", async () =>
   }).catch((error: unknown) => error)
 
   expect(error).toBeInstanceOf(Error)
+  expect(error).not.toBeInstanceOf(PortConflictError)
   if (!(error instanceof Error)) throw error
   expect(error.message).toContain("actionable startup failure")
   expect(error.message.length).toBeLessThan(9_000)
