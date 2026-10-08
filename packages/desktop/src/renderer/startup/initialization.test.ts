@@ -10,12 +10,23 @@ function failure(error: unknown) {
 }
 
 describe("desktop renderer initialization", () => {
-  test("throws the original initialization error, marked as a local server startup, before rendering", () => {
-    const error = new Error("Cannot migrate session_message projections")
+  test.each([
+    new Error("Cannot migrate session_message projections"),
+    new Error("Desktop IPC handler failed", {
+      cause: { message: "Cannot open database", stack: "original main trace" },
+    }),
+  ])("preserves the original initialization error and diagnostics (%s)", (error) => {
+    const message = error.message
+    const stack = error.stack
+    const cause = error.cause
     expect(failure(error)).toBe(error)
     expect(error).toHaveProperty("localServerStartup", true)
-    // The RPC error text reaches the error screen unchanged.
-    expect(error.message).toBe("Cannot migrate session_message projections")
+    expect(error.message).toBe(message)
+    expect(error.stack).toBe(stack)
+    expect(error.cause).toBe(cause)
+  })
+
+  test("normalizes encoded initialization failures before Solid wraps them", () => {
     // A falsy error is still an error.
     const empty = failure("")
     expect(empty).toBeInstanceOf(Error)

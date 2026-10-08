@@ -30,6 +30,12 @@ describe("local server port conflict", () => {
       49374,
     ],
     [Object.assign(new Error(message), { localServerStartup: true }), undefined],
+    [
+      Object.assign(new Error("Desktop IPC handler failed", { cause: { message: "Cannot open database" } }), {
+        localServerStartup: true,
+      }),
+      undefined,
+    ],
   ])("offers recovery for a typed conflict, never matching error text alone", (error, port) => {
     expect(errorPortConflict(error)).toBe(port)
   })

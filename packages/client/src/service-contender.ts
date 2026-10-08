@@ -115,14 +115,14 @@ export function contenderPool(timing: EnsureTiming) {
     recruitNow() {
       lastSpawn = Date.now() - spawnDelay
     },
-    /** Collect finished attempts. Confirmed port conflicts fail without waiting for other attempts. */
+    /** Collect finished attempts. Report the startup failure once no attempt is left alive. */
     reap() {
       const finished = [...contenders].filter(contenderFinished)
       failure ??= finished.map(contenderFailure).find((error) => error !== undefined)
       if (finished.some((item) => item.child.exitCode === 0))
         spawnDelay = Math.min(spawnDelay * 2, timing.maxSpawnDelay)
       finished.forEach((item) => contenders.delete(item))
-      return failure instanceof PortConflictError || contenders.size === 0 ? failure : undefined
+      return contenders.size === 0 ? failure : undefined
     },
     /**
      * Whether to start another attempt now. A registration that has not answered yet gets one
