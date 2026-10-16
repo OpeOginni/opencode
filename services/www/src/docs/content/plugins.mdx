@@ -83,16 +83,59 @@ policy.
 
 ## Manage
 
-Install, list, check, update, or remove global package plugins with the CLI.
+Run `plugin add` to enter a package specifier, then choose project or global configuration. You can also pass the
+package directly:
 
 ```sh
+opencode plugin add
 opencode plugin add opencode-acme-plugin@1.2.0
+```
+
+Skip the prompt with `--local` for the current project or `--global` for all projects.
+
+```sh
+opencode plugin add opencode-acme-plugin@1.2.0 --local
+opencode plugin add opencode-acme-plugin@1.2.0 --global
+```
+
+- Project installation uses an existing `opencode.json(c)` or `.opencode/opencode.json(c)` in the current directory,
+  or creates `opencode.json` there.
+- Noninteractive commands without either flag keep the global default.
+- TUI-only plugins always use global `cli.json`; `--local` is not supported for them.
+
+Run `plugin remove` to search configured plugins. The picker lists project plugins first, then global plugins, with
+each entry's configuration file. Select one entry and confirm removal; global removal affects all projects.
+
+```sh
+opencode plugin remove
+opencode plugin remove --local
+opencode plugin remove --global
+```
+
+Pass an exact configured target to remove it directly. Use `--local` or `--global` to limit the scope, and `--yes` to
+skip interactive confirmation:
+
+```sh
+opencode plugin remove opencode-acme-plugin@1.2.0 --local
+opencode plugin remove opencode-acme-plugin@1.2.0 --global --yes
+```
+
+- Project removal includes inherited parent configuration and `.opencode/opencode.json(c)` files.
+- A plugin configured in several files appears separately for each file. Removal changes only the selected file;
+  another configuration may still load the plugin.
+- Noninteractive removal requires a target and an unambiguous configuration file. It never guesses between scopes
+  or removes every occurrence. Narrow the scope with a flag, or edit the listed files if ambiguity remains.
+- Removal deletes a configuration entry, not plugin source files or cached packages. Automatically discovered local
+  plugins and built-in plugins are not removal choices.
+
+List loaded plugins, or check and update package plugins:
+
+```sh
 opencode plugin list
 opencode plugin list --builtin
 opencode plugin check
 opencode plugin update
 opencode plugin update opencode-acme-plugin
-opencode plugin remove opencode-acme-plugin@1.2.0
 ```
 
 `plugin check` checks server and TUI-only package plugins for updates. `plugin update` updates every outdated package;
