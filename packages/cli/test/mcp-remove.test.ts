@@ -1,9 +1,9 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
-import { mkdir } from "node:fs/promises"
+import { mkdir, realpath } from "node:fs/promises"
 import { parse, type ParseError } from "jsonc-parser"
 import { configuredServers, removeServer } from "../src/commands/handlers/mcp/remove"
-import { tmpdir } from "../../core/test/fixture/tmpdir"
+import { tmpdir } from "./fixture/tmpdir"
 import { isolatedEnv } from "./fixture/environment"
 
 test("removes only the selected local non-OAuth server, preserving JSONC and unrelated settings", async () => {
@@ -37,8 +37,9 @@ test("removes only the selected local non-OAuth server, preserving JSONC and unr
 
 test("enumerates native and legacy entries by source, including reserved legacy server names", async () => {
   await using tmp = await tmpdir()
-  const global = path.join(tmp.path, "global")
-  const project = path.join(tmp.path, "project")
+  const root = await realpath(tmp.path)
+  const global = path.join(root, "global")
+  const project = path.join(root, "project")
   const directory = path.join(project, "nested")
   await mkdir(directory, { recursive: true })
   const files = [
@@ -115,7 +116,7 @@ test("warns and skips malformed files during discovery, but refuses a malformed 
   expect(await Bun.file(file).text()).toBe(broken)
 })
 
-test("CLI rejects ambiguous names without edits and removes one global legacy entry with --yes", async () => {
+test("CLI rejects unknown or ambiguous names without edits and removes one scoped legacy entry", async () => {
   await using tmp = await tmpdir()
   const global = path.join(tmp.path, "config")
   const directory = path.join(tmp.path, "project")
@@ -124,7 +125,7 @@ test("CLI rejects ambiguous names without edits and removes one global legacy en
   const globalFile = path.join(global, "opencode.json")
   await Bun.write(projectFile, JSON.stringify(config))
   await Bun.write(globalFile, JSON.stringify(config))
-  const cli = async (args: string[]) => {
+  const cli = async (args: string[], name = "paper") => {
     const child = Bun.spawn(
       [
         process.execPath,
@@ -134,7 +135,7 @@ test("CLI rejects ambiguous names without edits and removes one global legacy en
         path.join(import.meta.dir, "../src/index.ts"),
         "mcp",
         "remove",
-        "paper",
+        name,
         "--yes",
         ...args,
       ],
@@ -152,8 +153,13 @@ test("CLI rejects ambiguous names without edits and removes one global legacy en
   expect(ambiguous.code).toBe(1)
   expect(await Bun.file(projectFile).json()).toEqual(config)
   expect(await Bun.file(globalFile).json()).toEqual(config)
+  const unknown = await cli(["--global"], "missing")
+  expect(unknown.stderr).toBe("")
+  expect(unknown.stdout).toContain('MCP server "missing" is not configured in the selected scope')
+  expect(unknown.code).toBe(1)
+  expect(await Bun.file(globalFile).json()).toEqual(config)
   const removed = await cli(["--global"])
-  expect(removed.stdout).toContain(`removed from ${globalFile}`)
+  expect(removed.stdout).toContain(`removed from ${await realpath(globalFile)}`)
   expect(removed.stderr).toBe("")
   expect(removed.code).toBe(0)
   expect(await Bun.file(globalFile).json()).toEqual({ mcp: {} })

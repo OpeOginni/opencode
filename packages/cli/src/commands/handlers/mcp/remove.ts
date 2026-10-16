@@ -5,6 +5,7 @@ import { autocomplete, confirm, log } from "@clack/prompts"
 import { Effect, Option } from "effect"
 import { applyEdits, createScanner, findNodeAtLocation, parse, parseTree, type ParseError } from "jsonc-parser"
 import { Global } from "@opencode/util/global"
+import { ConfigFile } from "@opencode/util/config-file"
 import { Commands } from "../../commands"
 import { Runtime } from "../../../framework/runtime"
 import { handlePromptErrors, prompt, requireInteractive } from "../../../ui/prompt"
@@ -26,11 +27,8 @@ export default Runtime.handler(
     inventory.warnings.forEach((message) => log.warn(`Skipping config: ${message}`))
     const entries = inventory.entries.filter((entry) => !name || entry.name === name)
     if (!entries.length) {
-      process.stdout.write(
-        name
-          ? `MCP server "${name}" is not configured in the selected scope${EOL}`
-          : `No configured MCP servers found${EOL}`,
-      )
+      if (name) return yield* Effect.fail(new Error(`MCP server "${name}" is not configured in the selected scope`))
+      process.stdout.write(`No configured MCP servers found${EOL}`)
       return
     }
     if (entries.length > 1)
@@ -90,8 +88,8 @@ export async function configuredServers(directory: string, global: string, scope
   const warnings: string[] = []
   for (const source of sources) {
     for (const name of source.scope === "Global"
-      ? ["opencode.json", "opencode.jsonc"]
-      : ["opencode.json", "opencode.jsonc", ".opencode/opencode.json", ".opencode/opencode.jsonc"]) {
+      ? ConfigFile.names
+      : [...ConfigFile.names, ...ConfigFile.names.map((name) => path.join(".opencode", name))]) {
       const file = path.join(source.directory, name)
       // A global config must not reappear as an inherited project config through a symlink.
       const resolved = await realpath(file).catch(() => file)
