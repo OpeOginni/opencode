@@ -18,7 +18,8 @@ export async function readPluginConfig(file: string) {
     if (error.code === "ENOENT") return undefined
     throw error
   })
-  if (text === undefined) return { text: "{}", plugins: [] }
+  if (text === undefined)
+    return { text: JSON.stringify({ $schema: "https://opencode.ai/config.json" }, null, 2), plugins: [] }
   const errors: ParseError[] = []
   const config = Option.getOrUndefined(decode(parse(text, errors, { allowTrailingComma: true })))
   if (errors.length || !config) throw new Error(`Invalid plugin configuration: ${file}`)

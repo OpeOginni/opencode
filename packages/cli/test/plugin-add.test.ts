@@ -35,7 +35,10 @@ test("--local creates project configuration without changing global configuratio
   const result = await cli(directory.path, [spec, "--local"])
   expect(result.exitCode).toBe(0)
   expect(result.stdout).toContain(path.join(directory.path, "opencode.json"))
-  expect(await Bun.file(path.join(directory.path, "opencode.json")).json()).toEqual({ plugins: [spec] })
+  expect(await Bun.file(path.join(directory.path, "opencode.json")).json()).toEqual({
+    $schema: "https://opencode.ai/config.json",
+    plugins: [spec],
+  })
   expect(await Bun.file(global).json()).toEqual({ plugins: ["existing-global"] })
 })
 
@@ -66,6 +69,7 @@ test.each(["--global", undefined])("global scope %s leaves project configuration
   const result = await cli(directory.path, [spec, ...(flag ? [flag] : [])])
   expect(result.exitCode).toBe(0)
   expect(await Bun.file(path.join(directory.path, "config/opencode.json")).json()).toEqual({
+    $schema: "https://opencode.ai/config.json",
     plugins: [spec],
   })
   expect(await Bun.file(project).json()).toEqual({ plugins: ["existing-project"] })
@@ -108,8 +112,20 @@ test("plugins with server and TUI entrypoints can use project configuration", as
   expect(configurationTarget("server.js", "tui.js")).toBe("server")
   const result = await cli(directory.path, [spec, "--local"])
   expect(result.exitCode).toBe(0)
-  expect(await Bun.file(path.join(directory.path, "opencode.json")).json()).toEqual({ plugins: [spec] })
+  expect(await Bun.file(path.join(directory.path, "opencode.json")).json()).toEqual({
+    $schema: "https://opencode.ai/config.json",
+    plugins: [spec],
+  })
   expect(await Bun.file(path.join(directory.path, "config/cli.json")).exists()).toBe(false)
+})
+
+test("adding a plugin preserves an existing schema", async () => {
+  await using directory = await tmpdir()
+  const config = path.join(directory.path, "opencode.json")
+  const existing = { $schema: "https://example.com/custom-schema.json", model: "test/model" }
+  await Bun.write(config, JSON.stringify(existing))
+  expect(await writePluginConfig(config, spec)).toBe(true)
+  expect(await Bun.file(config).json()).toEqual({ ...existing, plugins: [spec] })
 })
 
 test.each([spec, { package: spec, options: { enabled: true } }])(
