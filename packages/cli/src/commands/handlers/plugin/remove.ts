@@ -1,5 +1,5 @@
 import { EOL } from "node:os"
-import { autocomplete, confirm } from "@clack/prompts"
+import { autocomplete, confirm, log } from "@clack/prompts"
 import { Effect, Option } from "effect"
 import { Global } from "@opencode/util/global"
 import { Commands } from "../../commands"
@@ -19,14 +19,18 @@ export default Runtime.handler(
     const config = yield* Config.Service
     // Migrate legacy CLI configuration before enumerating its persisted plugin entries.
     if (!input.local) yield* config.get()
-    const entries = (yield* Effect.promise(() =>
-      configuredPlugins({
-        directory: process.cwd(),
-        global: global.config,
-        cli: config.path,
-        scope: input.local ? "project" : input.global ? "global" : undefined,
-      }),
-    )).filter((entry) => !target || entry.target === target)
+    const inventory = yield* Effect.tryPromise({
+      try: () =>
+        configuredPlugins({
+          directory: process.cwd(),
+          global: global.config,
+          cli: config.path,
+          scope: input.local ? "project" : input.global ? "global" : undefined,
+        }),
+      catch: (error) => error,
+    })
+    inventory.warnings.forEach((message) => log.warn(`Skipping config: ${message}`))
+    const entries = inventory.entries.filter((entry) => !target || entry.target === target)
     if (!entries.length) {
       process.stdout.write(
         target
@@ -48,7 +52,7 @@ export default Runtime.handler(
               maxItems: 10,
               options: entries.map((entry) => ({
                 value: entry,
-                label: `${entry.scope === "project" ? "Project" : "Global"} · ${entry.target}`,
+                label: `${entry.scope === "global" ? "Global" : entry.inherited ? "Inherited" : "Project"} · ${entry.target}`,
                 hint: `${entry.runtime === "tui" ? "TUI · " : ""}${entry.path}`,
               })),
             }),
@@ -56,7 +60,7 @@ export default Runtime.handler(
     if (!input.yes && process.stdin.isTTY && process.stdout.isTTY) {
       const accepted = yield* prompt(() =>
         confirm({
-          message: `Remove "${selected.target}" from ${selected.path}?${selected.scope === "global" ? " This affects all projects." : ""}`,
+          message: `Remove "${selected.target}" from ${selected.path}?${selected.scope === "global" ? " This affects all projects." : selected.inherited ? " This affects projects inheriting this file." : ""}`,
           initialValue: false,
         }),
       )
@@ -64,12 +68,17 @@ export default Runtime.handler(
     }
     const removed =
       selected.runtime === "tui"
-        ? yield* config
-            .update((draft) => {
+        ? yield* Effect.gen(function* () {
+            yield* Effect.tryPromise({ try: () => readPluginConfig(selected.path), catch: (error) => error })
+            yield* config.update((draft) => {
               draft.plugins = draft.plugins?.filter((entry) => pluginTarget(entry) !== selected.target)
             })
-            .pipe(Effect.as(true))
-        : yield* Effect.promise(() => removePluginConfig(selected.path, selected.target))
+            return true
+          })
+        : yield* Effect.tryPromise({
+            try: () => removePluginConfig(selected.path, selected.target),
+            catch: (error) => error,
+          })
     process.stdout.write(
       removed
         ? `Plugin "${selected.target}" removed from ${selected.path}${EOL}`

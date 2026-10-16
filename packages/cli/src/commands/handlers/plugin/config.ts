@@ -9,6 +9,7 @@ const decode = Schema.decodeUnknownOption(Schema.Struct({ plugins: Schema.option
 export interface ConfiguredPlugin {
   readonly target: string
   readonly scope: "project" | "global"
+  readonly inherited?: boolean
   readonly path: string
   readonly runtime: "server" | "tui"
 }
@@ -44,11 +45,17 @@ export async function configuredPlugins(input: {
   cli: string
   scope?: ConfiguredPlugin["scope"]
 }) {
+  const directory = path.resolve(input.directory)
   const global = path.resolve(input.global)
   const files = [
-    ...projectPaths(path.resolve(input.directory))
+    ...projectPaths(directory)
       .filter((file) => path.dirname(file) !== global)
-      .map((file) => ({ path: file, scope: "project" as const, runtime: "server" as const })),
+      .map((file) => ({
+        path: file,
+        scope: "project" as const,
+        inherited: ![directory, path.join(directory, ".opencode")].includes(path.dirname(file)),
+        runtime: "server" as const,
+      })),
     ...["opencode.json", "opencode.jsonc"].map((name) => ({
       path: path.join(global, name),
       scope: "global" as const,
@@ -56,26 +63,36 @@ export async function configuredPlugins(input: {
     })),
     { path: input.cli, scope: "global" as const, runtime: "tui" as const },
   ].filter((file) => !input.scope || file.scope === input.scope)
-  return (
-    await Promise.all(
-      files.map(async (file) => {
-        const config = await readPluginConfig(file.path)
-        return [...new Set(config.plugins.map(pluginTarget))]
+  const results = await Promise.all(
+    files.map(async (file) => {
+      const result = await readPluginConfig(file.path).then(
+        (config) => ({ config }),
+        (error: Error) => ({ error }),
+      )
+      if ("error" in result) return { entries: [], warnings: [result.error.message] }
+      return {
+        entries: [...new Set(result.config.plugins.map(pluginTarget))]
           .filter(
             (target) =>
               !target.startsWith("-") && target !== "*" && !target.endsWith(".*") && !target.startsWith("opencode."),
           )
-          .map((target): ConfiguredPlugin => ({ ...file, target }))
-      }),
-    )
+          .map((target): ConfiguredPlugin => ({ ...file, target })),
+        warnings: [],
+      }
+    }),
   )
-    .flat()
-    .toSorted(
-      (a, b) =>
-        Number(a.scope === "global") - Number(b.scope === "global") ||
-        a.target.localeCompare(b.target) ||
-        a.path.localeCompare(b.path),
-    )
+  return {
+    entries: results
+      .flatMap((result) => result.entries)
+      .toSorted(
+        (a, b) =>
+          Number(a.scope === "global") - Number(b.scope === "global") ||
+          Number(Boolean(a.inherited)) - Number(Boolean(b.inherited)) ||
+          a.target.localeCompare(b.target) ||
+          a.path.localeCompare(b.path),
+      ),
+    warnings: results.flatMap((result) => result.warnings),
+  }
 }
 
 export function pluginTarget(plugin: ConfigPlugin.Plugin) {

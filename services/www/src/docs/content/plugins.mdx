@@ -102,7 +102,7 @@ or creates `opencode.json` there. Noninteractive commands without a scope flag k
 
 TUI-only plugins always use global `cli.json`; `--local` is not supported for them.
 
-Run `plugin remove` to search configured plugins, with project entries first and each entry's config file shown.
+Run `plugin remove` to search configured plugins, grouped as Project, Inherited, and Global, with each entry's config file shown.
 Pass an exact target to skip the picker when it matches one file. Scope flags limit the selection; `--yes` skips confirmation:
 
 ```sh
@@ -116,6 +116,8 @@ opencode plugin remove opencode-acme-plugin@1.2.0 --global --yes
 - Global removal affects all projects. Built-in and automatically discovered local plugins are not removal choices.
 - Noninteractive removal requires a target that matches one config file. Use a scope flag to narrow ambiguous matches,
   or edit the listed files directly.
+- Listing warns about malformed or unreadable config files and skips them. Removal still validates the selected file
+  before writing.
 
 List loaded plugins, or check and update package plugins:
 

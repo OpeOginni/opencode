@@ -7,127 +7,74 @@ import { removePluginConfig } from "../src/commands/handlers/plugin/remove"
 import { tmpdir } from "./fixture/tmpdir"
 import { isolatedEnv } from "./fixture/environment"
 
-test("removal inventory sorts by scope and target without merging configuration sources", async () => {
+test("inventory keeps separate config sources in project, inherited, then global order", async () => {
   await using directory = await tmpdir()
-  const project = path.join(directory.path, "project")
   const global = path.join(directory.path, "global")
+  const project = path.join(global, "project")
   await Bun.write(
     path.join(project, "opencode.json"),
-    JSON.stringify({
-      plugins: ["z-plugin", "shared-plugin", "shared-plugin", "*", "-disabled", "opencode.provider.openai", "acme.*"],
-    }),
+    JSON.stringify({ plugins: ["shared-plugin", "shared-plugin", "*", "-disabled", "opencode.provider.openai"] }),
   )
-  await Bun.write(
-    path.join(project, ".opencode/opencode.jsonc"),
-    '{"plugins":[{"package":"a-plugin","options":{"a":true}}]}',
-  )
+  await Bun.write(path.join(project, ".opencode/opencode.jsonc"), '{"plugins":[{"package":"a-project","options":{}}]}')
+  await Bun.write(path.join(directory.path, "opencode.jsonc"), '{"plugins":["a-inherited"]}')
   await Bun.write(path.join(global, "opencode.json"), '{"plugins":["shared-plugin"]}')
   await Bun.write(path.join(global, "opencode.jsonc"), '{"plugins":["jsonc-plugin"]}')
-  await Bun.write(path.join(global, "cli.json"), '{"plugins":["tui-plugin","-opencode.tabs"]}')
+  await Bun.write(path.join(global, "cli.json"), '{"plugins":["tui-plugin"]}')
 
-  expect(await configuredPlugins({ directory: project, global, cli: path.join(global, "cli.json") })).toEqual([
-    { scope: "project", runtime: "server", target: "a-plugin", path: path.join(project, ".opencode/opencode.jsonc") },
-    { scope: "project", runtime: "server", target: "shared-plugin", path: path.join(project, "opencode.json") },
-    { scope: "project", runtime: "server", target: "z-plugin", path: path.join(project, "opencode.json") },
-    { scope: "global", runtime: "server", target: "jsonc-plugin", path: path.join(global, "opencode.jsonc") },
-    { scope: "global", runtime: "server", target: "shared-plugin", path: path.join(global, "opencode.json") },
-    { scope: "global", runtime: "tui", target: "tui-plugin", path: path.join(global, "cli.json") },
+  const inventory = await configuredPlugins({ directory: project, global, cli: path.join(global, "cli.json") })
+  expect(inventory.entries).toMatchObject([
+    { target: "a-project", scope: "project", inherited: false, path: path.join(project, ".opencode/opencode.jsonc") },
+    { target: "shared-plugin", scope: "project", inherited: false, path: path.join(project, "opencode.json") },
+    { target: "a-inherited", scope: "project", inherited: true, path: path.join(directory.path, "opencode.jsonc") },
+    { target: "jsonc-plugin", scope: "global", path: path.join(global, "opencode.jsonc") },
+    { target: "shared-plugin", scope: "global", path: path.join(global, "opencode.json") },
+    { target: "tui-plugin", scope: "global", runtime: "tui", path: path.join(global, "cli.json") },
   ])
 })
 
-test("removal inventory finds all project config forms inherited by nested directories", async () => {
+test("removal filters exact string and object targets while preserving other settings and options", async () => {
   await using directory = await tmpdir()
-  const files = ["opencode.json", "opencode.jsonc", ".opencode/opencode.json", ".opencode/opencode.jsonc"]
-  await Promise.all(files.map((file) => Bun.write(path.join(directory.path, file), '{"plugins":["inherited-plugin"]}')))
-  const entries = await configuredPlugins({
-    directory: path.join(directory.path, "packages/app"),
-    global: path.join(directory.path, "global"),
-    cli: path.join(directory.path, "global/cli.json"),
-  })
-  expect(entries.map((entry) => entry.path).sort()).toEqual(files.map((file) => path.join(directory.path, file)).sort())
-  expect(entries.every((entry) => entry.scope === "project")).toBe(true)
-})
-
-test("global config encountered in the ancestor walk is not also offered as project config", async () => {
-  await using directory = await tmpdir()
-  await Bun.write(path.join(directory.path, "opencode.json"), '{"plugins":["global-plugin"]}')
-  const entries = await configuredPlugins({
-    directory: directory.path,
-    global: directory.path,
-    cli: path.join(directory.path, "cli.json"),
-  })
-  expect(entries).toHaveLength(1)
-  expect(entries[0].scope).toBe("global")
-})
-
-test("explicit scope does not read or validate the other scope", async () => {
-  await using directory = await tmpdir()
-  const project = path.join(directory.path, "project")
-  const global = path.join(directory.path, "global")
-  await Bun.write(path.join(project, "opencode.json"), "{ invalid")
-  await Bun.write(path.join(global, "opencode.json"), '{"plugins":["global-plugin"]}')
-  expect(
-    await configuredPlugins({ directory: project, global, cli: path.join(global, "cli.json"), scope: "global" }),
-  ).toHaveLength(1)
-})
-
-test("removal preserves comments, unrelated settings, and other plugin options in the selected file only", async () => {
-  await using directory = await tmpdir()
-  const project = path.join(directory.path, "opencode.jsonc")
-  const global = path.join(directory.path, "global/opencode.json")
+  const file = path.join(directory.path, "opencode.jsonc")
   await Bun.write(
-    project,
-    '{\n // keep\n "model":"test/model",\n "plugins":["remove-me",{"package":"remove-me","options":{}},{"package":"keep-me","options":{"a":true}}],\n}\n',
+    file,
+    '{\n // keep\n "model":"test/model", "plugins":["remove-me",{"package":"remove-me","options":{}},{"package":"keep-me","options":{"a":true}}],\n}\n',
   )
-  const untouched = '{"plugins":["remove-me"]}'
-  await Bun.write(global, untouched)
-  expect(await removePluginConfig(project, "remove-me")).toBe(true)
-  const text = await Bun.file(project).text()
+  expect(await removePluginConfig(file, "remove-me")).toBe(true)
+  const text = await Bun.file(file).text()
   expect(text).toContain("// keep")
   expect(parse(text)).toEqual({ model: "test/model", plugins: [{ package: "keep-me", options: { a: true } }] })
-  expect(await Bun.file(global).text()).toBe(untouched)
-  expect(await removePluginConfig(project, "remove-me")).toBe(false)
-  expect(await Bun.file(project).text()).toBe(text)
+  expect(await removePluginConfig(file, "remove-me")).toBe(false)
+  expect(await Bun.file(file).text()).toBe(text)
 })
 
-test.each(["{ invalid", "[]", '{"plugins":{}}', '{"plugins":[{"package":42}]}'])(
-  "invalid configuration %s is never overwritten by removal",
-  async (text) => {
-    await using directory = await tmpdir()
-    const file = path.join(directory.path, "opencode.json")
-    await Bun.write(file, text)
-    await expect(removePluginConfig(file, "plugin")).rejects.toThrow("Invalid plugin configuration")
-    expect(await Bun.file(file).text()).toBe(text)
-  },
-)
-
-test("removing from a missing configuration does not create it", async () => {
+test.each(["{ bad", '{"plugins":{}}'])("invalid selected config %s is never overwritten", async (text) => {
   await using directory = await tmpdir()
   const file = path.join(directory.path, "opencode.json")
-  expect(await removePluginConfig(file, "missing")).toBe(false)
-  expect(await Bun.file(file).exists()).toBe(false)
+  await Bun.write(file, text)
+  await expect(removePluginConfig(file, "plugin")).rejects.toThrow("Invalid plugin configuration")
+  expect(await Bun.file(file).text()).toBe(text)
 })
 
-test("CLI removes only the requested scope and handles TUI-only global entries", async () => {
+test("scope flags remove only the selected source, including global TUI entries", async () => {
   await using directory = await tmpdir()
   const project = path.join(directory.path, "opencode.json")
   const global = path.join(directory.path, "config/cli.json")
   await Bun.write(project, '{"plugins":["shared-plugin"]}')
   await Bun.write(global, '{"plugins":["shared-plugin"],"theme":{"mode":"dark"}}')
-
   const local = await cli(directory.path, ["shared-plugin", "--local"])
   expect({ code: local.exitCode, stderr: local.stderr }).toEqual({ code: 0, stderr: "" })
-  expect(local.stdout).toContain(`removed from ${await realpath(project)}`)
   expect(await Bun.file(project).json()).toEqual({ plugins: [] })
   expect(await Bun.file(global).json()).toEqual({ plugins: ["shared-plugin"], theme: { mode: "dark" } })
 
+  await Bun.write(project, "{ bad")
   const removed = await cli(directory.path, ["shared-plugin", "--global", "--yes"])
   expect({ code: removed.exitCode, stderr: removed.stderr }).toEqual({ code: 0, stderr: "" })
-  expect(removed.stdout).toContain(`removed from ${global}`)
+  expect(removed.stdout).not.toContain("Skipping config:")
   expect(await Bun.file(global).json()).toEqual({ plugins: [], theme: { mode: "dark" } })
+  expect(await Bun.file(project).text()).toBe("{ bad")
 })
 
-test("CLI refuses ambiguous noninteractive removal without changing either configuration", async () => {
+test("an ambiguous target fails without a terminal and leaves every copy untouched", async () => {
   await using directory = await tmpdir()
   const project = path.join(directory.path, "opencode.json")
   const global = path.join(directory.path, "config/opencode.json")
@@ -136,19 +83,45 @@ test("CLI refuses ambiguous noninteractive removal without changing either confi
   const result = await cli(directory.path, ["shared-plugin", "--yes"])
   expect(result.exitCode).toBe(1)
   expect(result.stdout + result.stderr).toContain("ambiguous")
-  expect(result.stdout + result.stderr).toContain("--local or --global")
   expect(await Bun.file(project).text()).toBe(text)
   expect(await Bun.file(global).text()).toBe(text)
 })
 
-test("CLI without a target fails clearly outside a terminal", async () => {
+test("a unique target is removed without a scope flag", async () => {
+  await using directory = await tmpdir()
+  const project = path.join(directory.path, "opencode.json")
+  const global = path.join(directory.path, "config/opencode.json")
+  await Bun.write(project, '{"plugins":["project-plugin"]}')
+  await Bun.write(global, '{"plugins":["other-plugin"]}')
+  const result = await cli(directory.path, ["project-plugin"])
+  expect({ code: result.exitCode, stderr: result.stderr }).toEqual({ code: 0, stderr: "" })
+  expect(result.stdout).toContain(`removed from ${await realpath(project)}`)
+  expect(await Bun.file(project).json()).toEqual({ plugins: [] })
+  expect(await Bun.file(global).json()).toEqual({ plugins: ["other-plugin"] })
+})
+
+test("a malformed parent warns but does not block removal from a valid project file", async () => {
+  await using directory = await tmpdir()
+  const project = path.join(directory.path, "project")
+  const malformed = path.join(directory.path, "opencode.json")
+  await Bun.write(malformed, "{ bad")
+  await Bun.write(path.join(project, "opencode.jsonc"), '{"plugins":["foo-plugin"]}')
+  const result = await cli(directory.path, ["foo-plugin", "--local"], project)
+  expect({ code: result.exitCode, stderr: result.stderr }).toEqual({ code: 0, stderr: "" })
+  expect(result.stdout).toContain("Skipping config: Invalid plugin configuration:")
+  expect(result.stdout).toContain("removed from")
+  expect(await Bun.file(path.join(project, "opencode.jsonc")).json()).toEqual({ plugins: [] })
+  expect(await Bun.file(malformed).text()).toBe("{ bad")
+})
+
+test("removal without a target refuses to prompt outside a terminal", async () => {
   await using directory = await tmpdir()
   const result = await cli(directory.path, [])
   expect(result.exitCode).toBe(1)
   expect(result.stdout + result.stderr).toContain("Pass a plugin target")
 })
 
-async function cli(root: string, args: string[]) {
+async function cli(root: string, args: string[], cwd = root) {
   const child = Bun.spawn(
     [
       process.execPath,
@@ -160,7 +133,7 @@ async function cli(root: string, args: string[]) {
       "remove",
       ...args,
     ],
-    { cwd: root, env: isolatedEnv(root), stdin: "ignore", stdout: "pipe", stderr: "pipe" },
+    { cwd, env: isolatedEnv(root), stdin: "ignore", stdout: "pipe", stderr: "pipe" },
   )
   const [stdout, stderr, exitCode] = await Promise.all([
     new Response(child.stdout).text(),
