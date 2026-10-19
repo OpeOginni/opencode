@@ -2,10 +2,11 @@ export * as SessionRunnerModel from "./model.js"
 
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { LanguageModel } from "@opencode/ai"
-import { Model } from "@opencode/schema/model"
-import { Provider } from "@opencode/schema/provider"
+import { Provider } from "../../provider.js"
 import { Context, Effect, Layer, Schema } from "effect"
+import { Model } from "../../model.js"
 import { ModelResolver } from "../../model-resolver.js"
+import { PluginHooks } from "../../plugin/hooks.js"
 import { SessionSchema } from "../schema.js"
 
 export class ModelNotSelectedError extends Schema.TaggedError<ModelNotSelectedError>()(
@@ -71,26 +72,66 @@ const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const resolver = yield* ModelResolver.Service
+    const catalog = yield* Model.Service
+    const hooks = yield* PluginHooks.Service
+    const select = Effect.fn("SessionRunnerModel.select")(function* (
+      session: SessionSchema.Info,
+      available: () => Effect.Effect<ReadonlyArray<Model.Info>>,
+    ) {
+      // Location plugins populate and filter the catalog asynchronously during layer startup.
+      if (!session.model) {
+        const resolved = yield* resolver.resolve()
+        if (resolved) return resolved
+        return yield* new ModelNotSelectedError({ sessionID: session.id })
+      }
+      const selected = (yield* available()).find(
+        (model) => model.providerID === session.model?.providerID && model.id === session.model.id,
+      )
+      if (!selected)
+        return yield* new ModelUnavailableError({
+          providerID: session.model.providerID,
+          modelID: session.model.id,
+        })
+      return yield* resolver.resolveModel(selected, session.model.variant)
+    })
     return Service.of({
       resolve: Effect.fn("SessionRunnerModel.resolve")(function* (session, available) {
-        // Location plugins populate and filter the catalog asynchronously during layer startup.
-        if (!session.model) {
-          const resolved = yield* resolver.resolve()
-          if (resolved) return resolved
-          return yield* new ModelNotSelectedError({ sessionID: session.id })
-        }
-        const selected = (yield* available()).find(
-          (model) => model.providerID === session.model?.providerID && model.id === session.model.id,
-        )
-        if (!selected)
-          return yield* new ModelUnavailableError({
-            providerID: session.model.providerID,
-            modelID: session.model.id,
+        const selected = yield* select(session, available)
+        const event = yield* hooks.trigger("session", "model.resolve", { sessionID: session.id, model: selected.ref })
+        if (event.error !== undefined)
+          return yield* new ModelResolver.ModelConfigurationError({
+            providerID: selected.ref.providerID,
+            modelID: selected.ref.id,
+            package: selected.model.route.id,
+            detail: event.error,
           })
-        return yield* resolver.resolveModel(selected, session.model.variant)
+        const targetID = event.target ?? selected.ref.id
+        const target = targetID === selected.ref.id ? undefined : yield* catalog.get(selected.ref.providerID, targetID)
+        if (targetID !== selected.ref.id && !target)
+          return yield* new ModelUnavailableError({
+            providerID: selected.ref.providerID,
+            modelID: targetID,
+          })
+        const resolved = target ? yield* resolver.resolveModel(target) : selected
+        return {
+          ...resolved,
+          cost: event.cost ?? resolved.cost,
+          model:
+            event.headers === undefined
+              ? resolved.model
+              : LanguageModel.update(resolved.model, {
+                  route: resolved.model.route.with({
+                    headers: Provider.mergeHeaders(resolved.model.route.defaults.headers, event.headers),
+                  }),
+                }),
+        }
       }),
     })
   }),
 )
 
-export const node = makeLocationNode({ service: Service, layer, deps: [ModelResolver.node] })
+export const node = makeLocationNode({
+  service: Service,
+  layer,
+  deps: [ModelResolver.node, Model.node, PluginHooks.node],
+})

@@ -19,6 +19,11 @@ import {
 } from "@opencode/core/plugin/provider/github-copilot"
 import { Message, SystemPart } from "@opencode/ai"
 import { Provider } from "@opencode/core/provider"
+import { Credential } from "@opencode/core/credential"
+import { Database } from "@opencode/core/database/database"
+import { Bus } from "@opencode/core/bus"
+import { SessionInbox } from "@opencode/core/session/inbox"
+import { SessionMessage } from "@opencode/schema/session-message"
 import { Integration } from "@opencode/core/integration"
 import type { SessionRequestKind } from "@opencode/plugin/effect/session"
 import { fakeSelectorSdk } from "../fixture/selector"
@@ -55,6 +60,103 @@ const modelRequest = Effect.fn(function* (sessionID: Session.ID, kind: SessionRe
     kind,
     headers: {},
   })
+})
+
+const autoFixture = Effect.fn(function* (enabled: boolean) {
+  const routed: unknown[] = []
+  const state = { available: true, model: "routed" }
+  const remote = (id: string, extra: Record<string, unknown>) => ({
+    model_picker_enabled: enabled,
+    id,
+    name: id,
+    version: `${id}-2026-08-01`,
+    supported_endpoints: [id === "claude" ? "/v1/messages" : "/responses"],
+    capabilities: {
+      family: id,
+      limits: { max_prompt_tokens: 128_000, max_output_tokens: 64_000 },
+      supports: { tool_calls: true },
+    },
+    ...extra,
+  })
+  const server = yield* Effect.acquireRelease(
+    Effect.sync(() =>
+      Bun.serve({
+        port: 0,
+        fetch: async (request) => {
+          expect(request.headers.get("authorization")).toBe("Bearer copilot-token")
+          const path = new URL(request.url).pathname
+          if (path === "/models")
+            return Response.json({
+              data: [
+                remote("routed", {
+                  billing: {
+                    auto_discount: 0.1,
+                    token_prices: {
+                      batch_size: 1_000_000,
+                      default: { input_price: 250, output_price: 1500, cache_read_price: 25 },
+                    },
+                  },
+                }),
+                remote("claude", { billing: { auto_discount: 0.1 } }),
+                remote("fallback", { is_chat_fallback: true }),
+              ],
+            })
+          if (path === "/meta")
+            return Response.json({
+              auto: {
+                tiers: ["efficiency", "balance", "intelligence"].map((id) => ({
+                  id,
+                  type: "auto",
+                  status: { enabled: id !== "balance" },
+                })),
+              },
+            })
+          expect(path).toBe("/auto")
+          routed.push(await request.json())
+          if (!state.available) return new Response(null, { status: 503 })
+          return Response.json({
+            session_token: `session-token-${routed.length}`,
+            expires_at: Date.now() / 1000 + 24 * 60 * 60,
+            selected_model: { id: state.model },
+          })
+        },
+      }),
+    ),
+    (server) => Effect.sync(() => server.stop(true)),
+  )
+  const credentials = yield* Credential.Service
+  yield* credentials.create({
+    integrationID: Integration.ID.make("github-copilot"),
+    value: Credential.OAuth.make({
+      type: "oauth",
+      methodID: Integration.MethodID.make("device"),
+      access: "copilot-token",
+      refresh: "copilot-token",
+      expires: 0,
+      metadata: { apiEndpoint: server.url.origin },
+    }),
+  })
+  const providers = yield* Provider.Service
+  yield* providers.transform((editor) => editor.update(Provider.ID.githubCopilot, () => {}))
+  yield* addPlugin()
+  const models = yield* Model.Service
+  const deadline = Date.now() + 10_000
+  while (!(yield* models.get(Provider.ID.githubCopilot, Model.ID.make("auto"))) && Date.now() < deadline)
+    yield* Effect.sleep("10 millis")
+  expect(
+    (yield* models.get(Provider.ID.githubCopilot, Model.ID.make("auto")))?.variants.map((item) => item.id),
+  ).toEqual([Model.VariantID.make("efficiency"), Model.VariantID.make("intelligence")])
+  const hooks = yield* PluginHooks.Service
+  const resolve = (sessionID: Session.ID, variant?: string, id = "auto") =>
+    hooks.trigger("session", "model.resolve", {
+      sessionID,
+      model: Model.Ref.make({
+        providerID: Provider.ID.githubCopilot,
+        id: Model.ID.make(id),
+        ...(variant ? { variant: Model.VariantID.make(variant) } : {}),
+      }),
+    })
+  return { routed, state, models, resolve, ids: yield* sessions() }
 })
 
 describe("GithubCopilotPlugin", () => {
@@ -623,10 +725,9 @@ describe("GithubCopilotPlugin", () => {
         editor.models.update(Provider.ID.githubCopilot, Model.ID.make("gpt-5-chat-latest"), () => {})
       })
       yield* addPlugin()
-      expect(
-        required(yield* models.get(Provider.ID.githubCopilot, Model.ID.make("gpt-5-chat-latest")))
-          .enabled,
-      ).toBe(false)
+      expect(required(yield* models.get(Provider.ID.githubCopilot, Model.ID.make("gpt-5-chat-latest"))).enabled).toBe(
+        false,
+      )
     }),
   )
 
@@ -640,9 +741,77 @@ describe("GithubCopilotPlugin", () => {
       })
       yield* addPlugin()
       expect(
-        required(yield* models.get(Provider.ID.make("custom-copilot"), Model.ID.make("gpt-5-chat-latest")))
-          .enabled,
+        required(yield* models.get(Provider.ID.make("custom-copilot"), Model.ID.make("gpt-5-chat-latest"))).enabled,
       ).toBe(true)
+    }),
+  )
+
+  it.live("shares an Auto-only account's model/token pair across concurrent resolution", () =>
+    Effect.gen(function* () {
+      const fixture = yield* autoFixture(false)
+      expect(
+        (yield* fixture.models.available()).filter((model) => model.providerID === Provider.ID.githubCopilot),
+      ).toEqual([expect.objectContaining({ id: "auto" })])
+      // The title and the main request resolve a new Session's model concurrently.
+      const concurrent = yield* Effect.all([fixture.resolve(fixture.ids.parent), fixture.resolve(fixture.ids.parent)], {
+        concurrency: "unbounded",
+      })
+      expect(concurrent[0]).toMatchObject({ target: "routed", headers: { "Copilot-Session-Token": "session-token-1" } })
+      expect(concurrent[1]).toEqual(concurrent[0])
+      expect(fixture.routed).toEqual([{ prompt: "" }])
+      fixture.state.available = false
+      expect((yield* fixture.resolve(fixture.ids.child)).target).toBe(Model.ID.make("fallback"))
+    }),
+  )
+
+  it.live("reroutes paid Auto on delivered input and tier changes without altering manual models", () =>
+    Effect.gen(function* () {
+      const fixture = yield* autoFixture(true)
+      const inbox = yield* SessionInbox.make()
+      const database = yield* Database.Service
+      const bus = yield* Bus.Service
+      const admit = (delivery: "steer" | "queue") =>
+        inbox.admit({
+          id: SessionMessage.ID.create(),
+          sessionID: fixture.ids.parent,
+          item: { type: "user", payload: { text: "Review this" }, delivery },
+        })
+      yield* admit("steer")
+      yield* SessionInbox.promote(database.db, bus, fixture.ids.parent, "input")
+      const first = yield* fixture.resolve(fixture.ids.parent, "efficiency")
+      expect(first).toMatchObject({
+        target: "routed",
+        headers: { "Copilot-Session-Token": "session-token-1" },
+        cost: [{ input: 2.25, output: 13.5, cache: { read: 0.225, write: 0 } }],
+      })
+      expect(yield* fixture.models.get(Provider.ID.githubCopilot, Model.ID.make("routed"))).toMatchObject({
+        cost: [{ input: 2.5 }],
+      })
+      yield* admit("queue")
+      expect((yield* fixture.resolve(fixture.ids.parent, "efficiency")).headers).toEqual(first.headers)
+      expect(fixture.routed).toHaveLength(1)
+      yield* SessionInbox.promote(database.db, bus, fixture.ids.parent, "input")
+      fixture.state.model = "claude"
+      const second = yield* fixture.resolve(fixture.ids.parent, "efficiency")
+      expect(second).toMatchObject({ target: "claude", headers: { "Copilot-Session-Token": "session-token-2" } })
+      const intelligence = yield* fixture.resolve(fixture.ids.parent, "intelligence")
+      expect(intelligence.headers).toEqual({ "Copilot-Session-Token": "session-token-3" })
+      expect((yield* fixture.resolve(fixture.ids.parent, "efficiency")).headers).toEqual({
+        "Copilot-Session-Token": "session-token-4",
+      })
+      expect(fixture.routed).toMatchObject([
+        { prompt: "Review this", tier: "efficiency" },
+        { prompt: "Review this", tier: "efficiency" },
+        { prompt: "Review this", tier: "intelligence" },
+        { prompt: "Review this", tier: "efficiency" },
+      ])
+      expect(yield* fixture.resolve(fixture.ids.parent, undefined, "claude")).not.toHaveProperty("headers")
+      expect((yield* fixture.resolve(fixture.ids.parent, "balance")).error).toContain("unavailable")
+      fixture.state.available = false
+      expect((yield* fixture.resolve(fixture.ids.parent, "intelligence")).error).toContain("503")
+      fixture.state.available = true
+      fixture.state.model = "unknown"
+      expect((yield* fixture.resolve(fixture.ids.parent, "intelligence")).error).toContain("unavailable model")
     }),
   )
 

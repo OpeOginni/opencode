@@ -1,9 +1,13 @@
 import type { IntegrationOAuthMethodRegistration } from "@opencode/plugin/effect/integration"
 import type { SessionRequestKind, SessionTitle } from "@opencode/plugin/effect/session"
-import { Effect, Option, Schema, Semaphore, Stream } from "effect"
+import { Session } from "../../session.js"
+import type { SessionMessage } from "@opencode/schema/session-message"
+import { Money } from "@opencode/schema/money"
+import { Clock, Effect, Option, Schema, Semaphore, Stream } from "effect"
 import { IntegrationConnection } from "../../integration/connection.js"
 import { Credential } from "../../credential.js"
 import { Bus } from "../../bus.js"
+import { CopilotAuto } from "../../github-copilot/auto.js"
 import { CopilotModels } from "../../github-copilot/models.js"
 import { App } from "../../app.js"
 import { Integration } from "../../integration.js"
@@ -12,6 +16,7 @@ import { Agent } from "../../agent.js"
 import { define } from "@opencode/plugin/effect/plugin"
 import { Provider } from "../../provider.js"
 import { SessionAffinity } from "../../session/affinity.js"
+import { KeyedMutex } from "../../effect/keyed-mutex.js"
 import type { PluginInternal } from "../internal.js"
 
 const clientID = "Ov23li8tweQw6odWQebz"
@@ -160,16 +165,25 @@ export const GithubCopilotPlugin = define({
   id: "opencode.provider.github.copilot",
   effect: Effect.fn(function* (ctx) {
     const providers = yield* Provider.Service
+    const catalog = yield* Model.Service
+    const sessions = yield* Session.Service
     const bus = yield* Bus.Service
     const loading = Semaphore.makeUnsafe(1)
     const loaded: {
       baseURL?: string
       token?: string
       models?: CopilotModels.Snapshot
+      tiers?: readonly CopilotAuto.Tier[]
       connection?: Effect.Success<ReturnType<typeof ctx.integration.connection.active>>
     } = {}
+    const routes = new Map<
+      Session.ID,
+      { readonly route: CopilotAuto.Route; readonly messageID?: SessionMessage.ID; readonly tier?: CopilotAuto.Tier }
+    >()
+    const routing = KeyedMutex.makeUnsafe<Session.ID>()
 
     const load = Effect.fn("GithubCopilotPlugin.load")(function* () {
+      routes.clear()
       const connection = yield* ctx.integration.connection.active("github-copilot")
       const credential = connection
         ? yield* ctx.integration.connection.resolve(connection).pipe(Effect.orElseSucceed(() => undefined))
@@ -178,25 +192,32 @@ export const GithubCopilotPlugin = define({
         loaded.baseURL = undefined
         loaded.token = undefined
         loaded.models = undefined
+        loaded.tiers = undefined
         loaded.connection = undefined
         return
       }
 
       const url = copilotBaseURL(credential.metadata) ?? baseURL()
       const provider = yield* providers.get(Provider.ID.githubCopilot)
-      const remote = yield* Effect.tryPromise({
-        try: () =>
-          CopilotModels.load(url, {
-            ...provider?.headers,
-            Authorization: `Bearer ${credential.refresh}`,
-            "User-Agent": App.useragent(ctx.app),
-            "X-GitHub-Api-Version": apiVersion,
-          }),
-        catch: (cause) => cause,
-      }).pipe(
-        Effect.catch((cause) =>
-          Effect.logWarning("failed to sync GitHub Copilot models", { cause }).pipe(Effect.as(undefined)),
-        ),
+      const headers = {
+        ...provider?.headers,
+        Authorization: `Bearer ${credential.refresh}`,
+        "User-Agent": App.useragent(ctx.app),
+        "X-GitHub-Api-Version": apiVersion,
+      }
+      const remote = yield* Effect.all(
+        {
+          models: Effect.tryPromise(() => CopilotModels.load(url, headers)).pipe(
+            Effect.catch((cause) =>
+              Effect.logWarning("failed to sync GitHub Copilot models", { cause }).pipe(Effect.as(undefined)),
+            ),
+          ),
+          tiers: Effect.tryPromise(() => CopilotAuto.loadTiers(url, headers)).pipe(
+            Effect.tapError((cause) => Effect.logWarning("failed to discover GitHub Copilot auto tiers", { cause })),
+            Effect.orElseSucceed(() => []),
+          ),
+        },
+        { concurrency: "unbounded" },
       )
       if (
         IntegrationConnection.key(connection) !==
@@ -205,7 +226,8 @@ export const GithubCopilotPlugin = define({
         return
       loaded.baseURL = url
       loaded.token = credential.refresh
-      loaded.models = remote
+      loaded.models = remote.models
+      loaded.tiers = remote.tiers
       loaded.connection = connection
     })
 
@@ -220,7 +242,12 @@ export const GithubCopilotPlugin = define({
         evt.add({
           info: item.provider,
           models: Array.from(
-            CopilotModels.derive(loaded.baseURL ?? baseURL(), loaded.models, Array.from(item.models.values())).values(),
+            CopilotModels.derive(
+              loaded.baseURL ?? baseURL(),
+              loaded.models,
+              Array.from(item.models.values()),
+              loaded.tiers,
+            ).values(),
           ),
           sourceConnection: loaded.connection,
         })
@@ -290,6 +317,94 @@ export const GithubCopilotPlugin = define({
         }),
       { providerID: Provider.ID.githubCopilot },
     )
+    const route = Effect.fn("GithubCopilotPlugin.route")(function* (sessionID: Session.ID, tier?: CopilotAuto.Tier) {
+      const models = loaded.models
+      if (!loaded.baseURL || !loaded.token || !models)
+        return yield* Effect.fail(new Error("Copilot Auto is unavailable"))
+      if (tier && !loaded.tiers?.includes(tier))
+        return yield* Effect.fail(new Error(`Copilot Auto tier '${tier}' is unavailable for this account`))
+      // Read delivered input, not the inbox or compacted context. Identical prompts have distinct IDs.
+      const user = yield* sessions
+        .messages({ sessionID, type: "user", order: "desc", limit: 1 })
+        .pipe(Effect.map((messages) => messages.find((message) => message.type === "user")))
+      const now = yield* Clock.currentTimeMillis
+      const cached = routes.get(sessionID)
+      if (cached && cached.messageID === user?.id && cached.tier === tier && cached.route.until > now)
+        return cached.route
+      const provider = yield* providers.get(Provider.ID.githubCopilot)
+      const result = yield* Effect.tryPromise({
+        try: (signal) =>
+          CopilotAuto.route(
+            loaded.baseURL ?? baseURL(),
+            {
+              ...provider?.headers,
+              Authorization: `Bearer ${loaded.token}`,
+              "User-Agent": App.useragent(ctx.app),
+              "X-GitHub-Api-Version": apiVersion,
+            },
+            {
+              prompt: user?.text ?? "",
+              image: user?.files?.some((file) => file.mime.startsWith("image/")) ?? false,
+              tier,
+            },
+            signal,
+          ),
+        catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
+      }).pipe(
+        Effect.flatMap((routed) =>
+          models.has(routed.model)
+            ? Effect.succeed(routed)
+            : Effect.fail(new Error(`Copilot Auto selected an unavailable model: ${routed.model}`)),
+        ),
+        Effect.tapError((cause) => Effect.logWarning("Copilot auto routing failed", { cause })),
+        Effect.catch((error) => {
+          if (tier) return Effect.fail(error)
+          const fallback = Array.from(models.values()).find((model) => model.is_chat_fallback)
+          return fallback
+            ? Effect.succeed({ model: fallback.id, token: undefined, until: now + 5 * 60 * 1000 })
+            : Effect.fail(error)
+        }),
+      )
+      const oldest = routes.keys().next().value
+      if (!routes.has(sessionID) && routes.size >= 100 && oldest) routes.delete(oldest)
+      routes.set(sessionID, { route: result, messageID: user?.id, tier })
+      return result
+    })
+    // Reconsider Auto for each delivered prompt or tier change, keeping tool continuations stable.
+    yield* ctx.session.hook(
+      "model.resolve",
+      (evt) =>
+        Effect.gen(function* () {
+          if (evt.model.id !== CopilotModels.auto) return
+          const tier = CopilotAuto.tiers.find((tier) => tier === evt.model.variant)
+          const selected = yield* routing
+            .withLock(evt.sessionID)(route(evt.sessionID, tier))
+            .pipe(
+              Effect.catch((error) => {
+                evt.error = error.message
+                return Effect.succeed(undefined)
+              }),
+            )
+          if (!selected) return
+          evt.target = Model.ID.make(selected.model)
+          if (!selected.token) return
+          // Bind the model/token pair to this resolution, never to a later session-wide cache lookup.
+          evt.headers = Provider.mergeHeaders(evt.headers, { "Copilot-Session-Token": selected.token })
+          const discount = loaded.models?.get(selected.model)?.billing?.auto_discount
+          if (discount === undefined) return
+          const target = yield* catalog.get(Provider.ID.githubCopilot, evt.target)
+          evt.cost = target?.cost.map((cost) => ({
+            ...cost,
+            input: Money.USDPerMillionTokens.make(cost.input * (1 - discount)),
+            output: Money.USDPerMillionTokens.make(cost.output * (1 - discount)),
+            cache: {
+              read: Money.USDPerMillionTokens.make(cost.cache.read * (1 - discount)),
+              write: Money.USDPerMillionTokens.make(cost.cache.write * (1 - discount)),
+            },
+          }))
+        }),
+      { providerID: Provider.ID.githubCopilot },
+    )
     // GitHub's integration guide designates session naming as a utility scenario served by
     // free, rate-limited utility models. Any failure leaves the result unset so the normal
     // billable title path still runs.
@@ -299,7 +414,9 @@ export const GithubCopilotPlugin = define({
         Effect.gen(function* () {
           if (evt.model.providerID !== Provider.ID.githubCopilot) return
           if (!loaded.baseURL || !loaded.token || !loaded.models) return
-          const agent = yield* ctx.agent.get({ agentID: Agent.ID.make("title") }).pipe(Effect.orElseSucceed(() => undefined))
+          const agent = yield* ctx.agent
+            .get({ agentID: Agent.ID.make("title") })
+            .pipe(Effect.orElseSucceed(() => undefined))
           if (agent?.data.model) return
           const model = utilityTitleModels.find((id) => loaded.models?.has(id))
           if (!model) return
