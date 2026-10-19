@@ -142,7 +142,7 @@ export function DialogIntegration(
         category,
         disabled: methods.length === 0 && credentials.length === 0,
         gutter:
-          integration.connections.length > 0 && !status
+          (integration.connections.length > 0 || integration.configured) && !status
             ? () => <text fg={theme.text.feedback.success.base}>✓</text>
             : undefined,
         onSelect: () => {
