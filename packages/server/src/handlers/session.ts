@@ -5,9 +5,8 @@ import { SessionTransfer } from "@opencode/core/session/transfer"
 import { InstructionEntry } from "@opencode/core/session/instruction-entry"
 import { Form } from "@opencode/core/form"
 import { DateTime, Effect, Stream } from "effect"
-import { HttpApiBuilder, HttpApiSchema } from "effect/unstable/httpapi"
+import { HttpApiBuilder, HttpApiSchema } from "effect/http-api"
 import { Api } from "../api"
-import { SessionsCursor } from "@opencode/protocol/groups/session"
 import {
   ConflictError,
   CommandExecutionError,
@@ -23,9 +22,8 @@ import {
   SkillNotFoundError,
 } from "@opencode/protocol/errors"
 import { AbsolutePath } from "@opencode/core/schema"
+import { locationErrors } from "../location"
 import { failedMessageDecode, failedSnapshot, missingMessage, missingSession } from "./session-error"
-
-const DefaultSessionsLimit = 50
 
 function missingForm(id: Form.ID) {
   return new FormNotFoundError({ id, message: `Form not found: ${id}` })
@@ -60,44 +58,14 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
       .handle(
         "session.list",
         Effect.fn(function* (ctx) {
-          const query =
-            ctx.query.cursor !== undefined
-              ? yield* SessionsCursor.parse(ctx.query.cursor).pipe(
-                  Effect.mapError(() => new InvalidCursorError({ message: "Invalid cursor" })),
-                )
-              : ctx.query
-          const page = yield* session.list({
-            ...query,
-            limit: ctx.query.limit ?? DefaultSessionsLimit,
-          })
-          const sessions = page.data
-          const first = sessions[0]
-          const last = sessions.at(-1)
-          return {
-            data: sessions,
-            cursor: {
-              previous: first
-                ? SessionsCursor.make({
-                    ...query,
-                    anchor: {
-                      id: first.id,
-                      time: DateTime.toEpochMillis(first.time.updated),
-                      direction: "previous",
-                    },
-                  })
-                : undefined,
-              next: last
-                ? SessionsCursor.make({
-                    ...query,
-                    anchor: {
-                      id: last.id,
-                      time: DateTime.toEpochMillis(last.time.updated),
-                      direction: "next",
-                    },
-                  })
-                : undefined,
-            },
-          }
+          return yield* session
+            .list(ctx.query)
+            .pipe(
+              Effect.catchTag(
+                "Session.InvalidListCursorError",
+                (error) => new InvalidCursorError({ message: error.message }),
+              ),
+            )
         }),
       )
       .handle(
@@ -133,9 +101,11 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
                 model: ctx.payload.model,
                 metadata: ctx.payload.metadata,
                 permissions: ctx.payload.permissions,
-                location: ctx.payload.location ?? { directory: AbsolutePath.make(process.cwd()) },
+                ...(ctx.payload.parentID === undefined
+                  ? { location: ctx.payload.location ?? { directory: AbsolutePath.make(process.cwd()) } }
+                  : { parentID: ctx.payload.parentID }),
               })
-              .pipe(Effect.orDie),
+              .pipe(Effect.catchTag("Session.NotFoundError", missingSession)),
           }
         }),
       )
@@ -274,6 +244,10 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
             yield* session
               .setPermissions({ sessionID: ctx.params.sessionID, permissions: ctx.payload.permissions })
               .pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          if (ctx.payload.archived !== undefined)
+            yield* (ctx.payload.archived ? session.archive : session.unarchive)(ctx.params.sessionID).pipe(
+              Effect.catchTag("Session.NotFoundError", missingSession),
+            )
           return HttpApiSchema.NoContent.make()
         }),
       )
@@ -333,6 +307,7 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
                 Effect.catchTag("Session.SkillNotFoundError", (error) =>
                   Effect.fail(new InvalidRequestError({ message: `Skill not found: ${error.skill}`, field: "skills" })),
                 ),
+                locationErrors,
               ),
           }
         }),
@@ -368,6 +343,7 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
                   }),
                 ),
               ),
+              locationErrors,
             )
           return HttpApiSchema.NoContent.make()
         }),
@@ -386,6 +362,7 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
               Effect.catchTag("Session.SkillNotFoundError", (error) =>
                 Effect.fail(new SkillNotFoundError({ skill: error.skill, message: `Skill not found: ${error.skill}` })),
               ),
+              locationErrors,
             )
           return HttpApiSchema.NoContent.make()
         }),
@@ -469,6 +446,7 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
                 Effect.catchTag("Session.MessageNotFoundError", missingMessage),
                 Effect.catchTag("Session.BusyError", busySession),
                 Effect.catchTag("Snapshot.Error", failedSnapshot("stage session revert", ctx.params.sessionID)),
+                locationErrors,
               ),
           }
         }),
@@ -483,6 +461,7 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
               Effect.catchTag("Session.NotFoundError", missingSession),
               Effect.catchTag("Session.BusyError", busySession),
               Effect.catchTag("Snapshot.Error", failedSnapshot("clear session revert", ctx.params.sessionID)),
+              locationErrors,
             )
           return HttpApiSchema.NoContent.make()
         }),
@@ -525,6 +504,7 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
                 (error) => new InvalidRequestError({ message: error.message, field: error.field }),
               ),
               Effect.catchTag("Snapshot.Error", failedSnapshot("diff session turn", ctx.params.sessionID)),
+              locationErrors,
             ),
           }
         }),
@@ -692,7 +672,7 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
         "session.form.cancel",
         Effect.fn(function* (ctx) {
           const owned = yield* requireOwnedForm(ctx.params.sessionID, ctx.params.formID)
-          yield* owned.form.cancel(ctx.params.formID).pipe(
+          yield* owned.form.cancel(ctx.params.formID, { message: ctx.query.message }).pipe(
             Effect.catchTags({
               "Form.AlreadySettledError": (error) =>
                 new FormAlreadySettledError({ id: error.id, message: error.message }),

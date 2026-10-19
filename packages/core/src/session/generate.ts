@@ -1,5 +1,6 @@
 export * as SessionGenerate from "./generate.js"
 
+import type { FileSystem } from "../filesystem.js"
 import { LLMClient, Message, type AIError } from "@opencode/ai"
 import { Effect } from "effect"
 import { Database } from "../database/database.js"
@@ -11,10 +12,16 @@ import type { AgentNotFoundError } from "./error.js"
 import { SessionHistory } from "./history.js"
 import { SessionProviderContext } from "./provider-context.js"
 import { SessionModelRequest } from "./model-request.js"
+import { ModelRetry } from "../model-retry.js"
 import type { SessionRunnerModel } from "./runner/model.js"
 import type { SessionSchema } from "./schema.js"
 
-export type Error = AgentNotFoundError | Instructions.InitializationBlocked | SessionRunnerModel.Error | AIError
+export type Error =
+  | AgentNotFoundError
+  | Instructions.InitializationBlocked
+  | SessionRunnerModel.Error
+  | AIError
+  | FileSystem.DirectoryNotFoundError
 
 /** Generates text from current Session context without mutating the Session. */
 export const generate = Effect.fn("SessionGenerate.generate")(function* (input: {
@@ -60,7 +67,7 @@ export const generate = Effect.fn("SessionGenerate.generate")(function* (input: 
       providerID: model.ref.providerID,
       modelID: model.ref.id,
     })
-    const response = yield* llm.generate(prepared.request, prepared.options)
+    const response = yield* llm.generate(prepared.request, prepared.options).pipe(ModelRetry.retry)
     yield* Effect.logInfo("session generation usage diagnostic", { usage: response.usage })
     return response.text
   }).pipe(instances.provide(input.session))

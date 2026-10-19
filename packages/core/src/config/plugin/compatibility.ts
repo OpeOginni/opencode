@@ -6,9 +6,9 @@ import path from "path"
 import { Effect, FiberMap, PubSub, Semaphore, Stream } from "effect"
 import { Config } from "../../config.js"
 import { Watcher } from "../../filesystem/watcher.js"
-import { AbsolutePath } from "../../schema.js"
 import { Skill } from "../../skill.js"
 import { SkillFile } from "./skill-file.js"
+import { SkillScan } from "./skill-scan.js"
 
 export const Plugin = define({
   id: "opencode.config.compatibility",
@@ -25,7 +25,9 @@ export const Plugin = define({
       target: string,
       type: "file" | "directory",
     ) {
-      const updates = yield* watcher.subscribe({ path: target, type })
+      const updates = yield* watcher.subscribe(
+        type === "directory" ? { path: target, type, ignore: SkillScan.ignore } : { path: target, type },
+      )
       yield* FiberMap.run(
         watches,
         `${type}:${target}`,
@@ -44,10 +46,7 @@ export const Plugin = define({
           const resolved = yield* fs.realPath(directory).pipe(Effect.orElseSucceed(() => undefined))
           if (!resolved) continue
           yield* watch(resolved, "directory")
-          const files = yield* fs
-            .scan("{*.md,**/SKILL.md}", { cwd: resolved, absolute: true, include: "file", symlink: true, dot: true })
-            .pipe(Effect.orElseSucceed(() => [] as string[]))
-          for (const filepath of files.toSorted()) {
+          for (const filepath of yield* SkillScan.scan(resolved)) {
             const content = yield* fs.readFileStringSafe(filepath).pipe(Effect.orElseSucceed(() => undefined))
             if (!content) continue
             const parsed = SkillFile.parse(resolved, filepath, content)

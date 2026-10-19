@@ -1,4 +1,4 @@
-import { describe, expect } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { Cause, Deferred, Effect, Fiber, Layer } from "effect"
 import { Agent } from "@opencode/core/agent"
 import { Database } from "@opencode/core/database/database"
@@ -147,6 +147,14 @@ describe("Permission", () => {
       expect(yield* service.list()).toEqual([])
     }),
   )
+
+  test("matches Windows rule resources against slash-normalized file access resources", () => {
+    const rules: Permission.Ruleset = [
+      { action: "external_directory", resource: "C:\\Users\\x\\proj\\*", effect: "allow" },
+    ]
+    expect(Permission.evaluate("external_directory", "C:/Users/x/proj/src/*", rules).effect).toBe("allow")
+    expect(Permission.evaluate("external_directory", "C:/Users/x/other/*", rules).effect).toBe("ask")
+  })
 
   it.effect("allows managed output reads without granting external directory access", () =>
     Effect.gen(function* () {
@@ -335,6 +343,38 @@ describe("Permission", () => {
       yield* service.assert(assertion({ id: Permission.ID.create("per_next"), resources: ["src/next.ts"] }))
       yield* saved.remove(id)
       expect(yield* saved.list()).toEqual([])
+    }),
+  )
+
+  it.effect("edits saved approvals and enforces the edited rule", () =>
+    Effect.gen(function* () {
+      yield* setup()
+      const saved = yield* PermissionSaved.Service
+      const service = yield* Permission.Service
+      yield* saved.add({ projectID: Project.ID.global, action: "read", resources: ["src/*", "docs/*"] })
+      const src = (yield* saved.list()).find((item) => item.resource === "src/*")
+
+      expect(yield* saved.update({ id: src!.id, resource: "src/allowed.ts" })).toMatchObject({
+        id: src!.id,
+        projectID: Project.ID.global,
+        action: "read",
+        resource: "src/allowed.ts",
+      })
+      expect(
+        yield* service.ask(assertion({ id: Permission.ID.create("per_allowed"), resources: ["src/allowed.ts"] })),
+      ).toMatchObject({ effect: "allow" })
+      expect(
+        yield* service.ask(assertion({ id: Permission.ID.create("per_other"), resources: ["src/other.ts"] })),
+      ).toMatchObject({ effect: "ask" })
+
+      expect(yield* saved.update({ id: src!.id, resource: "docs/*" }).pipe(Effect.flip)).toMatchObject({
+        _tag: "PermissionSaved.ConflictError",
+        id: src!.id,
+        resource: "docs/*",
+      })
+      expect(
+        yield* saved.update({ id: PermissionSaved.ID.make("psv_missing"), action: "edit" }).pipe(Effect.flip),
+      ).toMatchObject({ _tag: "PermissionSaved.NotFoundError" })
     }),
   )
 

@@ -1,5 +1,4 @@
 import { domain } from "./stage"
-import { createWebApp } from "./webapp"
 
 const GITHUB_APP_ID = new sst.Secret("GITHUB_APP_ID")
 const GITHUB_APP_PRIVATE_KEY = new sst.Secret("GITHUB_APP_PRIVATE_KEY")
@@ -14,9 +13,6 @@ const bucket = new sst.cloudflare.Bucket("Bucket")
 export const api = new sst.cloudflare.Worker("Api", {
   domain: `api.${domain}`,
   handler: "packages/function/src/api.ts",
-  environment: {
-    WEB_DOMAIN: domain,
-  },
   url: true,
   link: [
     bucket,
@@ -59,5 +55,3 @@ new sst.cloudflare.x.Astro("Web", {
     VITE_API_URL: api.url.apply((url) => url!),
   },
 })
-
-createWebApp("app." + domain)

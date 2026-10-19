@@ -1,7 +1,7 @@
 import { describe, expect } from "bun:test"
 import { Effect } from "effect"
 import { Evaluation, EvaluationModel, type EvaluationOptions } from "../../src/experimental.js"
-import { OpenCodeZen, OpenRouter, TypeSafeAI } from "../../src/providers.js"
+import { OpenCode, OpenRouter, TypeSafeAI } from "../../src/providers.js"
 import { recordedTests } from "../recorded-test.js"
 
 const questions = {
@@ -32,8 +32,8 @@ const typesafe = recordedTests({
   metadata: { model: "jev-latest" },
 })
 
-const zen = recordedTests({
-  prefix: "opencode-zen-evaluation",
+const opencode = recordedTests({
+  prefix: "opencode-evaluation",
   provider: "opencode",
   protocol: "system-one",
   requires: ["OPENCODE_API_KEY"],
@@ -52,16 +52,14 @@ describe("experimental Evaluation recorded", () => {
   typesafe.effect("evaluates choice score and boolean questions", () =>
     assertEvaluation(
       TypeSafeAI.configure({ apiKey: process.env.TYPESAFE_API_KEY ?? "fixture" }).experimental.evaluation("jev-latest"),
-      "typesafe",
     ),
   )
 
-  zen.effect("evaluates choice score and boolean questions", () =>
+  opencode.effect("evaluates choice score and boolean questions", () =>
     assertEvaluation(
-      OpenCodeZen.configure({ apiKey: process.env.OPENCODE_API_KEY ?? "fixture" }).experimental.evaluation(
+      OpenCode.configure({ apiKey: process.env.OPENCODE_API_KEY ?? "fixture" }).experimental.evaluation(
         "jev-1.13-free",
       ),
-      "opencode",
     ),
   )
 
@@ -70,15 +68,11 @@ describe("experimental Evaluation recorded", () => {
       OpenRouter.configure({ apiKey: process.env.OPENROUTER_API_KEY ?? "fixture" }).experimental.evaluation(
         "typesafe/jev-1.13",
       ),
-      "openrouter",
     ),
   )
 })
 
-const assertEvaluation = <Options extends EvaluationOptions>(
-  model: EvaluationModel<Options>,
-  metadataKey: "typesafe" | "opencode" | "openrouter",
-) =>
+const assertEvaluation = <Options extends EvaluationOptions>(model: EvaluationModel<Options>) =>
   Effect.gen(function* () {
     const response = yield* Evaluation.run({ model, state, questions })
     expect(response.model).toContain("jev-")

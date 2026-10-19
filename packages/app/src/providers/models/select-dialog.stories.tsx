@@ -49,6 +49,7 @@ const models = [
 
 function SelectorStory(props: { plan: boolean }) {
   const [current, setCurrent] = createSignal(models[0].id)
+
   return (
     <div class="flex min-h-[280px] items-end justify-center">
       <ModelSelectorPopoverView
@@ -57,6 +58,7 @@ function SelectorStory(props: { plan: boolean }) {
             {models.find((model) => model.id === current())?.name}
           </Button>
         )}
+        all={() => models}
         models={(search) => models.filter((model) => model.name.toLowerCase().includes(search.toLowerCase()))}
         groups={(items) => [{ category: "openai", items }]}
         current={`openai:${current()}`}
@@ -75,4 +77,5 @@ export default {
 }
 
 export const ChatGPTPlan = { render: () => <SelectorStory plan /> }
+
 export const ApiKey = { render: () => <SelectorStory plan={false} /> }

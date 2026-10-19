@@ -1,6 +1,5 @@
 import { Hono } from "hono"
 import { DurableObject } from "cloudflare:workers"
-import { randomUUID } from "node:crypto"
 import { jwtVerify, createRemoteJWKSet } from "jose"
 import { createAppAuth } from "@octokit/auth-app"
 import { Octokit } from "@octokit/rest"
@@ -10,7 +9,6 @@ import { parseRepositoryClaim } from "./github"
 type Env = {
   SYNC_SERVER: DurableObjectNamespace<SyncServer>
   Bucket: R2Bucket
-  WEB_DOMAIN: string
 }
 
 export class SyncServer extends DurableObject<Env> {
@@ -43,53 +41,11 @@ export class SyncServer extends DurableObject<Env> {
     ws.close(code, "Durable Object is closing WebSocket")
   }
 
-  async publish(key: string, content: any) {
-    const sessionID = await this.getSessionID()
-    if (
-      !key.startsWith(`session/info/${sessionID}`) &&
-      !key.startsWith(`session/message/${sessionID}/`) &&
-      !key.startsWith(`session/part/${sessionID}/`)
-    )
-      return new Response("Error: Invalid key", { status: 400 })
-
-    // store message
-    await this.env.Bucket.put(`share/${key}.json`, JSON.stringify(content), {
-      httpMetadata: {
-        contentType: "application/json",
-      },
-    })
-    await this.ctx.storage.put(key, content)
-    const clients = this.ctx.getWebSockets()
-    console.log("SyncServer publish", key, "to", clients.length, "subscribers")
-    for (const client of clients) {
-      client.send(JSON.stringify({ key, content }))
-    }
-  }
-
-  public async share(sessionID: string) {
-    let secret = await this.getSecret()
-    if (secret) return secret
-    secret = randomUUID()
-
-    await this.ctx.storage.put("secret", secret)
-    await this.ctx.storage.put("sessionID", sessionID)
-
-    return secret
-  }
-
   public async getData() {
     const data = (await this.ctx.storage.list()) as Map<string, any>
     return Array.from(data.entries())
       .filter(([key, _]) => key.startsWith("session/"))
       .map(([key, content]) => ({ key, content }))
-  }
-
-  public async assertSecret(secret: string) {
-    if (secret !== (await this.getSecret())) throw new Error("Invalid secret")
-  }
-
-  private async getSecret() {
-    return this.ctx.storage.get<string>("secret")
   }
 
   private async getSessionID() {
@@ -116,28 +72,6 @@ export class SyncServer extends DurableObject<Env> {
 
 export default new Hono<{ Bindings: Env }>()
   .get("/", (c) => c.text("Hello, world!"))
-  .post("/share_create", async (c) => {
-    const body = await c.req.json<{ sessionID: string }>()
-    const sessionID = body.sessionID
-    const short = SyncServer.shortName(sessionID)
-    const id = c.env.SYNC_SERVER.idFromName(short)
-    const stub = c.env.SYNC_SERVER.get(id)
-    const secret = await stub.share(sessionID)
-    return c.json({
-      secret,
-      url: `https://${c.env.WEB_DOMAIN}/s/${short}`,
-    })
-  })
-  .post("/share_delete", async (c) => {
-    const body = await c.req.json<{ sessionID: string; secret: string }>()
-    const sessionID = body.sessionID
-    const secret = body.secret
-    const id = c.env.SYNC_SERVER.idFromName(SyncServer.shortName(sessionID))
-    const stub = c.env.SYNC_SERVER.get(id)
-    await stub.assertSecret(secret)
-    await stub.clear()
-    return c.json({})
-  })
   .post("/share_delete_admin", async (c) => {
     const body = await c.req.json<{ sessionShortName: string; adminSecret: string }>()
     const sessionShortName = body.sessionShortName
@@ -146,20 +80,6 @@ export default new Hono<{ Bindings: Env }>()
     const id = c.env.SYNC_SERVER.idFromName(sessionShortName)
     const stub = c.env.SYNC_SERVER.get(id)
     await stub.clear()
-    return c.json({})
-  })
-  .post("/share_sync", async (c) => {
-    const body = await c.req.json<{
-      sessionID: string
-      secret: string
-      key: string
-      content: any
-    }>()
-    const name = SyncServer.shortName(body.sessionID)
-    const id = c.env.SYNC_SERVER.idFromName(name)
-    const stub = c.env.SYNC_SERVER.get(id)
-    await stub.assertSecret(body.secret)
-    await stub.publish(body.key, body.content)
     return c.json({})
   })
   .get("/share_poll", async (c) => {

@@ -7,13 +7,18 @@ import { useGlobal } from "@/runtime/server/runtime"
 export type ModelKey = { providerID: string; modelID: string }
 
 type Visibility = "show" | "hide"
+
 const RECENT_LIMIT = 5
+
 // luxon's diffNow().as("months") used an average month; keep the same window.
 const sixMonths = 6 * 30.436875 * 24 * 60 * 60 * 1000
 
 function modelKey(model: ModelKey) {
   return `${model.providerID}:${model.modelID}`
 }
+
+export const isFreeModel = (model: { provider: { id: string }; cost?: { input: number } }) =>
+  model.provider.id === "opencode" && (!model.cost || model.cost.input === 0)
 
 const createModelsController = (directory: Accessor<string | undefined>) => {
   const providers = useProviders(() => directory())
@@ -45,17 +50,20 @@ const createModelsController = (directory: Accessor<string | undefined>) => {
       available(),
       filter((x) => {
         const released = release().get(modelKey({ providerID: x.provider.id, modelID: x.id })) ?? NaN
+
         return Math.abs(Date.now() - released) < sixMonths
       }),
       groupBy((x) => x.provider.id),
       mapValues((models) =>
         pipe(
           models,
-          groupBy((x) => x.family),
+          // A free model shares its family and release date with its paid twin, so group them apart.
+          groupBy((x) => `${x.family}:${isFreeModel(x)}`),
           values(),
           (groups) =>
             groups.flatMap((g) => {
               const first = firstBy(g, [(x) => x.release_date, "desc"])
+
               return first ? [{ modelID: first.id, providerID: first.provider.id }] : []
             }),
         ),
@@ -69,7 +77,9 @@ const createModelsController = (directory: Accessor<string | undefined>) => {
 
   const visibility = createMemo(() => {
     const map = new Map<string, Visibility>()
+
     for (const item of store.user) map.set(`${item.providerID}:${item.modelID}`, item.visibility)
+
     return map
   })
 
@@ -85,19 +95,26 @@ const createModelsController = (directory: Accessor<string | undefined>) => {
 
   function update(model: ModelKey, state: Visibility) {
     const index = store.user.findIndex((x) => x.modelID === model.modelID && x.providerID === model.providerID)
+
     if (index >= 0) {
       setStore("user", index, (current) => ({ ...current, visibility: state }))
+
       return
     }
+
     setStore("user", store.user.length, { ...model, visibility: state })
   }
 
   const visible = (model: ModelKey) => {
     const key = modelKey(model)
     const state = visibility().get(key)
+
     if (state === "hide") return false
+
     if (state === "show") return true
+
     if (latestSet().has(key)) return true
+
     // Models without a parseable release date stay visible.
     return !Number.isFinite(release().get(key) ?? NaN)
   }
@@ -108,6 +125,7 @@ const createModelsController = (directory: Accessor<string | undefined>) => {
 
   const push = (model: ModelKey) => {
     const uniq = uniqueBy([model, ...store.recent], (x) => `${x.providerID}:${x.modelID}`)
+
     if (uniq.length > RECENT_LIMIT) uniq.pop()
     setStore("recent", uniq)
   }
@@ -117,10 +135,13 @@ const createModelsController = (directory: Accessor<string | undefined>) => {
 
   const setVariant = (model: ModelKey, value: string | undefined) => {
     const key = variantKey(model)
+
     if (!store.variant) {
       setStore("variant", { [key]: value ?? "default" })
+
       return
     }
+
     setStore("variant", key, value ?? "default")
   }
 
@@ -144,7 +165,7 @@ const createModelsController = (directory: Accessor<string | undefined>) => {
 export const { use: useModels, provider: ModelsProvider } = createSimpleContext({
   name: "Models",
   gate: false,
-  init: (props: { directory?: string | Accessor<string | undefined> } = {}) => {
-    return createModelsController(() => (typeof props.directory === "function" ? props.directory() : props.directory))
+  init: (props: { directory?: string } = {}) => {
+    return createModelsController(() => props.directory)
   },
 })

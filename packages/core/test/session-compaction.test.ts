@@ -18,6 +18,7 @@ import { SessionRunnerModel } from "@opencode/core/session/runner/model"
 import { SessionTable } from "@opencode/core/session/sql"
 import { SessionStore } from "@opencode/core/session/store"
 import { Session } from "@opencode/core/session"
+import { Location } from "@opencode/core/location"
 import { Project } from "@opencode/core/project"
 import { ProjectTable } from "@opencode/core/project/sql"
 import { App } from "@opencode/core/app"
@@ -87,7 +88,11 @@ const it = testEffect(
       SessionModelRequest.node,
       PluginHooks.node,
     ]),
-    [Bus.node.replace(Bus.configured({ persist: true })), llmClient.replace(client)],
+    [
+      Bus.node.replace(Bus.configured({ persist: true })),
+      llmClient.replace(client),
+      Location.node.replace(Location.boundNode({ directory: AbsolutePath.make("/project") })),
+    ],
   ),
 )
 
@@ -445,6 +450,8 @@ it.effect("manual compaction summarizes short context instead of no-op", () =>
     expect(requests).toHaveLength(1)
     expect(requests[0]?.promptCacheKey).toBe(parentID)
     expect(requests[0]?.http?.headers).toEqual({
+      "x-opencode-session-id": session.id,
+      "x-opencode-parent-session-id": parentID,
       "x-session-affinity": parentID,
       "X-Session-Id": parentID,
       "x-parent-session-id": parentID,
@@ -488,6 +495,46 @@ it.effect("manual compaction summarizes short context instead of no-op", () =>
       { type: Bus.versionedType(SessionEvent.UsageRecorded.type, 1) },
       { type: Bus.versionedType(SessionEvent.Compaction.Ended.type, 1) },
     ])
+  }),
+)
+
+it.effect("compaction lowers the output limit when it sends a request it could not shrink", () =>
+  Effect.gen(function* () {
+    requests = []
+    const session = yield* insertSession(Session.ID.make("ses_unshrinkable_compaction"))
+    // One exchange estimated at 250k tokens, past the 200k window, so no older exchange can be dropped.
+    const messages = [
+      SessionMessage.User.make({
+        id: SessionMessage.ID.create(),
+        type: "user",
+        text: "x".repeat(1_000_000),
+        time: { created: DateTime.makeUnsafe(0) },
+      }),
+    ]
+
+    expect(yield* compactManually(session, messages)).toEqual({ status: "completed" })
+    expect(requests).toHaveLength(1)
+    expect(requests[0]?.generation).toEqual(GenerationOptions.make({ maxTokens: 1_024 }))
+  }),
+)
+
+it.effect("compaction keeps the output limit for a request that fits its target", () =>
+  Effect.gen(function* () {
+    requests = []
+    const session = yield* insertSession(Session.ID.make("ses_fitting_compaction"))
+    // About 170k estimated tokens, under the 180k target, leaving 30k of the 200k window.
+    const messages = [
+      SessionMessage.User.make({
+        id: SessionMessage.ID.create(),
+        type: "user",
+        text: "x".repeat(680_000),
+        time: { created: DateTime.makeUnsafe(0) },
+      }),
+    ]
+
+    expect(yield* compactManually(session, messages)).toEqual({ status: "completed" })
+    expect(requests).toHaveLength(1)
+    expect(requests[0]?.generation).toEqual(GenerationOptions.make({ maxTokens: 20_000 }))
   }),
 )
 

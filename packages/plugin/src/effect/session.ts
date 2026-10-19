@@ -152,13 +152,16 @@ export interface SessionHooks {
 
 export type SessionDomain = Pick<
   SessionApi<unknown>,
+  | "list"
   | "create"
   | "get"
+  | "remove"
   | "switchAgent"
   | "switchModel"
   | "prompt"
   | "generate"
   | "command"
+  | "compact"
   | "synthetic"
   | "interrupt"
   | "update"
