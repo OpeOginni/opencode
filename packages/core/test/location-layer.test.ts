@@ -33,7 +33,6 @@ import { LocationWatcher } from "@opencode/core/filesystem/location-watcher"
 import { Plugin } from "@opencode/core/plugin"
 import { Model } from "@opencode/core/model"
 import { Project } from "@opencode/core/project"
-import { PluginHooks } from "@opencode/core/plugin/hooks"
 import { Provider } from "@opencode/core/provider"
 import { AbsolutePath } from "@opencode/core/schema"
 import { Session } from "@opencode/core/session"
@@ -670,78 +669,6 @@ describe("LocationServiceMap", () => {
             }),
           )
           expect(String(resolved.model.id)).toBe("base")
-        }),
-      ),
-    ),
-  )
-
-  it.live("lets plugins route a selected model to a hidden catalog model", () =>
-    Effect.acquireRelease(
-      Effect.promise(() => tmpdir()),
-      (dir) => Effect.promise(() => dir[Symbol.asyncDispose]()),
-    ).pipe(
-      Effect.flatMap((dir) =>
-        Effect.gen(function* () {
-          const location = Location.Ref.make({ directory: AbsolutePath.make(dir.path) })
-          const resolved = yield* Effect.gen(function* () {
-            const providers = yield* Provider.Service
-            yield* providers.transform((editor) => {
-              editor.update(Provider.ID.make("router"), (provider) => {
-                provider.package = "@opencode/ai/providers/openai"
-              })
-              editor.models.update(Provider.ID.make("router"), Model.ID.make("auto"), () => {})
-              editor.models.update(Provider.ID.make("router"), Model.ID.make("hidden"), (model) => {
-                model.enabled = false
-              })
-            })
-            const hooks = yield* PluginHooks.Service
-            yield* hooks.register("session", "model.resolve", (event) =>
-              Effect.sync(() => {
-                if (event.model.id !== "auto") return
-                event.target = Model.ID.make("hidden")
-                event.headers = { "x-router-token": "request-token" }
-                event.cost = [
-                  {
-                    input: Money.USDPerMillionTokens.make(2.25),
-                    output: Money.USDPerMillionTokens.make(13.5),
-                    cache: { read: Money.USDPerMillionTokens.zero, write: Money.USDPerMillionTokens.zero },
-                  },
-                ]
-              }),
-            )
-            const modelState = yield* Model.Service
-            const models = yield* SessionRunnerModel.Service
-            const session = Session.Info.make({
-              id: Session.ID.make("ses_routed_model"),
-              projectID: Project.ID.global,
-              title: "test",
-              model: { id: Model.ID.make("auto"), providerID: Provider.ID.make("router") },
-              cost: Money.USD.zero,
-              tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
-              time: { created: DateTime.makeUnsafe(0), updated: DateTime.makeUnsafe(0) },
-              location,
-            })
-            const routed = yield* models.resolve(session, modelState.available)
-            expect(routed.model.route.defaults.headers).toMatchObject({ "x-router-token": "request-token" })
-            expect(routed.cost[0]).toMatchObject({ input: 2.25, output: 13.5 })
-            expect(
-              (yield* modelState.get(Provider.ID.make("router"), Model.ID.make("hidden")))?.headers,
-            ).toBeUndefined()
-            yield* hooks.register("session", "model.resolve", (event) =>
-              Effect.sync(() => {
-                event.error = "Routing preference unavailable"
-              }),
-            )
-            expect((yield* models.resolve(session, modelState.available).pipe(Effect.flip)).message).toContain(
-              "Routing preference unavailable",
-            )
-            return routed
-          }).pipe(Effect.scoped, Effect.provide(LocationServiceMap.Service.get(location)))
-
-          expect(resolved.ref).toEqual(
-            Model.Ref.make({ id: Model.ID.make("hidden"), providerID: Provider.ID.make("router") }),
-          )
-          expect(String(resolved.model.id)).toBe("hidden")
         }),
       ),
     ),

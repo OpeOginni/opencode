@@ -1,7 +1,7 @@
 export * as SessionRunnerModel from "./model.js"
 
 import { makeLocationNode } from "@opencode/util/effect/app-node"
-import { LanguageModel } from "@opencode/ai"
+import { HttpOptions, LanguageModel, mergeHttpOptions } from "@opencode/ai"
 import { Provider } from "../../provider.js"
 import { Context, Effect, Layer, Schema } from "effect"
 import { Model } from "../../model.js"
@@ -120,9 +120,10 @@ const layer = Layer.effect(
             event.headers === undefined
               ? resolved.model
               : LanguageModel.update(resolved.model, {
-                  route: resolved.model.route.with({
-                    headers: Provider.mergeHeaders(resolved.model.route.defaults.headers, event.headers),
-                  }),
+                  defaults: {
+                    ...resolved.model.defaults,
+                    http: mergeHttpOptions(resolved.model.defaults?.http, new HttpOptions({ headers: event.headers })),
+                  },
                 }),
         }
       }),

@@ -174,11 +174,17 @@ export const GithubCopilotPlugin = define({
       token?: string
       models?: CopilotModels.Snapshot
       tiers?: readonly CopilotAuto.Tier[]
+      router?: CopilotAuto.Router
       connection?: Effect.Success<ReturnType<typeof ctx.integration.connection.active>>
     } = {}
     const routes = new Map<
       Session.ID,
-      { readonly route: CopilotAuto.Route; readonly messageID?: SessionMessage.ID; readonly tier?: CopilotAuto.Tier }
+      {
+        readonly route: CopilotAuto.Route
+        readonly messageID?: SessionMessage.ID
+        readonly tier?: CopilotAuto.Tier
+        readonly remaining: number
+      }
     >()
     const routing = KeyedMutex.makeUnsafe<Session.ID>()
 
@@ -193,6 +199,7 @@ export const GithubCopilotPlugin = define({
         loaded.token = undefined
         loaded.models = undefined
         loaded.tiers = undefined
+        loaded.router = undefined
         loaded.connection = undefined
         return
       }
@@ -228,6 +235,11 @@ export const GithubCopilotPlugin = define({
       loaded.token = credential.refresh
       loaded.models = remote.models
       loaded.tiers = remote.tiers
+      loaded.router = new CopilotAuto.Router(url, {
+        ...headers,
+        "Openai-Intent": "conversation-edits",
+        "x-initiator": "user",
+      })
       loaded.connection = connection
     })
 
@@ -319,33 +331,36 @@ export const GithubCopilotPlugin = define({
     )
     const route = Effect.fn("GithubCopilotPlugin.route")(function* (sessionID: Session.ID, tier?: CopilotAuto.Tier) {
       const models = loaded.models
-      if (!loaded.baseURL || !loaded.token || !models)
-        return yield* Effect.fail(new Error("Copilot Auto is unavailable"))
+      const router = loaded.router
+      if (!router || !models) return yield* Effect.fail(new Error("Copilot Auto is unavailable"))
       if (tier && !loaded.tiers?.includes(tier))
         return yield* Effect.fail(new Error(`Copilot Auto tier '${tier}' is unavailable for this account`))
       // Read delivered input, not the inbox or compacted context. Identical prompts have distinct IDs.
-      const user = yield* sessions
-        .messages({ sessionID, type: "user", order: "desc", limit: 1 })
-        .pipe(Effect.map((messages) => messages.find((message) => message.type === "user")))
+      const messages = yield* sessions
+        .messages({ sessionID, type: "user", order: "desc", limit: 6 })
+        .pipe(Effect.map((messages) => messages.filter((message) => message.type === "user")))
+      const user = messages[0]
       const now = yield* Clock.currentTimeMillis
       const cached = routes.get(sessionID)
-      if (cached && cached.messageID === user?.id && cached.tier === tier && cached.route.until > now)
-        return cached.route
-      const provider = yield* providers.get(Provider.ID.githubCopilot)
+      const previous = cached && cached.tier === tier && cached.route.until > now ? cached : undefined
+      if (previous) {
+        if (previous.messageID === user?.id || !previous.route.state) return previous.route
+        if (previous.remaining > 0) {
+          routes.set(sessionID, { ...previous, messageID: user?.id, remaining: previous.remaining - 1 })
+          return previous.route
+        }
+      }
       const result = yield* Effect.tryPromise({
         try: (signal) =>
-          CopilotAuto.route(
-            loaded.baseURL ?? baseURL(),
+          router.route(
             {
-              ...provider?.headers,
-              Authorization: `Bearer ${loaded.token}`,
-              "User-Agent": App.useragent(ctx.app),
-              "X-GitHub-Api-Version": apiVersion,
-            },
-            {
-              prompt: user?.text ?? "",
+              prompt: messages
+                .toReversed()
+                .map((message) => message.text)
+                .join("\n\n"),
               image: user?.files?.some((file) => file.mime.startsWith("image/")) ?? false,
               tier,
+              state: previous?.route.state?.state_token,
             },
             signal,
           ),
@@ -357,20 +372,13 @@ export const GithubCopilotPlugin = define({
             : Effect.fail(new Error(`Copilot Auto selected an unavailable model: ${routed.model}`)),
         ),
         Effect.tapError((cause) => Effect.logWarning("Copilot auto routing failed", { cause })),
-        Effect.catch((error) => {
-          if (tier) return Effect.fail(error)
-          const fallback = Array.from(models.values()).find((model) => model.is_chat_fallback)
-          return fallback
-            ? Effect.succeed({ model: fallback.id, token: undefined, until: now + 5 * 60 * 1000 })
-            : Effect.fail(error)
-        }),
       )
       const oldest = routes.keys().next().value
       if (!routes.has(sessionID) && routes.size >= 100 && oldest) routes.delete(oldest)
-      routes.set(sessionID, { route: result, messageID: user?.id, tier })
+      routes.set(sessionID, { route: result, messageID: user?.id, tier, remaining: result.state?.skip_turns ?? 0 })
       return result
     })
-    // Reconsider Auto for each delivered prompt or tier change, keeping tool continuations stable.
+    // Copilot controls when to reconsider; deployments without multi-message state stay session-sticky.
     yield* ctx.session.hook(
       "model.resolve",
       (evt) =>
@@ -387,7 +395,6 @@ export const GithubCopilotPlugin = define({
             )
           if (!selected) return
           evt.target = Model.ID.make(selected.model)
-          if (!selected.token) return
           // Bind the model/token pair to this resolution, never to a later session-wide cache lookup.
           evt.headers = Provider.mergeHeaders(evt.headers, { "Copilot-Session-Token": selected.token })
           const discount = loaded.models?.get(selected.model)?.billing?.auto_discount

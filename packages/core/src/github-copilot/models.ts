@@ -8,7 +8,6 @@ import type { CopilotAuto } from "./auto.js"
 
 const RemoteModel = Schema.Struct({
   model_picker_enabled: Schema.Boolean,
-  is_chat_fallback: Schema.optional(Schema.Boolean),
   id: Schema.String,
   name: Schema.String,
   version: Schema.String,

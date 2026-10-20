@@ -2,9 +2,11 @@ import { AISDK } from "@opencode/core/aisdk"
 import { App } from "@opencode/core/app"
 import { Agent } from "@opencode/schema/agent"
 import { Session } from "@opencode/core/session"
+import { SessionRunnerModel } from "@opencode/core/session/runner/model"
 import { Location } from "@opencode/core/location"
 import { describe, expect, test } from "bun:test"
-import { Effect } from "effect"
+import { Effect, Layer } from "effect"
+import { FetchHttpClient } from "effect/http"
 import { Model } from "@opencode/core/model"
 import { ModelResolver } from "@opencode/core/model-resolver"
 import { Plugin } from "@opencode/core/plugin"
@@ -17,7 +19,8 @@ import {
   GithubCopilotPlugin,
   utilityTitle,
 } from "@opencode/core/plugin/provider/github-copilot"
-import { Message, SystemPart } from "@opencode/ai"
+import { LLM, LLMClient, Message, SystemPart } from "@opencode/ai"
+import { RequestExecutor } from "@opencode/ai/route"
 import { Provider } from "@opencode/core/provider"
 import { Credential } from "@opencode/core/credential"
 import { Database } from "@opencode/core/database/database"
@@ -64,7 +67,7 @@ const modelRequest = Effect.fn(function* (sessionID: Session.ID, kind: SessionRe
 
 const autoFixture = Effect.fn(function* (enabled: boolean) {
   const routed: unknown[] = []
-  const state = { available: true, model: "routed" }
+  const state: { available: boolean; model: string; skip?: number } = { available: true, model: "routed" }
   const remote = (id: string, extra: Record<string, unknown>) => ({
     model_picker_enabled: enabled,
     id,
@@ -85,6 +88,23 @@ const autoFixture = Effect.fn(function* (enabled: boolean) {
         fetch: async (request) => {
           expect(request.headers.get("authorization")).toBe("Bearer copilot-token")
           const path = new URL(request.url).pathname
+          if (path === "/responses") {
+            expect(await request.json()).toMatchObject({ model: "routed" })
+            if (request.headers.get("copilot-session-token") !== `session-token-${routed.length}`)
+              return Response.json({ error: { message: "The requested model is not supported." } }, { status: 400 })
+            return new Response(
+              [
+                { type: "response.created", response: { id: "test", created_at: 0, model: "routed" } },
+                { type: "response.output_item.added", output_index: 0, item: { type: "message", id: "msg_test" } },
+                { type: "response.output_text.delta", item_id: "msg_test", delta: "ok" },
+                { type: "response.output_item.done", output_index: 0, item: { type: "message", id: "msg_test" } },
+                { type: "response.completed", response: { usage: { input_tokens: 1, output_tokens: 1 } } },
+              ]
+                .map((event) => `data: ${JSON.stringify(event)}\n\n`)
+                .join(""),
+              { headers: { "Content-Type": "text/event-stream" } },
+            )
+          }
           if (path === "/models")
             return Response.json({
               data: [
@@ -98,7 +118,6 @@ const autoFixture = Effect.fn(function* (enabled: boolean) {
                   },
                 }),
                 remote("claude", { billing: { auto_discount: 0.1 } }),
-                remote("fallback", { is_chat_fallback: true }),
               ],
             })
           if (path === "/meta")
@@ -118,6 +137,9 @@ const autoFixture = Effect.fn(function* (enabled: boolean) {
             session_token: `session-token-${routed.length}`,
             expires_at: Date.now() / 1000 + 24 * 60 * 60,
             selected_model: { id: state.model },
+            ...(state.skip === undefined
+              ? {}
+              : { hydra_rl_multi_turn: { state_token: `state-${routed.length}`, skip_turns: state.skip } }),
           })
         },
       }),
@@ -156,7 +178,19 @@ const autoFixture = Effect.fn(function* (enabled: boolean) {
         ...(variant ? { variant: Model.VariantID.make(variant) } : {}),
       }),
     })
-  return { routed, state, models, resolve, ids: yield* sessions() }
+  const ids = yield* sessions()
+  const inbox = yield* SessionInbox.make()
+  const database = yield* Database.Service
+  const bus = yield* Bus.Service
+  const deliver = Effect.fn(function* (text: string) {
+    yield* inbox.admit({
+      id: SessionMessage.ID.create(),
+      sessionID: ids.parent,
+      item: { type: "user", payload: { text }, delivery: "steer" },
+    })
+    yield* SessionInbox.promote(database.db, bus, ids.parent, "input")
+  })
+  return { routed, state, models, resolve, deliver, ids }
 })
 
 describe("GithubCopilotPlugin", () => {
@@ -749,35 +783,26 @@ describe("GithubCopilotPlugin", () => {
   it.live("shares an Auto-only account's model/token pair across concurrent resolution", () =>
     Effect.gen(function* () {
       const fixture = yield* autoFixture(false)
-      expect(
-        (yield* fixture.models.available()).filter((model) => model.providerID === Provider.ID.githubCopilot),
-      ).toEqual([expect.objectContaining({ id: "auto" })])
       // The title and the main request resolve a new Session's model concurrently.
       const concurrent = yield* Effect.all([fixture.resolve(fixture.ids.parent), fixture.resolve(fixture.ids.parent)], {
         concurrency: "unbounded",
       })
-      expect(concurrent[0]).toMatchObject({ target: "routed", headers: { "Copilot-Session-Token": "session-token-1" } })
+      expect(concurrent[0]).toMatchObject({
+        target: "routed",
+        headers: { "Copilot-Session-Token": "session-token-1" },
+      })
       expect(concurrent[1]).toEqual(concurrent[0])
-      expect(fixture.routed).toEqual([{ prompt: "" }])
-      fixture.state.available = false
-      expect((yield* fixture.resolve(fixture.ids.child)).target).toBe(Model.ID.make("fallback"))
+      yield* fixture.deliver("A new prompt")
+      expect(yield* fixture.resolve(fixture.ids.parent)).toEqual(concurrent[0])
+      expect(fixture.routed).toHaveLength(1)
     }),
   )
 
-  it.live("reroutes paid Auto on delivered input and tier changes without altering manual models", () =>
+  it.live("follows Copilot's routing skip window and resets it on tier changes", () =>
     Effect.gen(function* () {
       const fixture = yield* autoFixture(true)
-      const inbox = yield* SessionInbox.make()
-      const database = yield* Database.Service
-      const bus = yield* Bus.Service
-      const admit = (delivery: "steer" | "queue") =>
-        inbox.admit({
-          id: SessionMessage.ID.create(),
-          sessionID: fixture.ids.parent,
-          item: { type: "user", payload: { text: "Review this" }, delivery },
-        })
-      yield* admit("steer")
-      yield* SessionInbox.promote(database.db, bus, fixture.ids.parent, "input")
+      fixture.state.skip = 2
+      yield* fixture.deliver("Review this")
       const first = yield* fixture.resolve(fixture.ids.parent, "efficiency")
       expect(first).toMatchObject({
         target: "routed",
@@ -787,24 +812,41 @@ describe("GithubCopilotPlugin", () => {
       expect(yield* fixture.models.get(Provider.ID.githubCopilot, Model.ID.make("routed"))).toMatchObject({
         cost: [{ input: 2.5 }],
       })
-      yield* admit("queue")
-      expect((yield* fixture.resolve(fixture.ids.parent, "efficiency")).headers).toEqual(first.headers)
-      expect(fixture.routed).toHaveLength(1)
-      yield* SessionInbox.promote(database.db, bus, fixture.ids.parent, "input")
       fixture.state.model = "claude"
+      for (const text of ["Follow up", "Third"]) {
+        yield* fixture.deliver(text)
+        expect(yield* fixture.resolve(fixture.ids.parent, "efficiency")).toEqual(first)
+        expect(yield* fixture.resolve(fixture.ids.parent, "efficiency")).toEqual(first)
+      }
+      expect(fixture.routed).toHaveLength(1)
+      yield* fixture.deliver("Different task")
       const second = yield* fixture.resolve(fixture.ids.parent, "efficiency")
       expect(second).toMatchObject({ target: "claude", headers: { "Copilot-Session-Token": "session-token-2" } })
-      const intelligence = yield* fixture.resolve(fixture.ids.parent, "intelligence")
-      expect(intelligence.headers).toEqual({ "Copilot-Session-Token": "session-token-3" })
-      expect((yield* fixture.resolve(fixture.ids.parent, "efficiency")).headers).toEqual({
+      expect(fixture.routed[1]).toMatchObject({
+        prompt: "Review this\n\nFollow up\n\nThird\n\nDifferent task",
+        hydra_rl_multi_turn: { state_token: "state-1" },
+      })
+      expect(fixture.routed[1]).not.toHaveProperty("multi_turn")
+      for (const text of ["Fifth", "Sixth", "Seventh"]) {
+        yield* fixture.deliver(text)
+        yield* fixture.resolve(fixture.ids.parent, "efficiency")
+      }
+      expect(fixture.routed).toHaveLength(3)
+      expect(fixture.routed[2]).toMatchObject({
+        prompt: "Follow up\n\nThird\n\nDifferent task\n\nFifth\n\nSixth\n\nSeventh",
+        hydra_rl_multi_turn: { state_token: "state-2" },
+      })
+      expect((yield* fixture.resolve(fixture.ids.parent, "intelligence")).headers).toEqual({
         "Copilot-Session-Token": "session-token-4",
       })
-      expect(fixture.routed).toMatchObject([
-        { prompt: "Review this", tier: "efficiency" },
-        { prompt: "Review this", tier: "efficiency" },
-        { prompt: "Review this", tier: "intelligence" },
-        { prompt: "Review this", tier: "efficiency" },
-      ])
+      expect(fixture.routed[3]).toMatchObject({
+        tier: "intelligence",
+        multi_turn: { routing_intent: "anchor", turns_since_anchor: 0 },
+        hydra_rl_multi_turn: {},
+      })
+      expect((yield* fixture.resolve(fixture.ids.parent, "efficiency")).headers).toEqual({
+        "Copilot-Session-Token": "session-token-5",
+      })
       expect(yield* fixture.resolve(fixture.ids.parent, undefined, "claude")).not.toHaveProperty("headers")
       expect((yield* fixture.resolve(fixture.ids.parent, "balance")).error).toContain("unavailable")
       fixture.state.available = false
@@ -812,6 +854,26 @@ describe("GithubCopilotPlugin", () => {
       fixture.state.available = true
       fixture.state.model = "unknown"
       expect((yield* fixture.resolve(fixture.ids.parent, "intelligence")).error).toContain("unavailable model")
+    }),
+  )
+
+  it.live("sends the Auto routing token on the actual Copilot inference request", () =>
+    Effect.gen(function* () {
+      const fixture = yield* autoFixture(false)
+      const service = yield* Session.Service
+      const runner = yield* SessionRunnerModel.Service
+      const session = required(yield* service.get(fixture.ids.parent))
+      const resolved = yield* runner.resolve(
+        { ...session, model: Model.Ref.make({ providerID: Provider.ID.githubCopilot, id: Model.ID.make("auto") }) },
+        fixture.models.available,
+      )
+      expect(resolved.ref.id).toBe(Model.ID.make("routed"))
+      const response = yield* LLM.generate({ model: resolved.model, prompt: "Hello" }).pipe(
+        Effect.provide(
+          LLMClient.layer.pipe(Layer.provide(RequestExecutor.layer), Layer.provide(FetchHttpClient.layer)),
+        ),
+      )
+      expect(response.text).toBe("ok")
     }),
   )
 
