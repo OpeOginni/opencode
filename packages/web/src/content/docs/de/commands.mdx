@@ -163,7 +163,7 @@ Dies ersetzt:
 
 ### Shell-Ausgabe
 
-Verwenden Sie _!`command`_, um die Ausgabe [bash command](/docs/tui#bash-commands) in Ihre Eingabeaufforderung einzufügen.
+Verwenden Sie _!`command`_, um die Ausgabe [shell command](/docs/tui#shell-commands) in Ihre Eingabeaufforderung einzufügen.
 
 So erstellen Sie beispielsweise einen benutzerdefinierten Befehl, der die Testabdeckung analysiert:
 

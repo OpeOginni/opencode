@@ -162,7 +162,7 @@ Celui-ci remplace :
 
 ### Sortie du shell
 
-Utilisez _!`command`_ pour injecter la sortie [bash command](/docs/tui#bash-commands) dans votre prompt.
+Utilisez _!`command`_ pour injecter la sortie [shell command](/docs/tui#shell-commands) dans votre prompt.
 
 Par exemple, pour créer une commande personnalisée qui analyse la couverture des tests :
 

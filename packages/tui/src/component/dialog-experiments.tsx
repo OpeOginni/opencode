@@ -1,5 +1,5 @@
 import { createMemo, createSignal } from "solid-js"
-import { useConfig } from "../config"
+import { useConfig, useNewDesigns } from "../config"
 import { DIALOG_LIST_INSET } from "../ui/dialog"
 import { DialogSelect } from "../ui/dialog-select"
 import { useTheme } from "../context/theme"
@@ -24,6 +24,7 @@ export const experiments: Experiment[] = [
 
 export function DialogExperiments() {
   const config = useConfig()
+  const newDesigns = useNewDesigns()
   const theme = useTheme()
   const toast = useToast()
   const [selected, setSelected] = createSignal<Experiment>()
@@ -67,7 +68,7 @@ export function DialogExperiments() {
           <text fg={theme.text.muted}>No experiments available</text>
         </box>
       }
-      footerHints={experiments.length > 0 ? [{ title: "change", label: "←/→" }] : []}
+      footerHints={experiments.length > 0 && !newDesigns() ? [{ title: "change", label: "←/→" }] : []}
       bindings={
         experiments.length > 0
           ? [

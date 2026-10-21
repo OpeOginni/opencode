@@ -218,7 +218,7 @@ opencode run "Hello world"
   "$schema": "https://opencode.ai/config.json",
   "tools": {
     "write": false,
-    "bash": false
+    "shell": false
   }
 }
 ```
@@ -445,14 +445,14 @@ OpenCode 啟動時會自動下載新版本。您可以使用 `autoupdate` 選項
 
 預設情況下，OpenCode **允許所有操作**，無需明確批准。您可以使用 `permission` 選項變更此行為。
 
-例如，要讓 `edit` 和 `bash` 工具需要使用者確認：
+例如，要讓 `edit` 和 `shell` 工具需要使用者確認：
 
 ```json title="opencode.json"
 {
   "$schema": "https://opencode.ai/config.json",
   "permission": {
     "edit": "ask",
-    "bash": "ask"
+    "shell": "ask"
   }
 }
 ```

@@ -49,11 +49,12 @@ The current list of models includes:
 - **LongCat-2.0**
 - **LongCat 2.5 Preview Free** (limited time)
 - **Step 5 Preview**
-- **Cat Jam Free** (limited time, limited regions)
+- **Beam Free** (limited time, limited regions)
 - **MiMo-V2.6-Flash**
 - **MiMo-V2.6-Pro**
 - **MiMo-V2.5**
 - **MiMo-V2.5-Pro**
+- **MiniMax M3.1 Flash Free** (limited time)
 - **MiniMax M3**
 - **Muse Spark 1.3 Contributor** ([limited regions](https://ai.developer.meta.com/legal/geographic-use-policy))
 - **Muse Spark 1.2 Contributor** ([limited regions](https://ai.developer.meta.com/legal/geographic-use-policy))
@@ -64,7 +65,6 @@ The current list of models includes:
 - **DeepSeek V4 Pro**
 - **Hy4 preview**
 - **Hy3**
-- **Space Bunny**
 
 The list of models may change as we test and add new ones.
 
@@ -82,14 +82,16 @@ Your client should:
 3. Send a stable session ID in `x-opencode-session` for each conversation so we can optimize routing and
    prompt caching.
 
+See [Harnesses](/console/harnesses) to set up Go in Claude Code, Codex, Hermes, Pi, and Raycast.
+
 ### Validated clients
 
 Besides OpenCode, the following clients have been validated to work properly
-with OpenCode Go. Although we do not guarantee that they will continue to work in the future.
+with OpenCode Go, although we do not guarantee that they will continue to work in the future.
 
 | Client            | Session support                                                                                                                                                                                                                             |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Hermes**        | Builds containing [PR #101864](https://github.com/NousResearch/hermes-agent/pull/101864) send the header on main and auxiliary OpenCode requests. The fix was merged after v0.21.0; that release alone does not include it.                 |
+| **Hermes**        | Update to **v0.21.6 or later**, which sends the header on main and auxiliary OpenCode requests ([PR #101864](https://github.com/NousResearch/hermes-agent/pull/101864)).                                                                    |
 | **Claude Code**   | Go recognizes its native session header. No custom-header wrapper is needed.                                                                                                                                                                |
 | **Codex**         | Go recognizes its native session header. Some versions and proxy setups still omit it; preserve the session header when forwarding requests.                                                                                                |
 | **ZCode**         | Go recognizes its native session header. Our [request for `x-opencode-session`](https://github.com/zai-org/feedback/issues/492) remains open, but it is no longer necessary to send that specific header.                                   |
@@ -134,12 +136,13 @@ Token prices are per 1M tokens.
     | Kimi K2.7 Code                          | $0.95  | $4.00  | $0.19       | -            | **$60**                                               |
     | LongCat-2.0                             | $0.30  | $1.20  | $0.006      | -            | **$60**                                               |
     | LongCat 2.5 Preview Free                | Free   | Free   | Free        | -            | **Unlimited**<br /><small>limited time</small>        |
-    | Step 5 Preview                          | $1.00  | $2.70  | $0.10       | -            | ~~$15~~ **$60**<br /><small>4x · Limited time</small> |
-    | Cat Jam Free                            | Free   | Free   | Free        | -            | **Unlimited**<br /><small>limited time</small>        |
+    | Step 5 Preview                          | $1.00  | $2.70  | $0.10       | -            | **$15**                                               |
+    | Beam Free                               | Free   | Free   | Free        | -            | **Unlimited**<br /><small>limited time</small>        |
     | MiMo-V2.6-Flash                         | $0.14  | $0.28  | $0.0028     | -            | **$60**                                               |
     | MiMo-V2.6-Pro                           | $0.435 | $0.87  | $0.003625   | -            | **$15**                                               |
     | MiMo-V2.5                               | $0.14  | $0.28  | $0.0028     | -            | **$60**                                               |
     | MiMo-V2.5-Pro                           | $0.435 | $0.87  | $0.003625   | -            | **$15**                                               |
+    | MiniMax M3.1 Flash Free                 | Free   | Free   | Free        | -            | **Unlimited**<br /><small>limited time</small>        |
     | MiniMax M3                              | $0.30  | $1.20  | $0.06       | -            | **$60**                                               |
     | Muse Spark 1.3 Contributor              | $0.10  | $0.20  | $0.002      | -            | **$60**                                               |
     | Muse Spark 1.2 Contributor              | $0.10  | $0.20  | $0.002      | -            | **$60**                                               |
@@ -153,7 +156,6 @@ Token prices are per 1M tokens.
     | DeepSeek V4 Pro (Peak)                  | $1.32  | $3.96  | $0.044      | -            | **$15**                                               |
     | Hy4 preview                             | $0.834 | $2.501 | $0.042      | -            | **$30**                                               |
     | Hy3                                     | $0.14  | $0.58  | $0.035      | -            | **$60**                                               |
-    | Space Bunny                             | $0.15  | $0.60  | $0.03       | -            | **$30**                                               |
     | Grok 4.7 (≤ 200K tokens)                | $2.00  | $6.00  | $0.50       | -            | **$15**                                               |
     | Grok 4.7 (> 200K tokens)                | $4.00  | $12.00 | $1.00       | -            | **$15**                                               |
     | GPT 6 Luna (≤ 272K tokens)              | $0.10  | $0.50  | $0.01       | $0.125       | **$15**                                               |
@@ -176,12 +178,13 @@ Token prices are per 1M tokens.
     | Kimi K2.7 Code                          | $0.95  | $4.00  | $0.19       | -            | **$180**                                                |
     | LongCat-2.0                             | $0.30  | $1.20  | $0.006      | -            | **$240**                                                |
     | LongCat 2.5 Preview Free                | Free   | Free   | Free        | -            | **Unlimited**<br /><small>limited time</small>          |
-    | Step 5 Preview                          | $1.00  | $2.70  | $0.10       | -            | ~~$60~~ **$240**<br /><small>4x · Limited time</small>  |
-    | Cat Jam Free                            | Free   | Free   | Free        | -            | **Unlimited**<br /><small>limited time</small>          |
+    | Step 5 Preview                          | $1.00  | $2.70  | $0.10       | -            | **$60**                                                 |
+    | Beam Free                               | Free   | Free   | Free        | -            | **Unlimited**<br /><small>limited time</small>          |
     | MiMo-V2.6-Flash                         | $0.14  | $0.28  | $0.0028     | -            | **$120**                                                |
     | MiMo-V2.6-Pro                           | $0.435 | $0.87  | $0.003625   | -            | **$60**                                                 |
     | MiMo-V2.5                               | $0.14  | $0.28  | $0.0028     | -            | **$120**                                                |
     | MiMo-V2.5-Pro                           | $0.435 | $0.87  | $0.003625   | -            | **$60**                                                 |
+    | MiniMax M3.1 Flash Free                 | Free   | Free   | Free        | -            | **Unlimited**<br /><small>limited time</small>          |
     | MiniMax M3                              | $0.30  | $1.20  | $0.06       | -            | **$180**                                                |
     | Muse Spark 1.3 Contributor              | $0.10  | $0.20  | $0.002      | -            | **$120**                                                |
     | Muse Spark 1.2 Contributor              | $0.10  | $0.20  | $0.002      | -            | **$120**                                                |
@@ -195,7 +198,6 @@ Token prices are per 1M tokens.
     | DeepSeek V4 Pro (Peak)                  | $1.32  | $3.96  | $0.044      | -            | **$60**                                                 |
     | Hy4 preview                             | $0.834 | $2.501 | $0.042      | -            | **$120**                                                |
     | Hy3                                     | $0.14  | $0.58  | $0.035      | -            | **$240**                                                |
-    | Space Bunny                             | $0.15  | $0.60  | $0.03       | -            | **$120**                                                |
     | Grok 4.7 (≤ 200K tokens)                | $2.00  | $6.00  | $0.50       | -            | **$60**                                                 |
     | Grok 4.7 (> 200K tokens)                | $4.00  | $12.00 | $1.00       | -            | **$60**                                                 |
     | GPT 6 Luna (≤ 272K tokens)              | $0.10  | $0.50  | $0.01       | $0.125       | **$60**                                                 |
@@ -211,7 +213,9 @@ Token prices are per 1M tokens.
 
 **LongCat 2.5 Preview Free:** Free for a limited time.
 
-**Cat Jam Free:** Free for a limited time. Not available in Angola, Belarus, Cambodia, China (including Hong Kong and Macau), Cuba, the Democratic Republic of the Congo, Equatorial Guinea, Iran, Iraq, Laos, Libya, Nigeria, North Korea, Russia, Syria, Turkmenistan, Uzbekistan, Venezuela, or the Crimea, Donetsk, and Luhansk regions of Ukraine.
+**MiniMax M3.1 Flash Free:** Free for a limited time.
+
+**Beam Free:** Free for a limited time. Not available in Angola, Belarus, Cambodia, China (including Hong Kong and Macau), Cuba, the Democratic Republic of the Congo, Equatorial Guinea, Iran, Iraq, Laos, Libya, Nigeria, North Korea, Russia, Syria, Turkmenistan, Uzbekistan, Venezuela, or the Crimea, Donetsk, and Luhansk regions of Ukraine.
 
 **DeepSeek V4.1 Flash / V4 Pro:** Peak hours are 01:00-04:00 and 06:00-10:00 UTC, Monday through Friday; all other hours, including weekends, are Off-Peak. [Learn more](https://api-docs.deepseek.com/quick_start/pricing/).
 
@@ -232,12 +236,13 @@ Plus estimates scale with each model's higher usage limit.
     | Kimi K2.7 Code                                                   | 1,350                | 3,380                  | 6,750                    |
     | LongCat-2.0                                                      | 11,400               | 28,600                 | 57,200                   |
     | LongCat 2.5 Preview Free                                         | Unlimited            | Unlimited              | Unlimited                |
-    | Step 5 Preview<br /><small>4x · Limited time</small>             | ~~430~~<br />**1,720** | ~~1,070~~<br />**4,280** | ~~2,130~~<br />**8,520** |
-    | Cat Jam Free                                                     | Unlimited            | Unlimited              | Unlimited                |
+    | Step 5 Preview                                                   | 430                  | 1,070                  | 2,130                    |
+    | Beam Free                                                        | Unlimited            | Unlimited              | Unlimited                |
     | MiMo-V2.6-Flash                                                  | 30,100               | 75,200                 | 150,400                  |
     | MiMo-V2.6-Pro                                                    | 3,250                | 8,150                  | 16,300                   |
     | MiMo-V2.5                                                        | 30,100               | 75,200                 | 150,400                  |
     | MiMo-V2.5-Pro                                                    | 3,250                | 8,150                  | 16,300                   |
+    | MiniMax M3.1 Flash Free                                          | Unlimited            | Unlimited              | Unlimited                |
     | MiniMax M3                                                       | 3,200                | 8,000                  | 16,000                   |
     | Muse Spark 1.3 Contributor                                       | 45,300               | 113,300                | 226,600                  |
     | Muse Spark 1.2 Contributor                                       | 45,300               | 113,300                | 226,600                  |
@@ -248,7 +253,6 @@ Plus estimates scale with each model's higher usage limit.
     | DeepSeek V4 Pro                                                  | 1,050                | 2,600                  | 5,200                    |
     | Hy4 preview                                                      | 1,350                | 3,380                  | 6,770                    |
     | Hy3                                                              | 4,300                | 10,750                 | 21,500                   |
-    | Space Bunny                                                      | 3,130                | 7,810                  | 15,630                   |
     | Grok 4.7                                                         | 169                  | 423                    | 845                      |
     | GPT 6 Luna                                                       | 4,230                | 10,560                 | 21,130                   |
     | GPT 5.6 Luna                                                     | 2,050                | 5,100                  | 10,250                   |
@@ -267,12 +271,13 @@ Plus estimates scale with each model's higher usage limit.
     | Kimi K2.7 Code                                                   | 4,050                  | 10,140                   | 20,250                   |
     | LongCat-2.0                                                      | 45,600                 | 114,400                  | 228,800                  |
     | LongCat 2.5 Preview Free                                         | Unlimited              | Unlimited                | Unlimited                |
-    | Step 5 Preview<br /><small>4x · Limited time</small>             | ~~1,720~~<br />**6,880** | ~~4,280~~<br />**17,120** | ~~8,520~~<br />**34,080** |
-    | Cat Jam Free                                                     | Unlimited              | Unlimited                | Unlimited                |
+    | Step 5 Preview                                                   | 1,720                  | 4,280                    | 8,520                    |
+    | Beam Free                                                        | Unlimited              | Unlimited                | Unlimited                |
     | MiMo-V2.6-Flash                                                  | 60,200                 | 150,400                  | 300,800                  |
     | MiMo-V2.6-Pro                                                    | 13,000                 | 32,600                   | 65,200                   |
     | MiMo-V2.5                                                        | 60,200                 | 150,400                  | 300,800                  |
     | MiMo-V2.5-Pro                                                    | 13,000                 | 32,600                   | 65,200                   |
+    | MiniMax M3.1 Flash Free                                          | Unlimited              | Unlimited                | Unlimited                |
     | MiniMax M3                                                       | 9,600                  | 24,000                   | 48,000                   |
     | Muse Spark 1.3 Contributor                                       | 90,600                 | 226,600                  | 453,200                  |
     | Muse Spark 1.2 Contributor                                       | 90,600                 | 226,600                  | 453,200                  |
@@ -283,7 +288,6 @@ Plus estimates scale with each model's higher usage limit.
     | DeepSeek V4 Pro                                                  | 4,200                  | 10,400                   | 20,800                   |
     | Hy4 preview                                                      | 5,400                  | 13,520                   | 27,080                   |
     | Hy3                                                              | 17,200                 | 43,000                   | 86,000                   |
-    | Space Bunny                                                      | 12,500                 | 31,250                   | 62,500                   |
     | Grok 4.7                                                         | 676                    | 1,692                    | 3,380                    |
     | GPT 6 Luna                                                       | 16,920                 | 42,240                   | 84,520                   |
     | GPT 5.6 Luna                                                     | 8,200                  | 20,400                   | 41,000                   |
@@ -319,7 +323,6 @@ The estimates use the following token counts per request; actual usage varies.
 - Qwen3.7 Plus — 500 input, 57,000 cached, 190 output tokens per request
 - Hy4 preview — 830 input, 71,500 cached, 295 output tokens per request
 - Hy3 — 830 input, 71,500 cached, 295 output tokens per request
-- Space Bunny — 1,000 input, 55,000 cached, 200 output tokens per request
 
 You can track your current usage in the [console](https://opencode.ai/console).
 
@@ -331,8 +334,8 @@ Usage limits may change as we learn from early usage and feedback.
 
 ### Usage beyond limits
 
-If you also have credits in your Console balance, you can enable the **Use balance**
-option in the console. When enabled, Go will fall back to your [pay-as-you-go balance](/console/models#pricing)
+If you also have credits in your Console balance, you can turn on **Extra usage** on the
+**Overview** credits card. When enabled, Go will fall back to your [pay-as-you-go balance](/console/models#pricing)
 after you've reached your usage limits instead of blocking requests.
 
 ### Why some models have lower usage
@@ -378,10 +381,10 @@ You can also access Go models through the following API endpoints.
 | Qwen3.7 Plus               | qwen3.7-plus               | `https://opencode.ai/inference/go/anthropic/v1/messages`                           | `@ai-sdk/anthropic`         |
 | Hy4 preview                | hy4-preview                | `https://opencode.ai/inference/go/openai/v1/chat/completions`                      | `@ai-sdk/openai-compatible` |
 | Hy3                        | hy3                        | `https://opencode.ai/inference/go/openai/v1/chat/completions`                      | `@ai-sdk/openai-compatible` |
-| Space Bunny                | space-bunny                | `https://opencode.ai/inference/go/openai/v1/chat/completions`                      | `@ai-sdk/openai-compatible` |
+| MiniMax M3.1 Flash Free    | minimax-m3.1-flash-free    | `https://opencode.ai/inference/go/openai/v1/chat/completions`                      | `@ai-sdk/openai-compatible` |
 | LongCat 2.5 Preview Free   | longcat-2.5-preview-free   | `https://opencode.ai/inference/go/openai/v1/chat/completions`                      | `@ai-sdk/openai-compatible` |
 | Step 5 Preview             | step-5-preview             | `https://opencode.ai/inference/go/openai/v1/chat/completions`                      | `@ai-sdk/openai-compatible` |
-| Cat Jam Free               | cat-jam-free               | `https://opencode.ai/inference/go/openai/v1/chat/completions`                      | `@ai-sdk/openai-compatible` |
+| Beam Free                  | beam-free                  | `https://opencode.ai/inference/go/openai/v1/chat/completions`                      | `@ai-sdk/openai-compatible` |
 
 </div>
 
@@ -432,10 +435,10 @@ curl https://opencode.ai/inference/go/v1/models
 | DeepSeek V4 Pro              | Not used       | 0 days\*       |
 | Hy4 preview                  | Not used       | 0 days         |
 | Hy3                          | Not used       | 0 days         |
-| Space Bunny                  | Not used       | 0 days         |
+| MiniMax M3.1 Flash Free      | Not used       | 0 days         |
 | LongCat 2.5 Preview Free     | Not used       | 0 days         |
 | Step 5 Preview               | Not used       | 0 days         |
-| Cat Jam Free                 | Not used       | 30 days        |
+| Beam Free                    | Not used       | 30 days        |
 
 - **Grok 4.7:** ZDR disables important API features that depend on stored data, including the stateful Responses API, Files and Collections, and the Batch API. [Learn more](https://docs.x.ai/developers/faq/security#what-is-zero-data-retention-zdr).
 - **GPT 6 Luna / GPT 5.6 Luna:** Abuse monitoring logs are generated for all API feature usage and retained for up to 30 days. [Learn more](https://developers.openai.com/api/docs/guides/your-data#data-retention-controls-for-abuse-monitoring).

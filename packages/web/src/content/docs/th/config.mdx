@@ -220,7 +220,7 @@ opencode run "Hello world"
   "$schema": "https://opencode.ai/config.json",
   "tools": {
     "write": false,
-    "bash": false
+    "shell": false
   }
 }
 ```
@@ -447,14 +447,14 @@ OpenCode จะดาวน์โหลดการอัปเดตใหม�
 
 ตามค่าเริ่มต้น opencode **อนุญาตการดำเนินการทั้งหมด** โดยไม่ต้องมีการอนุมัติอย่างชัดเจน คุณสามารถเปลี่ยนสิ่งนี้ได้โดยใช้ตัวเลือก `permission`
 
-ตัวอย่างเช่น เพื่อให้แน่ใจว่าเครื่องมือ `edit` และ `bash` ต้องได้รับการอนุมัติจากผู้ใช้:
+ตัวอย่างเช่น เพื่อให้แน่ใจว่าเครื่องมือ `edit` และ `shell` ต้องได้รับการอนุมัติจากผู้ใช้:
 
 ```json title="opencode.json"
 {
   "$schema": "https://opencode.ai/config.json",
   "permission": {
     "edit": "ask",
-    "bash": "ask"
+    "shell": "ask"
   }
 }
 ```

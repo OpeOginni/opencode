@@ -233,6 +233,7 @@ function modelInfo(
       tools: model.tool_call,
       input: [...(model.modalities?.input ?? [])],
       output: [...(model.modalities?.output ?? [])],
+      temperature: model.temperature,
     },
     variants: [...(input.variants ?? [])],
     time: { released: released(model.release_date) },
@@ -419,7 +420,7 @@ export const layer = (options?: Options) =>
               yield* decodeCatalog(text)
               yield* writeCache(text, digest)
               yield* invalidate
-              yield* bus.publish(ModelsDev.Event.Refreshed, {})
+              yield* bus.publish(ModelsDev.Event.Refreshed, {}, { global: true })
             }),
           )
           .pipe(

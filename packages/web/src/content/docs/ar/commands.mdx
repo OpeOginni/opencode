@@ -162,7 +162,7 @@ with the following content: $3
 
 ### خرج shell
 
-استخدم _!`command`_ لحقن خرج [أمر bash](/docs/tui#bash-commands) داخل مُطالبتك.
+استخدم _!`command`_ لحقن خرج [أمر shell](/docs/tui#shell-commands) داخل مُطالبتك.
 
 على سبيل المثال، لإنشاء أمر مخصص يُحلل تغطية الاختبارات:
 

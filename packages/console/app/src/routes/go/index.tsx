@@ -9,7 +9,6 @@ import { Legal } from "~/component/legal"
 import { Footer } from "~/component/footer"
 import { Header } from "~/component/header"
 import { GoPlanChart } from "~/component/go-plan-chart"
-import { config } from "~/config"
 import {
   IconAlibaba,
   IconAnthropic,
@@ -27,14 +26,14 @@ import {
   IconZai,
 } from "~/component/icon"
 import { useI18n } from "~/context/i18n"
-import { useLanguage } from "~/context/language"
 import { LocaleLinks } from "~/component/locale-links"
+import { SocialMeta } from "~/component/social-meta"
 
 const models = [
-  { name: "Space Bunny", training: "go.faq.a5.notUsed", retention: "go.faq.a5.retention0" },
+  { name: "MiniMax M3.1 Flash Free", training: "go.faq.a5.notUsed", retention: "go.faq.a5.retention0" },
   { name: "LongCat 2.5 Preview Free", training: "go.faq.a5.notUsed", retention: "go.faq.a5.retention0" },
   { name: "Step 5 Preview", training: "go.faq.a5.notUsed", retention: "go.faq.a5.retention0" },
-  { name: "Cat Jam Free", training: "go.faq.a5.notUsed", retention: "go.faq.a5.retention30" },
+  { name: "Beam Free", training: "go.faq.a5.notUsed", retention: "go.faq.a5.retention30" },
   { name: "Grok 4.7", training: "go.faq.a5.notUsed", retention: "go.faq.a5.retention30" },
   { name: "GPT 6 Luna", training: "go.faq.a5.notUsed", retention: "go.faq.a5.retention30" },
   { name: "GPT 5.6 Luna", training: "go.faq.a5.notUsed", retention: "go.faq.a5.retention30" },
@@ -65,7 +64,6 @@ const models = [
 export default function Home() {
   const subscribeUrl = "https://opencode.ai/console/go"
   const i18n = useI18n()
-  const language = useLanguage()
   const [searchParams] = useSearchParams()
   return (
     <main data-page="go">
@@ -73,21 +71,12 @@ export default function Home() {
       <Title>{i18n.t("go.title")}</Title>
       <Meta name="description" content={`${i18n.t("go.meta.description")} ${i18n.t("go.plans.plus.description")}`} />
       <LocaleLinks path="/go" />
-      <Meta property="og:type" content="website" />
-      <Meta property="og:url" content={`${config.baseUrl}${language.route("/go")}`} />
-      <Meta property="og:title" content={i18n.t("go.title")} />
-      <Meta
-        property="og:description"
-        content={`${i18n.t("go.meta.description")} ${i18n.t("go.plans.plus.description")}`}
+      <SocialMeta
+        title={i18n.t("go.title")}
+        description={`${i18n.t("go.meta.description")} ${i18n.t("go.plans.plus.description")}`}
+        path="/go"
+        image="/social-share-black.png"
       />
-      <Meta property="og:image" content="/social-share-black.png" />
-      <Meta name="twitter:card" content="summary_large_image" />
-      <Meta name="twitter:title" content={i18n.t("go.title")} />
-      <Meta
-        name="twitter:description"
-        content={`${i18n.t("go.meta.description")} ${i18n.t("go.plans.plus.description")}`}
-      />
-      <Meta name="twitter:image" content="/social-share-black.png" />
 
       <div data-component="container">
         <Header go hideGetStarted />
@@ -97,7 +86,7 @@ export default function Home() {
             <div data-component="desktop-app-banner">
               <span data-slot="badge">{i18n.t("home.banner.badge")}</span>
               <div data-slot="content">
-                <span data-slot="text">{i18n.t("go.promo.step5")}</span>
+                <span data-slot="text">{i18n.t("go.promo.minimaxM31FlashFree")}</span>
               </div>
             </div>
             <Show when={searchParams.ref}>
@@ -188,11 +177,8 @@ export default function Home() {
           <section data-component="problem">
             <div data-slot="section-title">
               <h3>{i18n.t("go.problem.title")}</h3>
-              <p>
-                {i18n.t("go.problem.body")} {i18n.t("go.plans.plus.description")}
-              </p>
+              <p>{i18n.t("go.problem.body")}</p>
             </div>
-            <p>{i18n.t("go.problem.subtitle")}</p>
             <ul>
               <li>
                 <span>[*]</span> {i18n.t("go.problem.item1")}
@@ -212,9 +198,7 @@ export default function Home() {
           <section data-component="how">
             <div data-slot="section-title">
               <h3>{i18n.t("go.how.title")}</h3>
-              <p>
-                {i18n.t("go.how.body")} {i18n.t("go.plans.plus.description")}
-              </p>
+              <p>{i18n.t("go.how.body")}</p>
             </div>
             <ul>
               <li>
@@ -318,7 +302,7 @@ export default function Home() {
                     <p>
                       <strong>Claude Haiku 5.5:</strong> {i18n.t("go.faq.a5.retention")}:{" "}
                       {i18n.t("go.faq.a5.retention30")}.{" "}
-                      <a href="https://docs.anthropic.com/en/docs/claude-code/data-usage">
+                      <a href="https://code.claude.com/docs/en/data-usage">
                         {i18n.t("go.faq.a5.learnMore")}
                       </a>
                       .

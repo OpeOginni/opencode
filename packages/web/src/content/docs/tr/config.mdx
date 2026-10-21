@@ -217,7 +217,7 @@ Bir LLM'nin kullanabileceği araçları `tools` seçeneği aracılığıyla yön
   "$schema": "https://opencode.ai/config.json",
   "tools": {
     "write": false,
-    "bash": false
+    "shell": false
   }
 }
 ```
@@ -330,7 +330,7 @@ opencode yapılandırmanızda kullanmak istediğiniz temayı `theme` seçeneği 
         // Disable file modification tools for review-only agent
         "write": false,
         "edit": false,
-        "bash": true,
+        "shell": true,
       },
     },
   },
@@ -445,14 +445,14 @@ Kod formatlayıcılarını `formatter` seçeneği aracılığıyla yapılandıra
 
 Varsayılan olarak, opencode açık bir onay gerektirmeden **tüm işlemlere izin verir**. `permission` seçeneğini kullanarak bunu değiştirebilirsiniz.
 
-Örneğin, `edit` ve `bash` araçlarının kullanıcı onayı gerektirdiğinden emin olmak için:
+Örneğin, `edit` ve `shell` araçlarının kullanıcı onayı gerektirdiğinden emin olmak için:
 
 ```json title="opencode.json"
 {
   "$schema": "https://opencode.ai/config.json",
   "permission": {
     "edit": "ask",
-    "bash": "ask"
+    "shell": "ask"
   }
 }
 ```

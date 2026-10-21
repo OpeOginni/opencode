@@ -163,7 +163,7 @@ Bu şunun yerini alır:
 
 ### Shell output
 
-İsteminize [bash command](/docs/tui#bash-commands) çıktısını enjekte etmek için \__!`command`_ kullanın.
+İsteminize [shell command](/docs/tui#shell-commands) çıktısını enjekte etmek için \__!`command`_ kullanın.
 
 Örneğin, test kapsamını analiz eden özel bir komut oluşturmak için:
 

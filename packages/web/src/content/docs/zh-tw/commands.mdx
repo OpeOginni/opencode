@@ -162,7 +162,7 @@ with the following content: $3
 
 ### Shell 輸出
 
-使用 _!`command`_ 將 [bash 指令](/docs/tui#bash-commands)輸出注入到提示詞中。
+使用 _!`command`_ 將 [shell 指令](/docs/tui#shell-commands)輸出注入到提示詞中。
 
 例如，建立一個分析測試覆蓋率的自訂指令：
 

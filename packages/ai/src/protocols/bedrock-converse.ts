@@ -261,12 +261,12 @@ const providerMetadata = (key: string, metadata: Record<string, unknown>): Provi
 const reasoningSignature = (part: ReasoningPart, providerMetadataKey: string) => {
   const metadata = part.providerMetadata?.[providerMetadataKey]
   if (part.encrypted !== undefined) return part.encrypted
-  if (ProviderShared.isRecord(metadata) && typeof metadata.signature === "string") return metadata.signature
+  if (typeof metadata?.signature === "string") return metadata.signature
 }
 
 const reasoningRedactedData = (part: ReasoningPart, providerMetadataKey: string) => {
   const metadata = part.providerMetadata?.[providerMetadataKey]
-  if (ProviderShared.isRecord(metadata) && typeof metadata.redactedData === "string") return metadata.redactedData
+  if (typeof metadata?.redactedData === "string") return metadata.redactedData
 }
 
 const removeEmptyToolInputKeys = (input: unknown): unknown => {

@@ -2,6 +2,7 @@ export * as V1Migration from "./v1-migration.js"
 
 import { Cause, Effect, Layer, Option, Schema, Semaphore } from "effect"
 import { Database } from "./database.js"
+import { storedAbsolutePath } from "./path.js"
 import { SessionMessageTable, SessionTable } from "../session/sql.js"
 import { SessionV1 } from "@opencode/schema/session-v1"
 import { SessionMessage } from "../session/message.js"
@@ -297,6 +298,8 @@ export function transformSession(input: TransformInput): TransformResult {
             : -1
           const compactionIndex = messages.findIndex((candidate) => candidate.row.id === item.row.id)
           const tail = tailIndex < 0 ? [] : messages.slice(tailIndex, compactionIndex)
+          // V1 kept these messages beside the summary; they replay as text, like compactions before v2.1.
+          const recent = serializeRecent(tail, byMessage)
           return [
             row(
               { ...item.row, time_updated: Math.max(item.row.time_updated, summary.row.time_updated) },
@@ -306,7 +309,7 @@ export function transformSession(input: TransformInput): TransformResult {
                 status: "completed",
                 reason: compaction.auto ? "auto" : "manual",
                 summary: summaryText,
-                recent: serializeRecent(tail, byMessage),
+                ...(recent ? { metadata: { recent } } : {}),
                 time: { created: item.row.time_created },
               },
             ),
@@ -379,13 +382,13 @@ export function transformSession(input: TransformInput): TransformResult {
         return []
       const content = owned.flatMap((part): Array<Record<string, unknown>> => {
         if (part.type === "text")
-          return [{ type: "text", text: part.text, ...(part.metadata ? { state: part.metadata } : {}) }]
+          return [{ type: "text", text: part.text, ...(part.metadata ? { native: part.metadata } : {}) }]
         if (part.type === "reasoning")
           return [
             {
               type: "reasoning",
               text: part.text,
-              ...(part.metadata ? { state: part.metadata } : {}),
+              ...(part.metadata ? { native: part.metadata } : {}),
               time: { created: part.time.start, ...(part.time.end === undefined ? {} : { completed: part.time.end }) },
             },
           ]
@@ -578,16 +581,19 @@ export function run(options: Options = {}): Effect.Effect<RunResult, never, Data
         updateProgress({ label: "Migrating sessions", numerator: migrated + completed, denominator })
       })
       updateProgress({ label: "Migrating sessions", numerator: migrated + sourceTotal, denominator })
-      const projects = new Set(
-        (yield* db.all<{ id: string }>(sql`SELECT id FROM project`)).map((project) => project.id),
+      const projects = new Map(
+        (yield* db.all<{ id: string; worktree: string }>(sql`SELECT id, worktree FROM project`)).map((project) => [
+          project.id,
+          project.worktree,
+        ]),
       )
       while (true) {
         const state = yield* readState(db)
         const cursorValue = state?.phase === "sessions" ? state.cursor : undefined
-        const nextID = yield* db.get<{ id: string; project_id: string }>(
+        const nextID = yield* db.get<{ id: string; project_id: string; directory: string }>(
           cursorValue === undefined
-            ? sql`SELECT id, project_id FROM session ORDER BY id DESC LIMIT 1`
-            : sql`SELECT id, project_id FROM session WHERE id < ${cursorValue} ORDER BY id DESC LIMIT 1`,
+            ? sql`SELECT id, project_id, directory FROM session ORDER BY id DESC LIMIT 1`
+            : sql`SELECT id, project_id, directory FROM session WHERE id < ${cursorValue} ORDER BY id DESC LIMIT 1`,
         )
         if (!nextID) break
         yield* db
@@ -607,6 +613,18 @@ export function run(options: Options = {}): Effect.Effect<RunResult, never, Data
                   sessionID: nextID.id,
                   projectID: nextID.project_id,
                 })
+              // Legacy ACP sessions can store a cwd relative to an unknown process directory.
+              // Use the project worktree instead, and leave the original V1 row intact.
+              const directory =
+                !nextID.directory || storedAbsolutePath(nextID.directory)
+                  ? nextID.directory
+                  : (storedAbsolutePath(projects.get(projectID) ?? path.parse(global.data).root) ?? "")
+              if (directory !== nextID.directory)
+                yield* Effect.logWarning("Replaced relative V1 session directory", {
+                  sessionID: nextID.id,
+                  directory: nextID.directory,
+                  resolved: directory,
+                })
               yield* tx.run(sql`
                   INSERT OR IGNORE INTO session_v2 (
                     id, project_id, workspace_id, parent_id, slug, directory, path, title, version, share_url,
@@ -615,7 +633,7 @@ export function run(options: Options = {}): Effect.Effect<RunResult, never, Data
                     revert, permission, agent, model, time_created, time_updated, time_compacting, time_archived
                   )
                   SELECT
-                    id, ${projectID}, workspace_id, parent_id, slug, directory, path, title, version, share_url,
+                    id, ${projectID}, workspace_id, parent_id, slug, ${directory}, path, title, version, share_url,
                     summary_additions, summary_deletions, summary_files, summary_diffs, metadata, cost,
                     tokens_input, tokens_output, tokens_reasoning, tokens_cache_read, tokens_cache_write,
                     revert, NULL, agent, model, time_created, time_updated, time_compacting, time_archived
@@ -939,9 +957,11 @@ function legacyToolNotice(messages: ReadonlyArray<TransformResult["messages"][nu
         : []),
     ...(called.has("skill") ? ["The `skill` tool now takes `id` instead of `name`."] : []),
     ...(removed.length === 1
-      ? [`The \`${removed[0]}\` tool is no longer available and must not be called.`]
+      ? [`The \`${removed[0]}\` tool is no longer available by default. Only call it if it is in your tool list.`]
       : removed.length > 1
-        ? [`The following tools are no longer available and must not be called: ${list(removed)}.`]
+        ? [
+            `The following tools are no longer available by default. Only call them if they are in your tool list: ${list(removed)}.`,
+          ]
         : []),
   ]
   if (parts.length === 0) return undefined
@@ -953,7 +973,7 @@ function migrateTool(part: typeof SessionV1.ToolPart.Type, fallback: number) {
     type: "tool" as const,
     id: part.callID,
     name: part.tool,
-    ...(part.metadata ? { providerState: part.metadata } : {}),
+    ...(part.metadata ? { native: part.metadata } : {}),
   }
   if (part.state.status === "completed")
     return {

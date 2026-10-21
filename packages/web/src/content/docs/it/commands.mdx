@@ -162,7 +162,7 @@ Questo sostituisce:
 
 ### Output della shell
 
-Usa _!`command`_ per inserire nel prompt l'output di un [comando bash](/docs/tui#bash-commands).
+Usa _!`command`_ per inserire nel prompt l'output di un [comando shell](/docs/tui#shell-commands).
 
 Per esempio, per creare un comando personalizzato che analizzi la copertura dei test:
 

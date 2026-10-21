@@ -163,7 +163,7 @@ Dette erstatter:
 
 ### Shell-utdata
 
-Bruk _!`command`_ for å injisere [bash-kommando](/docs/tui#bash-commands)-utdata i ledeteksten.
+Bruk _!`command`_ for å injisere [shell-kommando](/docs/tui#shell-commands)-utdata i ledeteksten.
 
 For eksempel, for å lage en egendefinert kommando som analyserer testdekning:
 

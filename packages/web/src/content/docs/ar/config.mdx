@@ -216,7 +216,7 @@ opencode run "Hello world"
   "$schema": "https://opencode.ai/config.json",
   "tools": {
     "write": false,
-    "bash": false
+    "shell": false
   }
 }
 ```
@@ -443,14 +443,14 @@ opencode run "Hello world"
 
 افتراضيًا يسمح opencode **بجميع العمليات** دون الحاجة إلى موافقة صريحة. يمكنك تغيير ذلك عبر الخيار `permission`.
 
-على سبيل المثال، لضمان أن أداتي `edit` و`bash` تتطلبان موافقة المستخدم:
+على سبيل المثال، لضمان أن أداتي `edit` و`shell` تتطلبان موافقة المستخدم:
 
 ```json title="opencode.json"
 {
   "$schema": "https://opencode.ai/config.json",
   "permission": {
     "edit": "ask",
-    "bash": "ask"
+    "shell": "ask"
   }
 }
 ```

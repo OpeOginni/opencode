@@ -36,6 +36,7 @@ export const dict = {
   "email.placeholder": "電子郵件地址",
   "email.subscribe": "訂閱",
   "email.success": "就差一步，請查收你的信箱並確認電子郵件地址",
+  "email.error": "訂閱失敗，請再試一次。",
 
   "notFound.title": "找不到頁面 | OpenCode",
   "notFound.heading": "404 - 找不到頁面",
@@ -57,22 +58,6 @@ export const dict = {
   "app.meta.description": "OpenCode - 開源編碼代理。",
 
   "home.title": "OpenCode | 開源 AI 編碼代理",
-
-  "temp.title": "OpenCode | 專為終端打造的 AI 編碼代理",
-  "temp.hero.title": "專為終端打造的 AI 編碼代理",
-  "temp.zen": "OpenCode Zen",
-  "temp.getStarted": "開始使用",
-  "temp.feature.native.title": "原生 TUI",
-  "temp.feature.native.body": "響應式、原生、可自訂主題的終端介面",
-  "temp.feature.zen.beforeLink": "",
-  "temp.feature.zen.link": "精選模型列表",
-  "temp.feature.zen.afterLink": "由 OpenCode 提供",
-  "temp.feature.models.beforeLink": "透過",
-  "temp.feature.models.afterLink": "支援 75+ 家 LLM 供應商，包括本地模型",
-  "temp.screenshot.caption": "使用 tokyonight 主題的 OpenCode TUI",
-  "temp.screenshot.alt": "使用 tokyonight 主題的 OpenCode TUI",
-  "temp.logoLightAlt": "opencode 淺色標誌",
-  "temp.logoDarkAlt": "opencode 深色標誌",
 
   "home.banner.badge": "新",
 
@@ -207,7 +192,7 @@ export const dict = {
   "zen.privacy.beforeExceptions": "所有 Zen 模型均在美國託管。供應商遵循零留存政策，不會將你的資料用於模型訓練，並且有",
   "zen.privacy.exceptionsLink": "以下例外情況",
 
-  "go.promo.step5": "Step 5 Preview 現已上線 Go，限時 4 倍用量。",
+  "go.promo.minimaxM31FlashFree": "MiniMax M3.1 Flash Free 現已上線 Go，限時免費。",
   "go.title": "OpenCode Go | 低成本全民編碼模型",
   "go.meta.description": "Go 每月 $10，提供充裕的使用限額，並可穩定存取領先的編碼模型。",
   "go.hero.title": "低成本全民編碼模型",
@@ -244,7 +229,6 @@ export const dict = {
   "go.problem.title": "Go 正在解決什麼問題？",
   "go.problem.body":
     "我們致力於將 OpenCode 體驗帶給盡可能多的人。OpenCode Go 是一款每月 $10 的低成本訂閱服務。它提供充裕的額度，並讓您能可靠地使用最強大的開源模型。",
-  "go.problem.subtitle": " ",
   "go.problem.item1": "低成本訂閱定價",
   "go.problem.item2": "寬裕的限額與穩定存取",
   "go.problem.item3": "專為盡可能多的程式設計師打造",
@@ -297,36 +281,10 @@ export const dict = {
 
   "go.faq.q9": "免費模型與 Go 有什麼區別？",
   "go.faq.a9":
-    "免費模型包括 Big Pickle 以及當時可用的促銷模型，配額為每天 200 次請求。Go 提供精選模型陣容，並在滾動視窗內執行較高的請求配額：每 5 小時為每月額度的 20%、每週 50%、每月 100%。具體額度可能因模型而異（實際請求次數因模型和使用情況而異）。",
+    "免費模型包括 Big Pickle 以及當時可用的促銷模型。Go 提供精選模型陣容，並在滾動視窗內執行較高的請求配額：每 5 小時為每月額度的 20%、每週 50%、每月 100%。具體額度可能因模型而異（實際請求次數因模型和使用情況而異）。",
   "go.faq.q10": "我可以退款嗎？",
   "go.faq.a10":
     "若扣款發生在過去 14 天內，且你在該計費期間尚未使用任何 Go 額度，你可能符合退款資格。請{{contact}}申請退款。",
-
-  "black.meta.title": "OpenCode Black | 存取全球最佳編碼模型",
-  "black.meta.description": "透過 OpenCode Black 訂閱方案存取 Claude、GPT、Gemini 等模型。",
-  "black.hero.title": "存取全球最佳編碼模型",
-  "black.hero.subtitle": "包括 Claude、GPT、Gemini 等",
-  "black.title": "OpenCode Black | 定價",
-  "black.paused": "Black 訂閱暫時暫停註冊。",
-  "black.plan.icon20": "Black 20 方案",
-  "black.plan.icon100": "Black 100 方案",
-  "black.plan.icon200": "Black 200 方案",
-  "black.plan.multiplier100": "比 Black 20 多 5 倍使用量",
-  "black.plan.multiplier200": "比 Black 20 多 20 倍使用量",
-  "black.price.perMonth": "每月",
-  "black.price.perPersonBilledMonthly": "每人每月計費",
-  "black.terms.1": "你的訂閱不會立即開始",
-  "black.terms.2": "你將被加入候補名單並在不久後啟用",
-  "black.terms.3": "你的卡片僅在訂閱啟用時才會扣款",
-  "black.terms.4": "適用使用限制，高度自動化的使用可能會更快達到限制",
-  "black.terms.5": "訂閱僅限個人使用，團隊請聯繫企業版",
-  "black.terms.6": "未來可能會調整限制或終止方案",
-  "black.terms.7": "隨時取消你的訂閱",
-  "black.finePrint.beforeTerms": "顯示價格未包含適用稅項",
-  "black.finePrint.terms": "服務條款",
-  "black.workspace.title": "OpenCode Black | 選擇工作區",
-  "black.workspace.selectPlan": "為此方案選擇一個工作區",
-  "black.workspace.name": "工作區 {{n}}",
 
   "download.title": "OpenCode | 下載",
   "download.meta.description": "下載適用於 macOS、Windows 與 Linux 的 OpenCode",
@@ -388,6 +346,7 @@ export const dict = {
   "enterprise.form.error.invalidEmailFormat": "無效的電子郵件格式。",
   "enterprise.form.error.invalidInferenceSpend": "請選擇有效的推論支出範圍。",
   "enterprise.form.error.internalServer": "內部伺服器錯誤。",
+  "enterprise.form.error.captcha": "驗證碼驗證失敗，請再試一次。",
   "enterprise.faq.title": "常見問題",
   "enterprise.faq.q1": "什麼是 OpenCode Enterprise？",
   "enterprise.faq.a1":

@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect"
+import { Effect, Schema, SchemaGetter } from "effect"
 import { Route } from "../route/client.js"
 import { Auth } from "../route/auth.js"
 import { Endpoint } from "../route/endpoint.js"
@@ -132,13 +132,22 @@ const OutputStep = Schema.Struct({
   content: Schema.optional(Schema.Array(Schema.Struct({ type: Schema.String, text: Schema.optional(Schema.String) }))),
 })
 type OutputStep = typeof OutputStep.Type
+const KNOWN_DELTA_TYPES = new Set(["text", "arguments_delta", "thought_signature", "thought_summary"])
+const UnknownDelta = Schema.Struct({
+  type: Schema.String.check(Schema.makeFilter((type) => !KNOWN_DELTA_TYPES.has(type))),
+}).pipe(
+  Schema.decodeTo(Schema.Struct({ type: Schema.Literal("unknown"), rawType: Schema.String }), {
+    decode: SchemaGetter.transform((delta) => ({ type: "unknown" as const, rawType: delta.type })),
+    encode: SchemaGetter.forbidden(() => "Unknown Google Interactions deltas are decode-only"),
+  }),
+)
 const Delta = Schema.Union([
   Schema.Struct({ type: Schema.Literal("text"), text: Schema.String }),
   Schema.Struct({ type: Schema.Literal("arguments_delta"), arguments: Schema.String }),
   Schema.Struct({ type: Schema.Literal("thought_signature"), signature: Schema.String }),
   Schema.Struct({ type: Schema.Literal("thought_summary"), content: Text }),
   // Unknown output modalities must fail explicitly rather than disappearing from a successful response.
-  Schema.Struct({ type: Schema.String }),
+  UnknownDelta,
 ])
 const Interaction = Schema.StructWithRest(
   Schema.Struct({
@@ -147,6 +156,24 @@ const Interaction = Schema.StructWithRest(
     usage: Schema.optional(RawUsage),
   }),
   [Schema.Record(Schema.String, Schema.Unknown)],
+)
+const KNOWN_EVENT_TYPES = new Set([
+  "step.start",
+  "step.delta",
+  "step.stop",
+  "interaction.created",
+  "interaction.status_update",
+  "interaction.completed",
+  "error",
+])
+// Google may add stream event types. Unknown types are ignored, while a malformed known type still fails decoding.
+const UnknownEvent = Schema.Struct({
+  event_type: Schema.String.check(Schema.makeFilter((type) => !KNOWN_EVENT_TYPES.has(type))),
+}).pipe(
+  Schema.decodeTo(Schema.Struct({ event_type: Schema.Literal("unknown") }), {
+    decode: SchemaGetter.transform(() => ({ event_type: "unknown" as const })),
+    encode: SchemaGetter.forbidden(() => "Unknown Google Interactions stream events are decode-only"),
+  }),
 )
 const Event = Schema.Union([
   Schema.Struct({ event_type: Schema.Literal("step.start"), index: Schema.Number, step: OutputStep }),
@@ -163,6 +190,7 @@ const Event = Schema.Union([
   }),
   Schema.Struct({ event_type: Schema.Literal("interaction.completed"), interaction: Interaction }),
   Schema.Struct({ event_type: Schema.Literal("error"), error: Schema.Unknown }),
+  UnknownEvent,
 ])
 type Event = typeof Event.Type
 
@@ -203,9 +231,7 @@ const mediaContent = Effect.fnUntraced(function* (asset: Media.Asset) {
 
 const signature = (metadata: ProviderMetadata | undefined, key: string) => {
   const value = metadata?.[key]
-  return ProviderShared.isRecord(value) && typeof value.interactionSignature === "string"
-    ? value.interactionSignature
-    : undefined
+  return typeof value?.interactionSignature === "string" ? value.interactionSignature : undefined
 }
 
 const lowerMessages = Effect.fnUntraced(function* (request: LLMRequest) {
@@ -411,17 +437,17 @@ const onDelta = Effect.fnUntraced(function* (
   if (!step)
     return yield* ProviderShared.eventError(ADAPTER, "Interactions delta without step.start", encodeJson(delta))
   const events: LLMEvent[] = []
-  if (delta.type === "text" && "text" in delta && step.type === "model_output")
+  if (delta.type === "text" && step.type === "model_output")
     return [
       { ...state, lifecycle: Lifecycle.textDelta(state.lifecycle, events, String(index), delta.text) },
       events,
     ] satisfies StepResult
-  if (delta.type === "thought_summary" && "content" in delta && step.type === "thought")
+  if (delta.type === "thought_summary" && step.type === "thought")
     return [
       { ...state, lifecycle: Lifecycle.reasoningDelta(state.lifecycle, events, String(index), delta.content.text) },
       events,
     ] satisfies StepResult
-  if (delta.type === "thought_signature" && "signature" in delta) {
+  if (delta.type === "thought_signature") {
     const next = { ...step, signature: delta.signature }
     const tool = state.tools[index]
     return [
@@ -433,7 +459,7 @@ const onDelta = Effect.fnUntraced(function* (
       events,
     ] satisfies StepResult
   }
-  if (delta.type === "arguments_delta" && "arguments" in delta && step.type === "function_call") {
+  if (delta.type === "arguments_delta" && step.type === "function_call") {
     const result = ToolStream.appendExisting(
       ADAPTER,
       state.tools,
@@ -444,7 +470,11 @@ const onDelta = Effect.fnUntraced(function* (
     if (ToolStream.isError(result)) return yield* result
     return [{ ...state, tools: result.tools }, result.events] satisfies StepResult
   }
-  return yield* ProviderShared.eventError(ADAPTER, `Unsupported Interactions delta: ${delta.type}`, encodeJson(delta))
+  return yield* ProviderShared.eventError(
+    ADAPTER,
+    `Unsupported Interactions delta: ${delta.type === "unknown" ? delta.rawType : delta.type}`,
+    encodeJson(delta),
+  )
 })
 
 const onStop = Effect.fnUntraced(function* (state: ParserState, index: number) {
@@ -475,6 +505,7 @@ const step = Effect.fnUntraced(function* (state: ParserState, event: Event) {
       return yield* onStop(state, event.index)
     case "interaction.created":
     case "interaction.status_update":
+    case "unknown":
       return [state, []] satisfies StepResult
     case "error":
       return yield* new AIError({
