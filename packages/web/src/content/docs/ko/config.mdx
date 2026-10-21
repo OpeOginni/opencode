@@ -216,7 +216,7 @@ TUI 관련 설정에는 전용 `tui.json` (또는 `tui.jsonc`) 파일을 사용�
   "$schema": "https://opencode.ai/config.json",
   "tools": {
     "write": false,
-    "bash": false
+    "shell": false
   }
 }
 ```
@@ -443,14 +443,14 @@ OpenCode는 시작 시 새 업데이트를 자동으로 다운로드합니다. `
 
 기본적으로 OpenCode는 **명시적 승인 없이 모든 작업을 허용**합니다. `permission` 옵션으로 이 동작을 바꿀 수 있습니다.
 
-예를 들어 `edit`, `bash` tool이 사용자 승인을 요구하게 하려면:
+예를 들어 `edit`, `shell` tool이 사용자 승인을 요구하게 하려면:
 
 ```json title="opencode.json"
 {
   "$schema": "https://opencode.ai/config.json",
   "permission": {
     "edit": "ask",
-    "bash": "ask"
+    "shell": "ask"
   }
 }
 ```

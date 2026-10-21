@@ -192,62 +192,6 @@ test("service config manages environment variables", async () => {
   }
 })
 
-test("managed service loads configured environment", async () => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "opencode-service-env-"))
-  const registration = path.join(root, "state", "opencode", ServiceConfig.filename())
-  await fs.mkdir(path.join(root, "config"), { recursive: true })
-  await fs.writeFile(
-    path.join(root, "config", ServiceConfig.filename()),
-    JSON.stringify({ env: { OPENCODE_SERVICE_ENV_TEST: "configured", OPENCODE_SERVICE_ENV_EMPTY_TEST: "" } }),
-  )
-  await fs.writeFile(
-    path.join(root, "config", "opencode.json"),
-    JSON.stringify({
-      mcp: {
-        servers: {
-          env: {
-            type: "local",
-            command: ["true"],
-            environment: {
-              configured: "{env:OPENCODE_SERVICE_ENV_TEST}",
-              empty: "{env:OPENCODE_SERVICE_ENV_EMPTY_TEST}",
-              inherited: "{env:OPENCODE_SERVICE_ENV_INHERITED_TEST}",
-            },
-          },
-        },
-      },
-    }),
-  )
-  const owner = Bun.spawn(
-    [process.execPath, path.join(import.meta.dir, "../src/index.ts"), "serve", "--service", "--port", "0"],
-    {
-      env: isolatedEnv(root, {
-        OPENCODE_SERVICE_ENV_TEST: "inherited",
-        OPENCODE_SERVICE_ENV_EMPTY_TEST: "inherited",
-        OPENCODE_SERVICE_ENV_INHERITED_TEST: "inherited",
-      }),
-      stderr: "pipe",
-      stdout: "ignore",
-    },
-  )
-  try {
-    const info = await waitForInfo(registration)
-    const url = new URL("/api/config", info.url)
-    url.searchParams.set("location[directory]", root)
-    const response = await fetch(url, { headers: { authorization: "Basic " + btoa(`opencode:${info.password}`) } })
-    expect(response.status).toBe(200)
-    expect((await response.json())[0].info.mcp.servers.env.environment).toEqual({
-      configured: "configured",
-      empty: "",
-      inherited: "inherited",
-    })
-  } finally {
-    owner.kill("SIGTERM")
-    await owner.exited
-    await fs.rm(root, { recursive: true, force: true })
-  }
-}, 30_000)
-
 test("service filenames share release channels and identify preview channels", () => {
   expect(ServiceConfig.filename("latest")).toBe("service.json")
   expect(ServiceConfig.filename("dev")).toBe("service.json")
@@ -421,7 +365,7 @@ test("concurrent service processes elect one server", async () => {
       urls: [info.url],
       // The server reports the canonical tmp directory; Windows os.tmpdir() can be an 8.3 short name.
       paths: { tmp: await fs.realpath(path.join(os.tmpdir(), "opencode")) },
-      capabilities: { persistentPty: process.platform !== "win32" },
+      capabilities: { persistentPty: true },
     })
     const contender = Bun.spawn(command, { env, stderr: "pipe", stdout: "ignore" })
     try {

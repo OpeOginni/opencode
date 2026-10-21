@@ -36,6 +36,7 @@ export const dict = {
   "email.placeholder": "Endereço de e-mail",
   "email.subscribe": "Inscrever-se",
   "email.success": "Quase lá, verifique sua caixa de entrada e confirme seu e-mail",
+  "email.error": "Não foi possível concluir a inscrição. Tente novamente.",
 
   "notFound.title": "Não encontrado | opencode",
   "notFound.heading": "404 - Página não encontrada",
@@ -57,22 +58,6 @@ export const dict = {
   "app.meta.description": "OpenCode - O agente de codificação de código aberto.",
 
   "home.title": "OpenCode | O agente de codificação de código aberto com IA",
-
-  "temp.title": "opencode | Agente de codificação com IA feito para o terminal",
-  "temp.hero.title": "O agente de codificação com IA feito para o terminal",
-  "temp.zen": "opencode zen",
-  "temp.getStarted": "Começar",
-  "temp.feature.native.title": "TUI Nativa",
-  "temp.feature.native.body": "Uma interface de terminal responsiva, nativa e personalizável",
-  "temp.feature.zen.beforeLink": "Uma",
-  "temp.feature.zen.link": "lista selecionada de modelos",
-  "temp.feature.zen.afterLink": "fornecida pela opencode",
-  "temp.feature.models.beforeLink": "Suporta mais de 75 provedores de LLM através do",
-  "temp.feature.models.afterLink": ", incluindo modelos locais",
-  "temp.screenshot.caption": "OpenCode TUI com o tema tokyonight",
-  "temp.screenshot.alt": "OpenCode TUI com tema tokyonight",
-  "temp.logoLightAlt": "logo opencode claro",
-  "temp.logoDarkAlt": "logo opencode escuro",
 
   "home.banner.badge": "Novo",
 
@@ -220,7 +205,7 @@ export const dict = {
     "Todos os modelos Zen são hospedados nos EUA. Os provedores seguem uma política de retenção zero e não usam seus dados para treinamento de modelo, com as",
   "zen.privacy.exceptionsLink": "seguintes exceções",
 
-  "go.promo.step5": "Step 5 Preview já está disponível no Go com 4× mais uso por tempo limitado.",
+  "go.promo.minimaxM31FlashFree": "MiniMax M3.1 Flash Free já está disponível no Go, grátis por tempo limitado.",
   "go.title": "OpenCode Go | Modelos de codificação de baixo custo para todos",
   "go.meta.description":
     "O Go custa $10/mês, com limites generosos de uso e acesso confiável aos principais modelos de codificação.",
@@ -258,7 +243,6 @@ export const dict = {
   "go.problem.title": "Que problema o Go resolve?",
   "go.problem.body":
     "Estamos focados em levar a experiência do OpenCode para o maior número de pessoas possível. OpenCode Go é uma assinatura de baixo custo de $10/mês. Oferece limites generosos e acesso confiável aos modelos open source mais capazes.",
-  "go.problem.subtitle": " ",
   "go.problem.item1": "Preço de assinatura de baixo custo",
   "go.problem.item2": "Limites generosos e acesso confiável",
   "go.problem.item3": "Feito para o maior número possível de programadores",
@@ -318,36 +302,10 @@ export const dict = {
 
   "go.faq.q9": "Qual a diferença entre os modelos gratuitos e o Go?",
   "go.faq.a9":
-    "Os modelos gratuitos incluem Big Pickle e modelos promocionais disponíveis no momento, com uma cota de 200 requisições/dia. O Go oferece uma seleção de modelos com cotas de requisição mais altas em janelas móveis: 20% da cota mensal a cada 5 horas, 50% por semana e 100% por mês. As cotas específicas podem variar por modelo (as contagens reais de requisições variam de acordo com o modelo e o uso).",
+    "Os modelos gratuitos incluem Big Pickle e modelos promocionais disponíveis no momento. O Go oferece uma seleção de modelos com cotas de requisição mais altas em janelas móveis: 20% da cota mensal a cada 5 horas, 50% por semana e 100% por mês. As cotas específicas podem variar por modelo (as contagens reais de requisições variam de acordo com o modelo e o uso).",
   "go.faq.q10": "Posso receber um reembolso?",
   "go.faq.a10":
     "Você pode ter direito a um reembolso se a cobrança foi feita nos últimos 14 dias e você não usou sua cota do Go durante esse período de faturamento. {{contact}} para solicitar um reembolso.",
-
-  "black.meta.title": "OpenCode Black | Acesse os melhores modelos de codificação do mundo",
-  "black.meta.description": "Tenha acesso ao Claude, GPT, Gemini e mais com os planos de assinatura OpenCode Black.",
-  "black.hero.title": "Acesse os melhores modelos de codificação do mundo",
-  "black.hero.subtitle": "Incluindo Claude, GPT, Gemini e mais",
-  "black.title": "OpenCode Black | Preços",
-  "black.paused": "A inscrição no plano Black está temporariamente pausada.",
-  "black.plan.icon20": "Plano Black 20",
-  "black.plan.icon100": "Plano Black 100",
-  "black.plan.icon200": "Plano Black 200",
-  "black.plan.multiplier100": "5x mais uso que o Black 20",
-  "black.plan.multiplier200": "20x mais uso que o Black 20",
-  "black.price.perMonth": "por mês",
-  "black.price.perPersonBilledMonthly": "por pessoa faturado mensalmente",
-  "black.terms.1": "Sua assinatura não começará imediatamente",
-  "black.terms.2": "Você será adicionado à lista de espera e ativado em breve",
-  "black.terms.3": "Seu cartão só será cobrado quando sua assinatura for ativada",
-  "black.terms.4": "Limites de uso se aplicam; uso fortemente automatizado pode atingir os limites mais cedo",
-  "black.terms.5": "Assinaturas são para indivíduos, contate Enterprise para equipes",
-  "black.terms.6": "Limites podem ser ajustados e planos podem ser descontinuados no futuro",
-  "black.terms.7": "Cancele sua assinatura a qualquer momento",
-  "black.finePrint.beforeTerms": "Os preços mostrados não incluem impostos aplicáveis",
-  "black.finePrint.terms": "Termos de Serviço",
-  "black.workspace.title": "OpenCode Black | Selecionar Workspace",
-  "black.workspace.selectPlan": "Selecione um workspace para este plano",
-  "black.workspace.name": "Workspace {{n}}",
 
   "download.title": "OpenCode | Baixar",
   "download.meta.description": "Baixe o OpenCode para macOS, Windows e Linux",
@@ -411,6 +369,7 @@ export const dict = {
   "enterprise.form.error.invalidEmailFormat": "Formato de e-mail inválido.",
   "enterprise.form.error.invalidInferenceSpend": "Selecione uma faixa de gasto com inferência válida.",
   "enterprise.form.error.internalServer": "Erro interno do servidor.",
+  "enterprise.form.error.captcha": "A verificação captcha falhou. Tente novamente.",
   "enterprise.faq.title": "FAQ",
   "enterprise.faq.q1": "O que é OpenCode Enterprise?",
   "enterprise.faq.a1":

@@ -208,7 +208,7 @@ Use the `ai.opencode.managed` PayloadType. The OpenCode config keys go directly 
       <dict>
         <key>*</key>
         <string>ask</string>
-        <key>bash</key>
+        <key>shell</key>
         <dict>
           <key>*</key>
           <string>ask</string>
@@ -348,7 +348,7 @@ You can manage the tools an LLM can use through the `tools` option.
   "$schema": "https://opencode.ai/config.json",
   "tools": {
     "write": false,
-    "bash": false
+    "shell": false
   }
 }
 ```
@@ -703,14 +703,14 @@ Use an object to keep built-ins enabled while configuring overrides or custom LS
 
 By default, opencode **allows all operations** without requiring explicit approval. You can change this using the `permission` option.
 
-For example, to ensure that the `edit` and `bash` tools require user approval:
+For example, to ensure that the `edit` and `shell` tools require user approval:
 
 ```json title="opencode.json"
 {
   "$schema": "https://opencode.ai/config.json",
   "permission": {
     "edit": "ask",
-    "bash": "ask"
+    "shell": "ask"
   }
 }
 ```

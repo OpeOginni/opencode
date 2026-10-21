@@ -163,7 +163,7 @@ Wartości:
 
 ### Dane wyjściowe poleceń
 
-Użyj `!command`, aby wstawić dane wyjściowe [polecenia bash](/docs/tui#bash-commands) do promptu.
+Użyj `!command`, aby wstawić dane wyjściowe [polecenia shell](/docs/tui#shell-commands) do promptu.
 
 Na przykład, aby przeanalizować pokrycie testami:
 

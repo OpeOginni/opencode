@@ -216,7 +216,7 @@ Možete upravljati alatima koje LLM može koristiti putem opcije `tools`.
   "$schema": "https://opencode.ai/config.json",
   "tools": {
     "write": false,
-    "bash": false
+    "shell": false
   }
 }
 ```
@@ -443,14 +443,14 @@ Možete konfigurirati formatere koda putem opcije `formatter`.
 
 Prema zadanim postavkama, OpenCode **dopušta sve operacije** bez potrebe za eksplicitnim dopuštenjem. Ovo možete promijeniti koristeći opciju `permission`.
 
-Na primjer, da osigurate da alati `edit` i `bash` zahtijevaju odobrenje korisnika:
+Na primjer, da osigurate da alati `edit` i `shell` zahtijevaju odobrenje korisnika:
 
 ```json title="opencode.json"
 {
   "$schema": "https://opencode.ai/config.json",
   "permission": {
     "edit": "ask",
-    "bash": "ask"
+    "shell": "ask"
   }
 }
 ```

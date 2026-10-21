@@ -163,7 +163,7 @@ Esto reemplaza:
 
 ### Salida del shell
 
-Utilice _!`command`_ para inyectar la salida de [comando bash](/docs/tui#bash-commands) en su mensaje.
+Utilice _!`command`_ para inyectar la salida de [comando shell](/docs/tui#shell-commands) en su mensaje.
 
 Por ejemplo, para crear un comando personalizado que analice la cobertura de la prueba:
 

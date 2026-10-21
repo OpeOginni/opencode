@@ -217,7 +217,7 @@ Você pode gerenciar as ferramentas que um LLM pode usar através da opção `to
   "$schema": "https://opencode.ai/config.json",
   "tools": {
     "write": false,
-    "bash": false
+    "shell": false
   }
 }
 ```
@@ -444,14 +444,14 @@ Você pode configurar formatadores de código através da opção `formatter`.
 
 Por padrão, o opencode **permite todas as operações** sem exigir aprovação explícita. Você pode mudar isso usando a opção `permission`.
 
-Por exemplo, para garantir que as ferramentas `edit` e `bash` exijam aprovação do usuário:
+Por exemplo, para garantir que as ferramentas `edit` e `shell` exijam aprovação do usuário:
 
 ```json title="opencode.json"
 {
   "$schema": "https://opencode.ai/config.json",
   "permission": {
     "edit": "ask",
-    "bash": "ask"
+    "shell": "ask"
   }
 }
 ```

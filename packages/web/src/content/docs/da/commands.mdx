@@ -163,7 +163,7 @@ Dette erstatter:
 
 ### Shell-output
 
-Brug _!`command`_ til at injicere [bash command](/docs/tui#bash-commands) output i din prompt.
+Brug _!`command`_ til at injicere [shell command](/docs/tui#shell-commands) output i din prompt.
 
 For eksempel, for at oprette en brugerdefineret kommando, der analyserer testdækning:
 

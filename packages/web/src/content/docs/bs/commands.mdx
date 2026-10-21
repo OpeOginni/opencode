@@ -159,7 +159,7 @@ Ovo zamjenjuje:
 
 ### Shell izlaz
 
-Koristite _!`command`_ da ubacite izlaz [bash command](/docs/tui#bash-commands) u svoj prompt.
+Koristite _!`command`_ da ubacite izlaz [shell command](/docs/tui#shell-commands) u svoj prompt.
 Na primjer, da kreirate prilagođenu naredbu koja analizira pokrivenost testom:
 
 ```md title=".opencode/commands/analyze-coverage.md"

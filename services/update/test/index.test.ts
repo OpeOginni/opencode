@@ -2,7 +2,7 @@ import { Database } from "bun:sqlite"
 import { afterEach, expect, setSystemTime, test } from "bun:test"
 import { readdirSync, readFileSync } from "node:fs"
 import path from "node:path"
-import worker from "../src/index"
+import worker, { channelsForRef, validGitHubClaims } from "../src/index"
 
 type Env = Parameters<typeof worker.fetch>[1]
 
@@ -163,3 +163,36 @@ test("caches rollout fallback reads across caller IPs and overlapping releases",
   expect(new Set(versions)).toEqual(new Set(["1.0.0", "1.1.0"]))
   expect(db.queries).toHaveLength(3)
 })
+
+function publishClaims(ref: string) {
+  return {
+    repository: "anomalyco/opencode",
+    repository_id: "975734319",
+    repository_owner_id: "66570915",
+    workflow_ref: `anomalyco/opencode/.github/workflows/publish.yml@${ref}`,
+    ref,
+    sha: "0".repeat(40),
+    run_id: "1",
+    run_attempt: "1",
+    actor: "opencode",
+  }
+}
+
+// dev publishes both kinds of build: pushes ship 0.0.0-dev-N to "dev", and dispatches with a bump or version ship
+// releases to "latest".
+test.each([
+  ["refs/heads/dev", ["dev", "latest"]],
+  ["refs/heads/beta", ["beta"]],
+])("accepts publish tokens from %s", (ref, channels) => {
+  expect(channelsForRef(ref)).toEqual(channels)
+  expect(validGitHubClaims(publishClaims(ref))).toBe(true)
+})
+
+// These branches no longer publish (v2 was merged into dev), so their tokens must not be accepted.
+test.each(["refs/heads/v2", "refs/heads/ci", "refs/heads/fix/npm-native-binary-install", "refs/heads/snapshot-otui"])(
+  "rejects publish tokens from %s",
+  (ref) => {
+    expect(channelsForRef(ref)).toEqual([])
+    expect(validGitHubClaims(publishClaims(ref))).toBe(false)
+  },
+)

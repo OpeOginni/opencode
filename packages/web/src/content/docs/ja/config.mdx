@@ -219,7 +219,7 @@ LLM が使用できるツールは、`tools` オプションを通じて管理�
   "$schema": "https://opencode.ai/config.json",
   "tools": {
     "write": false,
-    "bash": false
+    "shell": false
   }
 }
 ```
@@ -446,14 +446,14 @@ OpenCode は起動時に新しいアップデートを自動的にダウンロ�
 
 デフォルトでは、opencode は明示的な承認を必要とせずに **すべての操作を許可**します。これは、`permission` オプションを使用して変更できます。
 
-たとえば、`edit` ツールと `bash` ツールにユーザーの承認が必要であることを確認するには、次のようにします。
+たとえば、`edit` ツールと `shell` ツールにユーザーの承認が必要であることを確認するには、次のようにします。
 
 ```json title="opencode.json"
 {
   "$schema": "https://opencode.ai/config.json",
   "permission": {
     "edit": "ask",
-    "bash": "ask"
+    "shell": "ask"
   }
 }
 ```

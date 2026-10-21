@@ -163,7 +163,7 @@ with the following content: $3
 
 ### シェル出力
 
-_!`command`_ を使用して、[bash コマンド](/docs/tui#bash-commands) の出力をプロンプトに挿入します。
+_!`command`_ を使用して、[shell コマンド](/docs/tui#shell-commands) の出力をプロンプトに挿入します。
 
 たとえば、テストカバレッジを分析するカスタムコマンドを作成するには、次のようにします。
 

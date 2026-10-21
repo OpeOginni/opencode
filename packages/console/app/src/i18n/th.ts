@@ -35,6 +35,7 @@ export const dict = {
   "email.placeholder": "ที่อยู่อีเมล",
   "email.subscribe": "สมัครรับข่าวสาร",
   "email.success": "เกือบเสร็จแล้ว ตรวจสอบกล่องจดหมายและยืนยันที่อยู่อีเมลของคุณ",
+  "email.error": "สมัครรับข่าวสารไม่สำเร็จ โปรดลองอีกครั้ง",
 
   "notFound.title": "ไม่พบหน้า | OpenCode",
   "notFound.heading": "404 - ไม่พบหน้าที่ค้นหา",
@@ -56,22 +57,6 @@ export const dict = {
   "app.meta.description": "OpenCode - เอเจนต์เขียนโค้ดแบบโอเพนซอร์ส",
 
   "home.title": "OpenCode | เอเจนต์เขียนโค้ดด้วย AI แบบโอเพนซอร์ส",
-
-  "temp.title": "OpenCode | เอเจนต์เขียนโค้ด AI ที่สร้างมาเพื่อเทอร์มินัล",
-  "temp.hero.title": "เอเจนต์เขียนโค้ด AI ที่สร้างมาเพื่อเทอร์มินัล",
-  "temp.zen": "OpenCode Zen",
-  "temp.getStarted": "เริ่มต้นใช้งาน",
-  "temp.feature.native.title": "Native TUI",
-  "temp.feature.native.body": "UI เทอร์มินัลแบบเนทีฟที่ตอบสนองไวและปรับแต่งธีมได้",
-  "temp.feature.zen.beforeLink": "",
-  "temp.feature.zen.link": "รายการโมเดลที่คัดสรรแล้ว",
-  "temp.feature.zen.afterLink": "โดย OpenCode",
-  "temp.feature.models.beforeLink": "รองรับผู้ให้บริการ LLM กว่า 75 รายผ่าน",
-  "temp.feature.models.afterLink": "รวมถึงโมเดล Local",
-  "temp.screenshot.caption": "OpenCode TUI พร้อมธีม tokyonight",
-  "temp.screenshot.alt": "OpenCode TUI พร้อมธีม tokyonight",
-  "temp.logoLightAlt": "โลโก้ opencode แบบสว่าง",
-  "temp.logoDarkAlt": "โลโก้ opencode แบบมืด",
 
   "home.banner.badge": "ใหม่",
 
@@ -217,7 +202,7 @@ export const dict = {
     "โมเดล Zen ทั้งหมดโฮสต์ในสหรัฐอเมริกา ผู้ให้บริการปฏิบัติตามนโยบายไม่เก็บรักษาข้อมูล (zero-retention policy) และไม่ใช้ข้อมูลของคุณสำหรับการฝึกโมเดล โดยมี",
   "zen.privacy.exceptionsLink": "ข้อยกเว้นดังนี้",
 
-  "go.promo.step5": "Step 5 Preview พร้อมให้ใช้งานใน Go แล้ว พร้อมการใช้งาน 4 เท่าในช่วงเวลาจำกัด",
+  "go.promo.minimaxM31FlashFree": "MiniMax M3.1 Flash Free พร้อมให้ใช้งานใน Go แล้ว ใช้ฟรีในช่วงเวลาจำกัด",
   "go.title": "OpenCode Go | โมเดลเขียนโค้ดราคาประหยัดสำหรับทุกคน",
   "go.meta.description":
     "Go มีราคา $10/เดือน พร้อมขีดจำกัดการใช้งานที่เอื้อเฟื้อและการเข้าถึงโมเดลเขียนโค้ดชั้นนำอย่างเชื่อถือได้",
@@ -255,7 +240,6 @@ export const dict = {
   "go.problem.title": "Go แก้ปัญหาอะไร?",
   "go.problem.body":
     "เรามุ่งมั่นที่จะนำประสบการณ์ OpenCode ไปสู่ผู้คนให้ได้มากที่สุด OpenCode Go เป็นการสมัครสมาชิกราคาประหยัด $10/เดือน โดยมอบขีดจำกัดที่เอื้อเฟื้อและการเข้าถึงโมเดลโอเพนซอร์สที่มีความสามารถสูงสุดอย่างเชื่อถือได้",
-  "go.problem.subtitle": " ",
   "go.problem.item1": "ราคาการสมัครสมาชิกที่ต่ำ",
   "go.problem.item2": "ขีดจำกัดที่กว้างขวางและการเข้าถึงที่เชื่อถือได้",
   "go.problem.item3": "สร้างขึ้นเพื่อโปรแกรมเมอร์จำนวนมากที่สุดเท่าที่จะเป็นไปได้",
@@ -313,36 +297,10 @@ export const dict = {
 
   "go.faq.q9": "ความแตกต่างระหว่างโมเดลฟรีและ Go คืออะไร?",
   "go.faq.a9":
-    "โมเดลฟรีประกอบด้วย Big Pickle และโมเดลโปรโมชันที่มีให้บริการในขณะนั้น โดยมีโควตา 200 คำขอ/วัน Go นำเสนอชุดโมเดลที่คัดสรร พร้อมโควตาคำขอที่สูงกว่าในกรอบเวลาแบบต่อเนื่อง ได้แก่ 20% ของโควตารายเดือนต่อ 5 ชั่วโมง 50% ต่อสัปดาห์ และ 100% ต่อเดือน โควตาเฉพาะอาจแตกต่างกันไปตามโมเดล (จำนวนคำขอจริงแตกต่างกันไปตามโมเดลและการใช้งาน)",
+    "โมเดลฟรีประกอบด้วย Big Pickle และโมเดลโปรโมชันที่มีให้บริการในขณะนั้น Go นำเสนอชุดโมเดลที่คัดสรร พร้อมโควตาคำขอที่สูงกว่าในกรอบเวลาแบบต่อเนื่อง ได้แก่ 20% ของโควตารายเดือนต่อ 5 ชั่วโมง 50% ต่อสัปดาห์ และ 100% ต่อเดือน โควตาเฉพาะอาจแตกต่างกันไปตามโมเดล (จำนวนคำขอจริงแตกต่างกันไปตามโมเดลและการใช้งาน)",
   "go.faq.q10": "ฉันขอเงินคืนได้หรือไม่?",
   "go.faq.a10":
     "หากมีการเรียกเก็บเงินภายใน 14 วันที่ผ่านมาและคุณยังไม่ได้ใช้สิทธิ์การใช้งาน Go เลยในรอบการเรียกเก็บเงินนั้น คุณอาจมีสิทธิ์ได้รับเงินคืน {{contact}}เพื่อขอเงินคืน",
-
-  "black.meta.title": "OpenCode Black | เข้าถึงโมเดลเขียนโค้ดที่ดีที่สุดในโลก",
-  "black.meta.description": "เข้าถึง Claude, GPT, Gemini และอื่นๆ ด้วยแผนสมาชิก OpenCode Black",
-  "black.hero.title": "เข้าถึงโมเดลเขียนโค้ดที่ดีที่สุดในโลก",
-  "black.hero.subtitle": "รวมถึง Claude, GPT, Gemini และอื่นๆ อีกมากมาย",
-  "black.title": "OpenCode Black | ราคา",
-  "black.paused": "การสมัครแผน Black หยุดชั่วคราว",
-  "black.plan.icon20": "แผน Black 20",
-  "black.plan.icon100": "แผน Black 100",
-  "black.plan.icon200": "แผน Black 200",
-  "black.plan.multiplier100": "ใช้งานได้มากกว่า Black 20 ถึง 5 เท่า",
-  "black.plan.multiplier200": "ใช้งานได้มากกว่า Black 20 ถึง 20 เท่า",
-  "black.price.perMonth": "ต่อเดือน",
-  "black.price.perPersonBilledMonthly": "ต่อคน เรียกเก็บรายเดือน",
-  "black.terms.1": "การสมัครสมาชิกของคุณจะยังไม่เริ่มต้นทันที",
-  "black.terms.2": "คุณจะถูกเพิ่มในรายชื่อรอและจะได้รับการเปิดใช้งานเร็วๆ นี้",
-  "black.terms.3": "บัตรของคุณจะถูกตัดเงินเมื่อการสมัครสมาชิกของคุณถูกเปิดใช้งานเท่านั้น",
-  "black.terms.4": "มีขีดจำกัดการใช้งาน การใช้ระบบอัตโนมัติอย่างหนักอาจทำให้ถึงขีดจำกัดเร็วขึ้น",
-  "black.terms.5": "การสมัครสมาชิกสำหรับบุคคลธรรมดา ติดต่อฝ่ายองค์กรสำหรับทีม",
-  "black.terms.6": "ขีดจำกัดอาจมีการปรับเปลี่ยนและแผนอาจถูกยกเลิกในอนาคต",
-  "black.terms.7": "ยกเลิกการสมัครสมาชิกได้ตลอดเวลา",
-  "black.finePrint.beforeTerms": "ราคาที่แสดงยังไม่รวมภาษีที่เกี่ยวข้อง",
-  "black.finePrint.terms": "ข้อกำหนดการให้บริการ",
-  "black.workspace.title": "OpenCode Black | เลือก Workspace",
-  "black.workspace.selectPlan": "เลือก Workspace สำหรับแผนนี้",
-  "black.workspace.name": "Workspace {{n}}",
 
   "download.title": "OpenCode | ดาวน์โหลด",
   "download.meta.description": "ดาวน์โหลด OpenCode สำหรับ macOS, Windows และ Linux",
@@ -405,6 +363,7 @@ export const dict = {
   "enterprise.form.error.invalidEmailFormat": "รูปแบบอีเมลไม่ถูกต้อง",
   "enterprise.form.error.invalidInferenceSpend": "เลือกช่วงค่าใช้จ่ายด้าน inference ที่ถูกต้อง",
   "enterprise.form.error.internalServer": "เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์",
+  "enterprise.form.error.captcha": "การยืนยัน captcha ล้มเหลว โปรดลองอีกครั้ง",
   "enterprise.faq.title": "คำถามที่พบบ่อย",
   "enterprise.faq.q1": "OpenCode Enterprise คืออะไร?",
   "enterprise.faq.a1":

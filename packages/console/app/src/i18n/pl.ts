@@ -35,6 +35,7 @@ export const dict = {
   "email.placeholder": "Adres e-mail",
   "email.subscribe": "Subskrybuj",
   "email.success": "Prawie gotowe, sprawdź skrzynkę i potwierdź swój adres e-mail",
+  "email.error": "Nie udało się zapisać. Spróbuj ponownie.",
 
   "notFound.title": "Nie znaleziono | opencode",
   "notFound.heading": "404 - Nie znaleziono strony",
@@ -56,22 +57,6 @@ export const dict = {
   "app.meta.description": "OpenCode - Otwartoźródłowy agent programistyczny.",
 
   "home.title": "OpenCode | Open source'owy agent AI do kodowania",
-
-  "temp.title": "opencode | Agent AI do kodowania zbudowany dla terminala",
-  "temp.hero.title": "Agent AI do kodowania zbudowany dla terminala",
-  "temp.zen": "opencode zen",
-  "temp.getStarted": "Rozpocznij",
-  "temp.feature.native.title": "Natywny TUI",
-  "temp.feature.native.body": "Responsywny, natywny, tematyczny interfejs terminala",
-  "temp.feature.zen.beforeLink": "A",
-  "temp.feature.zen.link": "wyselekcjonowana lista modeli",
-  "temp.feature.zen.afterLink": "dostarczana przez opencode",
-  "temp.feature.models.beforeLink": "Obsługuje 75+ dostawców LLM przez",
-  "temp.feature.models.afterLink": ", w tym modele lokalne",
-  "temp.screenshot.caption": "OpenCode TUI z motywem tokyonight",
-  "temp.screenshot.alt": "OpenCode TUI z motywem tokyonight",
-  "temp.logoLightAlt": "jasne logo opencode",
-  "temp.logoDarkAlt": "ciemne logo opencode",
 
   "home.banner.badge": "Nowość",
 
@@ -219,7 +204,7 @@ export const dict = {
     "Wszystkie modele Zen są hostowane w USA. Dostawcy stosują politykę zerowej retencji i nie wykorzystują Twoich danych do trenowania modeli, z",
   "zen.privacy.exceptionsLink": "następującymi wyjątkami",
 
-  "go.promo.step5": "Step 5 Preview jest już dostępny w Go z 4× większym limitem przez ograniczony czas.",
+  "go.promo.minimaxM31FlashFree": "MiniMax M3.1 Flash Free jest już dostępny w Go, za darmo przez ograniczony czas.",
   "go.title": "OpenCode Go | Niskokosztowe modele do kodowania dla każdego",
   "go.meta.description":
     "Go kosztuje $10/miesiąc, oferując hojne limity użycia i niezawodny dostęp do wiodących modeli do kodowania.",
@@ -257,7 +242,6 @@ export const dict = {
   "go.problem.title": "Jaki problem rozwiązuje Go?",
   "go.problem.body":
     "Skupiamy się na udostępnieniu doświadczenia OpenCode jak największej liczbie osób. OpenCode Go to tania subskrypcja za $10/miesiąc. Zapewnia hojne limity i niezawodny dostęp do najbardziej wydajnych modeli open source.",
-  "go.problem.subtitle": " ",
   "go.problem.item1": "Niskokosztowa cena subskrypcji",
   "go.problem.item2": "Hojne limity i niezawodny dostęp",
   "go.problem.item3": "Stworzony dla jak największej liczby programistów",
@@ -317,36 +301,10 @@ export const dict = {
 
   "go.faq.q9": "Jaka jest różnica między darmowymi modelami a Go?",
   "go.faq.a9":
-    "Darmowe modele obejmują Big Pickle oraz modele promocyjne dostępne w danym momencie, z limitem 200 zapytań/dzień. Go oferuje starannie dobrany zestaw modeli z wyższymi limitami zapytań w oknach kroczących: 20% miesięcznego limitu na 5 godzin, 50% na tydzień i 100% na miesiąc. Limity mogą się różnić zależnie od modelu (rzeczywista liczba zapytań zależy od modelu i użycia).",
+    "Darmowe modele obejmują Big Pickle oraz modele promocyjne dostępne w danym momencie. Go oferuje starannie dobrany zestaw modeli z wyższymi limitami zapytań w oknach kroczących: 20% miesięcznego limitu na 5 godzin, 50% na tydzień i 100% na miesiąc. Limity mogą się różnić zależnie od modelu (rzeczywista liczba zapytań zależy od modelu i użycia).",
   "go.faq.q10": "Czy mogę otrzymać zwrot pieniędzy?",
   "go.faq.a10":
     "Możesz kwalifikować się do zwrotu, jeśli opłata została pobrana w ciągu ostatnich 14 dni i nie wykorzystano żadnej części limitu Go w tym okresie rozliczeniowym. {{contact}}, aby poprosić o zwrot.",
-
-  "black.meta.title": "OpenCode Black | Dostęp do najlepszych na świecie modeli kodujących",
-  "black.meta.description": "Uzyskaj dostęp do Claude, GPT, Gemini i innych dzięki planom subskrypcji OpenCode Black.",
-  "black.hero.title": "Dostęp do najlepszych na świecie modeli kodujących",
-  "black.hero.subtitle": "W tym Claude, GPT, Gemini i inne",
-  "black.title": "OpenCode Black | Cennik",
-  "black.paused": "Rejestracja planu Black jest tymczasowo wstrzymana.",
-  "black.plan.icon20": "Plan Black 20",
-  "black.plan.icon100": "Plan Black 100",
-  "black.plan.icon200": "Plan Black 200",
-  "black.plan.multiplier100": "5x większe użycie niż Black 20",
-  "black.plan.multiplier200": "20x większe użycie niż Black 20",
-  "black.price.perMonth": "miesięcznie",
-  "black.price.perPersonBilledMonthly": "za osobę rozliczane miesięcznie",
-  "black.terms.1": "Twoja subskrypcja nie rozpocznie się natychmiast",
-  "black.terms.2": "Zostaniesz dodany do listy oczekujących i aktywowany wkrótce",
-  "black.terms.3": "Twoja karta zostanie obciążona dopiero po aktywacji subskrypcji",
-  "black.terms.4": "Obowiązują limity użycia, intensywne automatyczne użycie może wyczerpać limity szybciej",
-  "black.terms.5": "Subskrypcje są dla osób indywidualnych, skontaktuj się z Enterprise dla zespołów",
-  "black.terms.6": "Limity mogą zostać dostosowane, a plany mogą zostać wycofane w przyszłości",
-  "black.terms.7": "Anuluj subskrypcję w dowolnym momencie",
-  "black.finePrint.beforeTerms": "Podane ceny nie zawierają stosownego podatku",
-  "black.finePrint.terms": "Warunki świadczenia usług",
-  "black.workspace.title": "OpenCode Black | Wybierz obszar roboczy",
-  "black.workspace.selectPlan": "Wybierz obszar roboczy dla tego planu",
-  "black.workspace.name": "Obszar roboczy {{n}}",
 
   "download.title": "OpenCode | Pobierz",
   "download.meta.description": "Pobierz OpenCode na macOS, Windows i Linux",
@@ -410,6 +368,7 @@ export const dict = {
   "enterprise.form.error.invalidEmailFormat": "Nieprawidłowy format adresu e-mail.",
   "enterprise.form.error.invalidInferenceSpend": "Wybierz prawidłowy przedział wydatków na inferencję.",
   "enterprise.form.error.internalServer": "Wewnętrzny błąd serwera.",
+  "enterprise.form.error.captcha": "Weryfikacja captcha nie powiodła się. Spróbuj ponownie.",
   "enterprise.faq.title": "FAQ",
   "enterprise.faq.q1": "Czym jest OpenCode Enterprise?",
   "enterprise.faq.a1":

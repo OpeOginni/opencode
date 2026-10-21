@@ -164,7 +164,7 @@ with the following content: $3
 
 ### 셸 출력
 
-_!`command`_ 문법으로 [bash 명령](/docs/tui#bash-commands)의 출력 결과를 프롬프트에 주입할 수 있습니다.
+_!`command`_ 문법으로 [shell 명령](/docs/tui#shell-commands)의 출력 결과를 프롬프트에 주입할 수 있습니다.
 
 예를 들어 테스트 커버리지 분석 명령을 만들면:
 

@@ -162,7 +162,7 @@ with the following content: $3
 
 ### คำสั่ง Shell
 
-ใช้ _!`command`_ เพื่อแทรกเอาต์พุตของ [คำสั่ง bash](/docs/tui#bash-commands) ใดๆ ลงในพรอมต์ของคุณ
+ใช้ _!`command`_ เพื่อแทรกเอาต์พุตของ [คำสั่ง shell](/docs/tui#shell-commands) ใดๆ ลงในพรอมต์ของคุณ
 
 ตัวอย่างเช่น การรันชุดทดสอบและรวมผลลัพธ์:
 

@@ -386,7 +386,7 @@ automatic and manual requests with a provider or model policy:
 
 A model setting overrides the provider setting. Automatic compaction uses the
 selected model's usable input budget. Provider checkpoints keep recent user messages within the same
-`compaction.tokens` budget that local summaries use for their retained tail.
+`compaction.keep.tokens` budget that local summaries use for their retained tail.
 Top-level `compaction.auto: false` disables new automatic compaction without
 discarding installed checkpoints. See the [compaction guide](/compaction) for
 budgeting and overflow recovery.
@@ -609,3 +609,58 @@ These are useful for:
 
 - Keeping sensitive data like API keys in separate files.
 - Sharing common configuration snippets across multiple config files.
+
+## Experimental
+
+<Callout type="warning">
+  Experimental settings may change, break, or be removed in any release without notice. Don't rely on them for stable
+  workflows.
+</Callout>
+
+All experimental settings live under the `experimental` key:
+
+```jsonc title="opencode.jsonc"
+{
+  "$schema": "https://opencode.ai/config.json",
+  "experimental": {
+    "todo": true,
+    "subagent_depth": 2,
+    "portable_shell_scanner": true,
+    "location_idle_timeout": "4 hours",
+  },
+}
+```
+
+### Todos
+
+Set `todo` to `true` to give agents a `todowrite` tool for tracking multi-step work. Defaults to `false`.
+
+### Subagent depth
+
+`subagent_depth` sets how deeply subagents can start their own subagents. Defaults to `1`, so a subagent cannot
+start another subagent.
+
+### Portable shell scanner
+
+Set `portable_shell_scanner` to `true` to replace the default tree-sitter shell scanner used by permission checks.
+Defaults to `false`. See [Permissions](/permissions#scanner) for how it behaves.
+
+### Location idle timeout
+
+`location_idle_timeout` controls how long a project location can go without session activity before OpenCode unloads
+its services. It takes a duration such as `"2 hours"` and defaults to `"60 minutes"`. Running sessions and background
+jobs keep a location loaded. Set it to `false` to never unload idle locations. Project config can override the global
+value.
+
+```jsonc
+{
+  "experimental": {
+    "location_idle_timeout": false,
+  },
+}
+```
+
+### Deprecated policies
+
+`experimental.policies` is deprecated. Use top-level [`policies`](/policies) instead. The old key still works and
+merges into `policies`.

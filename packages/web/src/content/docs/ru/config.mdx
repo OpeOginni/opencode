@@ -216,7 +216,7 @@ opencode run "Hello world"
   "$schema": "https://opencode.ai/config.json",
   "tools": {
     "write": false,
-    "bash": false
+    "shell": false
   }
 }
 ```
@@ -443,14 +443,14 @@ opencode автоматически загрузит все новые обно�
 
 По умолчанию opencode **разрешает все операции**, не требуя явного разрешения. Вы можете изменить это, используя опцию `permission`.
 
-Например, чтобы гарантировать, что инструменты `edit` и `bash` требуют одобрения пользователя:
+Например, чтобы гарантировать, что инструменты `edit` и `shell` требуют одобрения пользователя:
 
 ```json title="opencode.json"
 {
   "$schema": "https://opencode.ai/config.json",
   "permission": {
     "edit": "ask",
-    "bash": "ask"
+    "shell": "ask"
   }
 }
 ```

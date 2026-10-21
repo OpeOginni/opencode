@@ -32,6 +32,7 @@ import {
 } from "@opencode/ai"
 import { Auth, Endpoint, RequestExecutor, type AnyRoute, type HttpMiddleware } from "@opencode/ai/route"
 import { ProviderShared } from "@opencode/ai/protocols/shared"
+import { isRecord } from "@opencode/ai/utils/record"
 import { Cause, Context, Effect, Layer, Option, Schema, Scope, Stream } from "effect"
 import { makeParser } from "effect/encoding/Sse"
 import { HttpClientRequest, HttpClientResponse } from "effect/http"
@@ -39,6 +40,7 @@ import { AsyncLocalStorage } from "node:async_hooks"
 import type { ID, RuntimeInfo } from "./model.js"
 import { Provider } from "./provider.js"
 import { State } from "./state.js"
+import { stringify } from "./tool/runtime.js"
 
 type SDK = any
 type UserContent = Extract<LanguageModelV3Message, { role: "user" }>["content"]
@@ -420,11 +422,8 @@ function modelFromLanguage(info: RuntimeInfo, language: LanguageModelV3) {
   })
 }
 
-function gatewayProviderOptions(modelID: ID, settings: Readonly<Record<string, unknown>>) {
-  const gateway =
-    typeof settings.gateway === "object" && settings.gateway !== null && !Array.isArray(settings.gateway)
-      ? Object.fromEntries(Object.entries(settings.gateway))
-      : undefined
+function gatewayProviderOptions(modelID: ID, settings: Readonly<Record<string, JSONValue>>) {
+  const gateway = isRecord(settings.gateway) ? Object.fromEntries(Object.entries(settings.gateway)) : undefined
   const model = Object.fromEntries(Object.entries(settings).filter(([key]) => key !== "gateway"))
   if (Object.keys(model).length === 0) return gateway === undefined ? undefined : { gateway }
 
@@ -666,7 +665,7 @@ function toolOutput(result: ToolResultValue) {
   switch (result.type) {
     case "text":
     case "error":
-      return { type: "text" as const, value: messageValue(result.value) }
+      return { type: "text" as const, value: stringify(result.value) }
     case "content":
       return {
         type: "content" as const,
@@ -924,16 +923,7 @@ function jsonValue(input: unknown): JSONValue {
     const encoded = JSON.stringify(input)
     return encoded === undefined ? null : (JSON.parse(encoded) as JSONValue)
   } catch {
-    return messageValue(input)
-  }
-}
-
-function messageValue(input: unknown) {
-  if (typeof input === "string") return input
-  try {
-    return JSON.stringify(input) ?? String(input)
-  } catch {
-    return String(input)
+    return stringify(input)
   }
 }
 
