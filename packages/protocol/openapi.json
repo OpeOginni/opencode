@@ -16495,6 +16495,9 @@
           "name": {
             "type": "string"
           },
+          "configured": {
+            "type": "boolean"
+          },
           "metadata": {
             "type": "object"
           },
