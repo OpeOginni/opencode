@@ -6,10 +6,18 @@ import { DialogModel } from "../../src/component/dialog-model"
 import { model, renderLocal } from "../fixture/local"
 import { directory, json } from "../fixture/tui-client"
 
-test("identifies models with the same name without integration connections", async () => {
+test("identifies models with the same name from config-only integrations", async () => {
   await using setup = await renderLocal({
     models: ["one", "two"].map((providerID) => ({ ...model("chat"), providerID, name: "Same Model" })),
     fetch: (url) => {
+      if (url.pathname === "/api/integration")
+        return json({
+          location: { directory },
+          data: [
+            { id: "one", name: "Gateway One", configured: true, methods: [], connections: [] },
+            { id: "two", name: "Gateway Two", configured: true, methods: [], connections: [] },
+          ],
+        })
       if (url.pathname === "/api/provider")
         return json({
           location: { directory },

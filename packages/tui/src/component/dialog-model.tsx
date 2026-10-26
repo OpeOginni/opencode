@@ -138,7 +138,7 @@ function DialogConnectedModels(props: {
             title: model.name,
             releaseDate: model.time.released,
             description: newDesigns() ? undefined : favorite ? "(Favorite)" : undefined,
-            category: freeGroup(model) ? "Free" : (provider?.name ?? model.providerID),
+            category: connected() ? (freeGroup(model) ? "Free" : (provider?.name ?? model.providerID)) : undefined,
             footer: trailing(model, favorite),
             free: isFreeModel(model),
             detail: newDesigns() ? () => <ModelDetail model={model} /> : undefined,
