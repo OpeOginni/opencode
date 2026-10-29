@@ -31,10 +31,9 @@ export default Runtime.handler(
       return yield* Effect.fail(new Error("Plugin target must be an npm registry package or Git package specifier"))
     const npm = yield* Npm.Service
     const installed = yield* npm.add(targetPackage)
-    const entrypoints = Host.resolve(installed)
-    const target = configurationTarget(entrypoints.server, entrypoints.tui)
+    const target = configurationTarget(Host.resolve(installed))
     if (!target)
-      return yield* Effect.fail(new Error(`Plugin package has no server or TUI entrypoint: ${targetPackage}`))
+      return yield* Effect.fail(new Error(`Plugin package has no server, GUI, or TUI entrypoint: ${targetPackage}`))
 
     if (target === "server") {
       const global = yield* Global.Service
@@ -74,9 +73,11 @@ export default Runtime.handler(
   }, handlePromptErrors),
 )
 
-export function configurationTarget(server?: string, tui?: string) {
-  if (server) return "server" as const
-  if (tui) return "tui" as const
+// The server lists packages with a server or GUI part, and the TUI loads their TUI parts from that list; the desktop
+// app reads GUI parts only from the global opencode.json. Only a TUI-only package belongs in the TUI's own config.
+export function configurationTarget(entrypoints: Host.Entrypoints) {
+  if (entrypoints.server || entrypoints.gui) return "server" as const
+  if (entrypoints.tui) return "tui" as const
 }
 
 export async function writePluginConfig(configPath: string, spec: string) {
