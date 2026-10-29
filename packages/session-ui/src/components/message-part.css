@@ -1380,7 +1380,8 @@
   scroll-margin-top: var(--sticky-accordion-top, 0px);
 }
 
-[data-component="dock-prompt"] {
+[data-component="dock-prompt"][data-kind="permission"],
+[data-component="dock-prompt"][data-variant="experimental"] {
   position: relative;
   display: flex;
   flex-direction: column;

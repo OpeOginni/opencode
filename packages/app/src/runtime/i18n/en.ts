@@ -378,7 +378,7 @@ export const dict = {
   "dialog.mcp.error.details":
     "MCP server: {{name}}\nStatus: failed\nConfiguration: mcp.servers.{{name}}\nError: {{error}}",
   "dialog.fork.search.empty": "No messages found",
-  "dialog.fork.description": "Edit an earlier message in a new session",
+  "dialog.fork.description": "Choose a message to fork from",
 
   "mcp.status.connected": "Connected",
   "mcp.status.failed": "Failed",
@@ -674,6 +674,10 @@ export const dict = {
   "session.quote.actions": "Quote selection",
   "session.quote.add": "Quote",
   "session.quote.addWithComment": "Quote and comment",
+  "session.quote.addWithoutComment": "Quote without comment",
+  "session.quote.optionalCommentPlaceholder": "Add an optional comment...",
+  "session.quote.done": "Done",
+  "session.quote.addComment": "Add comment",
   "session.quote.commentPlaceholder": "Add a comment about this quote",
   "session.quote.tooLong": "Selection too long",
   "session.header.open.finder": "Finder",
@@ -782,6 +786,8 @@ export const dict = {
   "settings.experimental.row.newIcons.description": "Preview the updated icon set",
   "settings.experimental.row.foldUserMessages.title": "Fold long messages",
   "settings.experimental.row.foldUserMessages.description": "Fold your messages past 12 lines behind a Read more button",
+  "settings.experimental.row.newQuestionUI.title": "New question UI",
+  "settings.experimental.row.newQuestionUI.description": "Preview the keyboard-first question dock",
   "settings.plugins.reload": "Reload",
   "settings.plugins.status.loading": "Loading",
   "settings.plugins.status.failed": "Failed",
