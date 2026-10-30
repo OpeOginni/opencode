@@ -119,6 +119,7 @@ You can also omit `settings.apiKey` and list credential environment variables un
 ```
 
 Set these variables in the server's environment. OpenCode can use their values as provider credentials.
+The selected connection's key, supplied through `/connect` or `env`, takes precedence over `settings.apiKey`.
 The runtime package may also read its own environment variables for authentication or other settings.
 
 ### Settings
