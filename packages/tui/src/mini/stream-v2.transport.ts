@@ -1425,6 +1425,7 @@ export async function createSessionTransport(input: StreamInput): Promise<Sessio
     if (
       event.type === "session.execution.succeeded" ||
       event.type === "session.execution.failed" ||
+      event.type === "session.execution.unrecorded" ||
       event.type === "session.execution.interrupted"
     ) {
       state.executionEpoch++
@@ -1435,7 +1436,7 @@ export async function createSessionTransport(input: StreamInput): Promise<Sessio
       if (current.interrupted && event.type === "session.execution.interrupted" && event.data.reason === "user") {
         return
       }
-      if (event.type === "session.execution.failed") {
+      if (event.type === "session.execution.failed" || event.type === "session.execution.unrecorded") {
         if (!current.failureRendered) current.terminalError = new Error(errorMessage(event.data.error))
         return
       }

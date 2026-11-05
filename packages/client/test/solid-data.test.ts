@@ -1470,6 +1470,55 @@ test("ignores activity snapshots from an older connection", async () => {
   }
 })
 
+test("settles running tools without a durable terminal when execution cannot be recorded", () => {
+  const setup = activityFixture(() => Response.json({ data: {} }))
+  const sessionID = "ses_refresh"
+  const assistantMessageID = "msg_storage"
+  const error = { type: "storage.error", message: "OpenCode couldn't save session data: database or disk is full" }
+  try {
+    setup.data.session.setStatus(sessionID, "running")
+    setup.emit({
+      id: "evt_storage_step",
+      created: 1,
+      type: "session.step.started",
+      durable: { aggregateID: sessionID, seq: 1, version: 1 },
+      data: { sessionID, assistantMessageID, agent: "build", model: { id: "test", providerID: "test" }, started: 1 },
+    })
+    setup.emit({
+      id: "evt_storage_input",
+      created: 2,
+      type: "session.tool.input.started",
+      durable: { aggregateID: sessionID, seq: 2, version: 1 },
+      data: { sessionID, assistantMessageID, id: "call_storage", name: "shell" },
+    })
+    setup.emit({
+      id: "evt_storage_call",
+      created: 3,
+      type: "session.tool.called",
+      durable: { aggregateID: sessionID, seq: 3, version: 1 },
+      data: { sessionID, assistantMessageID, id: "call_storage", input: { command: "pwd" }, executed: false },
+    })
+    setup.emit({
+      id: "evt_storage_failure",
+      created: 4,
+      type: "session.execution.unrecorded",
+      data: { sessionID, error },
+    })
+
+    expect(setup.data.session.status(sessionID)).toBe("idle")
+    expect(setup.data.session.message.list(sessionID)).toMatchObject([
+      {
+        type: "assistant",
+        time: { completed: 4 },
+        content: [{ state: { status: "error", input: { command: "pwd" }, error } }],
+      },
+      { type: "idle", outcome: "failed", error },
+    ])
+  } finally {
+    setup.dispose()
+  }
+})
+
 test("projects background user shell metadata from durable shell data", () => {
   const setup = activityFixture(() => Response.json({ data: {} }))
   try {

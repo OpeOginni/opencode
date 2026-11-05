@@ -255,6 +255,13 @@ export namespace Execution {
   })
   export type Failed = typeof Failed.Type
 
+  /** Execution stopped, but its lifecycle could not be persisted. Live clients must not wait for a durable terminal. */
+  export const Unrecorded = Event.ephemeral({
+    type: "session.execution.unrecorded",
+    schema: { ...Base, error: SessionError.Error },
+  })
+  export type Unrecorded = typeof Unrecorded.Type
+
   export const Interrupted = Event.durable({
     type: "session.execution.interrupted",
     ...options,
@@ -672,6 +679,7 @@ export const Definitions = Event.inventory(
   Execution.Started,
   Execution.Succeeded,
   Execution.Failed,
+  Execution.Unrecorded,
   Execution.Interrupted,
   InstructionsUpdated,
   Synthetic,

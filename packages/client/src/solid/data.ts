@@ -1166,6 +1166,7 @@ export function createData(config: CreateDataInput) {
         })
         if (event.data.inputID) compacting.get(event.data.sessionID)?.observed.add(event.data.inputID)
         return
+      case "session.execution.unrecorded":
       case "session.execution.succeeded":
       case "session.execution.failed":
       case "session.execution.interrupted":
@@ -1173,6 +1174,29 @@ export function createData(config: CreateDataInput) {
         message.update(event.data.sessionID, (draft) => {
           const currentAssistant = message.activeAssistant(draft)
           if (currentAssistant) currentAssistant.retry = undefined
+          if (event.type !== "session.execution.failed" && event.type !== "session.execution.unrecorded") return
+          const assistant = draft.findLast((item) => item.type === "assistant")
+          if (assistant?.type !== "assistant") return
+          if (
+            assistant.time.completed !== undefined &&
+            !assistant.content.some(
+              (part) => part.type === "tool" && (part.state.status === "streaming" || part.state.status === "running"),
+            )
+          )
+            return
+          assistant.retry = undefined
+          assistant.time.completed ??= event.created
+          assistant.finish = "error"
+          for (const part of assistant.content) {
+            if (part.type !== "tool" || (part.state.status !== "streaming" && part.state.status !== "running")) continue
+            part.state = {
+              status: "error",
+              error: event.data.error,
+              input: typeof part.state.input === "string" ? {} : part.state.input,
+              metadata: part.state.status === "running" ? part.state.metadata : undefined,
+            }
+            part.time.completed = event.created
+          }
         })
         if (event.type === "session.execution.interrupted" && event.data.reason === "shutdown") return
         // Mirror the projected idle marker so turn boundaries match before the next message read.
@@ -1182,12 +1206,15 @@ export function createData(config: CreateDataInput) {
           outcome:
             event.type === "session.execution.succeeded"
               ? "succeeded"
-              : event.type === "session.execution.failed"
+              : event.type === "session.execution.failed" || event.type === "session.execution.unrecorded"
                 ? "failed"
                 : "interrupted",
-          ...(event.type === "session.execution.failed" ? { error: event.data.error } : {}),
+          ...(event.type === "session.execution.failed" || event.type === "session.execution.unrecorded"
+            ? { error: event.data.error }
+            : {}),
           time: { created: event.created },
         })
+        if (event.type === "session.execution.unrecorded") return
         if (
           store.session.message[event.data.sessionID]?.some(
             (item) =>

@@ -324,7 +324,7 @@ type MessageRow = typeof SessionMessageTable.$inferSelect
 type PartRow = typeof SessionPartTable.$inferSelect
 type Writes = Pick<
   SessionMessageUpdater.Adapter,
-  | "getCurrentAssistant"
+  | "getLatestAssistant"
   | "getAssistant"
   | "updateAssistant"
   | "appendAssistantPart"
@@ -441,9 +441,9 @@ function assistantReads(
   db: DatabaseService,
   event: MessageEvent,
   decode: (row: MessageRow) => Effect.Effect<SessionMessage.Info>,
-): Pick<Writes, "getCurrentAssistant" | "getAssistant"> {
+): Pick<Writes, "getLatestAssistant" | "getAssistant"> {
   return {
-    getCurrentAssistant() {
+    getLatestAssistant() {
       return Effect.gen(function* () {
         // A newer step supersedes stale incomplete rows; never resume an older assistant projection.
         const row = yield* db
@@ -456,9 +456,9 @@ function assistantReads(
           .limit(1)
           .get()
           .pipe(Effect.orDie)
-        if (!row || ("completed" in row.data.time && row.data.time.completed)) return
+        if (!row) return
         const message = yield* decode(row)
-        return message.type === "assistant" && !message.time.completed ? message : undefined
+        return message.type === "assistant" ? message : undefined
       })
     },
     getAssistant(messageID) {

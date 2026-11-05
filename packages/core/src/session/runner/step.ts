@@ -284,7 +284,8 @@ export const make = Effect.gen(function* () {
           if (input.isLocationClosed()) return Outcome.Completed({ needsContinuation: true })
           return yield* Effect.interrupt
         }
-        if (tools.interrupted && tools.failure) return yield* Effect.failCause(tools.failure)
+        if (tools.failure && (tools.interrupted || publisher.hasFailedPublication()))
+          return yield* Effect.failCause(tools.failure)
         if (tools.interrupted && Exit.isFailure(joined)) return yield* Effect.failCause(joined.cause)
         if (record.failure) return yield* new StepFailedError({ error: record.failure })
         const needsContinuation = input.prepared.request.toolChoice?.type !== "none" && record.needsContinuation

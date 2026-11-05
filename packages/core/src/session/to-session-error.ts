@@ -7,6 +7,7 @@ import { AgentNotFoundError, StepFailedError } from "./error.js"
 import { ModelResolver } from "../model-resolver.js"
 import { ModelRetry } from "../model-retry.js"
 import { SessionRunnerModel } from "./runner/model.js"
+import { SqlError } from "effect/sql/SqlError"
 
 const tokenSharingMessages = {
   subscription_sharing_user_not_eligible:
@@ -32,6 +33,13 @@ const BUDGET_LIMIT_MESSAGE = "Workspace usage limit reached. Model use is paused
 const MODEL_BUDGET_LIMIT_MESSAGE = "You've reached the spend limit for this model. Switch models to keep going."
 
 export function toSessionError(cause: unknown): SessionError.Error {
+  if (cause instanceof SqlError) {
+    const error = cause.reason.cause
+    return {
+      type: "storage.error",
+      message: `OpenCode couldn't save session data: ${error instanceof Error ? error.message : cause.message}`,
+    }
+  }
   if (cause instanceof AIError) {
     // ChatGPT's usage limit arrives in HTTP and stream errors alike, whatever their reason, so its code decides the type.
     if (cause.reason.body?.includes("subscription_sharing_usage_limit_exceeded"))

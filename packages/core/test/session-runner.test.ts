@@ -7096,6 +7096,35 @@ describe("SessionRunnerLLM", () => {
     expect(events[2]?.data.error).toMatchObject({ type: "unknown", message: "unexpected tool defect" })
   })
 
+  for (const phase of ["stream", "tool"] as const) {
+    scenario(`settles running tools immediately when ${phase} persistence fails`, function* (s) {
+      const failure = new Error("Failed to execute statement", { cause: new Error("database or disk is full") })
+      yield* s.bus.project(phase === "stream" ? SessionEvent.Step.Streamed : SessionEvent.Tool.Success, () =>
+        Effect.die(failure),
+      )
+      if (phase === "stream") yield* s.blockTools()
+      yield* s.llm.push(
+        TestLLM.stop(LLMEvent.toolCall({ id: "call-storage-failure", name: "echo", input: { text: "done" } })),
+      )
+
+      const exit = yield* s.runPrompt("Persist tool result").pipe(Effect.exit)
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      if (Exit.isFailure(exit)) expect(Cause.squash(exit.cause)).toBe(failure)
+      const execution = yield* SessionExecution.Service
+      expect(yield* execution.isActive(sessionID)).toBe(false)
+      yield* s.bus.publish(SessionEvent.Execution.Failed, {
+        sessionID,
+        error: { type: "unknown", message: failure.message },
+      })
+      expect(requireAssistant(yield* s.context)).toMatchObject({
+        content: [
+          { id: "call-storage-failure", state: { status: "error", error: { message: "Failed to execute statement" } } },
+        ],
+      })
+    })
+  }
+
   scenario("preserves the provider failure when tool output persistence also fails", function* (s) {
     let injected = false
     yield* s.bus.project(SessionEvent.Tool.Success, (event) => {

@@ -569,7 +569,7 @@ export async function runNonInteractivePrompt(input: Input) {
         if (!emit("error", time, { error: event.data.error })) UI.error(event.data.error.message)
         continue
       }
-      if (event.type === "session.execution.failed") {
+      if (event.type === "session.execution.failed" || event.type === "session.execution.unrecorded") {
         if (input.compatibility === "v1" && (v1InvalidOutput || permissionRejected || formCancelled)) return
         flushStep()
         if (!emittedError && !formCancelled) {
