@@ -7,7 +7,7 @@ export interface Adapter {
   readonly getAgent: () => Effect.Effect<SessionMessage.AgentSelected["agent"] | undefined>
   readonly getModel: () => Effect.Effect<SessionMessage.ModelSelected["model"] | undefined>
   readonly getLocation: () => Effect.Effect<SessionMessage.LocationSwitched["previous"]>
-  readonly getCurrentAssistant: () => Effect.Effect<SessionMessage.Assistant | undefined>
+  readonly getLatestAssistant: () => Effect.Effect<SessionMessage.Assistant | undefined>
   readonly getAssistant: (messageID: SessionMessage.ID) => Effect.Effect<SessionMessage.Assistant | undefined>
   readonly getShell: (shellID: SessionMessage.Shell["shellID"]) => Effect.Effect<SessionMessage.Shell | undefined>
   readonly getCompaction: () => Effect.Effect<SessionMessage.Compaction | undefined>
@@ -57,18 +57,40 @@ export function update(adapter: Adapter, event: SessionEvent.DurableEvent) {
       yield* adapter.updateAssistant(produce(assistant, recipe))
     })
 
-  const clearCurrentRetry = Effect.gen(function* () {
-    const assistant = yield* adapter.getCurrentAssistant()
-    if (!assistant?.retry) return
-    yield* adapter.updateAssistant(
-      produce(assistant, (draft) => {
-        draft.retry = undefined
-      }),
-    )
-  })
+  const settleCurrentAssistant = (error?: SessionMessage.Idle["error"]) =>
+    Effect.gen(function* () {
+      const assistant = yield* adapter.getLatestAssistant()
+      if (!assistant || (!assistant.retry && !error)) return
+      if (
+        error &&
+        assistant.time.completed &&
+        !assistant.content.some(
+          (part) => part.type === "tool" && (part.state.status === "streaming" || part.state.status === "running"),
+        )
+      )
+        return
+      yield* adapter.updateAssistant(
+        produce(assistant, (draft) => {
+          draft.retry = undefined
+          if (!error) return
+          draft.finish = "error"
+          draft.time.completed ??= created
+          for (const part of draft.content) {
+            if (part.type !== "tool" || (part.state.status !== "streaming" && part.state.status !== "running")) continue
+            part.state = {
+              status: "error",
+              error,
+              input: typeof part.state.input === "string" ? {} : part.state.input,
+              metadata: part.state.status === "running" ? part.state.metadata : undefined,
+            }
+            part.time.completed = created
+          }
+        }),
+      )
+    })
 
   const idle = (outcome: SessionMessage.Idle["outcome"], error?: SessionMessage.Idle["error"]) =>
-    clearCurrentRetry.pipe(
+    settleCurrentAssistant(error).pipe(
       Effect.andThen(
         adapter.appendMessage(
           SessionMessage.Idle.make({
@@ -150,7 +172,7 @@ export function update(adapter: Adapter, event: SessionEvent.DurableEvent) {
       "session.execution.failed": (event) => idle("failed", event.data.error),
       // Shutdown keeps the execution claim and the resumed drain continues the turn.
       "session.execution.interrupted": (event) =>
-        event.data.reason === "shutdown" ? clearCurrentRetry : idle("interrupted"),
+        event.data.reason === "shutdown" ? settleCurrentAssistant() : idle("interrupted"),
       "session.instructions.updated": (event) => {
         if (event.data.text === undefined) return Effect.void
         return adapter.appendMessage(
@@ -238,8 +260,8 @@ export function update(adapter: Adapter, event: SessionEvent.DurableEvent) {
             )
             return
           }
-          const currentAssistant = yield* adapter.getCurrentAssistant()
-          if (currentAssistant) {
+          const currentAssistant = yield* adapter.getLatestAssistant()
+          if (currentAssistant && !currentAssistant.time.completed) {
             yield* adapter.updateAssistant(
               produce(currentAssistant, (draft) => {
                 draft.retry = undefined

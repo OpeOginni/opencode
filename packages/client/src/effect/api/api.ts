@@ -2076,6 +2076,7 @@ export type EventSubscribeInput = {
         | "session.execution.started"
         | "session.execution.succeeded"
         | "session.execution.failed"
+        | "session.execution.unrecorded"
         | "session.execution.interrupted"
         | "session.instructions.updated"
         | "session.synthetic"

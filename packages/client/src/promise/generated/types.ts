@@ -1735,6 +1735,15 @@ export type SessionUsageUpdated = {
   data: { sessionID: SessionID; cost: MoneyUSD; tokens: TokenUsageInfo }
 }
 
+export type SessionExecutionUnrecorded = {
+  id: EventID
+  created: number
+  metadata?: { [x: string]: any }
+  type: "session.execution.unrecorded"
+  location?: LocationRef
+  data: { sessionID: SessionID; error: SessionStructuredError }
+}
+
 export type SessionTextDelta = {
   id: EventID
   created: number
@@ -2870,6 +2879,7 @@ export type V2Event =
   | SessionExecutionStarted
   | SessionExecutionSucceeded
   | SessionExecutionFailed
+  | SessionExecutionUnrecorded
   | SessionExecutionInterrupted
   | SessionInstructionsUpdated
   | SessionSynthetic
@@ -4362,6 +4372,7 @@ export type EventSubscribeInput = {
         | "session.execution.started"
         | "session.execution.succeeded"
         | "session.execution.failed"
+        | "session.execution.unrecorded"
         | "session.execution.interrupted"
         | "session.instructions.updated"
         | "session.synthetic"

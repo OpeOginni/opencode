@@ -23,10 +23,27 @@ import { Provider } from "@opencode/core/provider"
 import { Tool } from "@opencode/schema/tool"
 import { toSessionError } from "@opencode/core/session/to-session-error"
 import { SessionRunnerRetry } from "@opencode/core/session/runner/retry"
+import { SqlError, UnknownError } from "effect/sql/SqlError"
 
 const llm = (reason: AIError["reason"]) => new AIError({ reason })
 
 describe("toSessionError", () => {
+  test("exposes the storage failure instead of the SQL wrapper message", () => {
+    expect(
+      toSessionError(
+        new SqlError({
+          reason: new UnknownError({
+            message: "Failed to execute statement",
+            cause: new Error("database or disk is full"),
+          }),
+        }),
+      ),
+    ).toEqual({
+      type: "storage.error",
+      message: "OpenCode couldn't save session data: database or disk is full",
+    })
+  })
+
   test("maps every AI error reason to the open wire type", () => {
     expect(toSessionError(llm(new RateLimitError({ message: "rate", retryAfterMs: 123 })))).toEqual({
       type: "provider.rate-limit",

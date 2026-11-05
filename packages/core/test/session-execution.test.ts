@@ -22,7 +22,7 @@ import { SessionMessage } from "@opencode/core/session/message"
 import { SessionRunner } from "@opencode/core/session/runner/index"
 import { SessionInboxTable, SessionTable } from "@opencode/core/session/sql"
 import { SessionStore } from "@opencode/core/session/store"
-import { Cause, Context, Deferred, Effect, Exit, Fiber, Layer, LayerMap, Scope } from "effect"
+import { Cause, Context, Deferred, Effect, Exit, Fiber, Layer, LayerMap, Scope, Stream } from "effect"
 import { eq } from "drizzle-orm"
 import { testEffect } from "./lib/effect"
 
@@ -153,6 +153,37 @@ describe("SessionExecution lifecycle", () => {
       expect(yield* execution.interrupt(sessionID)).toBeFalse()
       expect(yield* execution.active).not.toContain(sessionID)
       expect(yield* execution.isActive(sessionID)).toBe(false)
+    }),
+  )
+
+  it.effect("reports an unrecorded execution failure when the database rejects writes", () =>
+    Effect.gen(function* () {
+      const database = yield* Database.Service
+      const bus = yield* Bus.Service
+      const sessionID = Session.ID.make("ses_unrecorded_failure")
+      yield* seedSessions(database, [sessionID])
+      const events: Array<typeof SessionEvent.Execution.Unrecorded.Type> = []
+      yield* bus.subscribe(SessionEvent.Execution.Unrecorded).pipe(
+        Stream.runForEach((event) => Effect.sync(() => void events.push(event))),
+        Effect.forkScoped({ startImmediately: true }),
+      )
+      const scope = yield* Scope.make()
+      yield* Effect.addFinalizer(() => Scope.close(scope, Exit.void))
+      const context = yield* buildExecution(scope, () =>
+        database.db.run("PRAGMA query_only = ON").pipe(Effect.orDie, Effect.andThen(Effect.die("Storage failed"))),
+      )
+      const execution = Context.get(context, SessionExecution.Service)
+
+      const exit = yield* execution
+        .resume(sessionID)
+        .pipe(Effect.exit, Effect.ensuring(database.db.run("PRAGMA query_only = OFF").pipe(Effect.orDie)))
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(yield* execution.isActive(sessionID)).toBe(false)
+      expect(events).toHaveLength(1)
+      expect(events[0]).toMatchObject({ data: { sessionID, error: { type: "storage.error" } } })
+      expect(events[0]).not.toHaveProperty("durable")
+      expect((yield* claims(database))[sessionID]).toBe(true)
     }),
   )
 

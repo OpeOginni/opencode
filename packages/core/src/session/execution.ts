@@ -64,8 +64,18 @@ export const layer = Layer.effect(
         Effect.tapCause((cause) =>
           Cause.hasInterruptsOnly(cause)
             ? Effect.void
-            : Effect.logError("Failed to publish Session execution lifecycle", cause).pipe(
-                Effect.annotateLogs({ sessionID }),
+            : Effect.gen(function* () {
+                yield* Effect.logError("Failed to publish Session execution lifecycle", cause).pipe(
+                  Effect.annotateLogs({ sessionID }),
+                )
+                const session = yield* store.get(sessionID)
+                yield* bus.publish(
+                  SessionEvent.Execution.Unrecorded,
+                  { sessionID, error: toSessionError(Cause.squash(cause)) },
+                  { location: session?.location },
+                )
+              }).pipe(
+                Effect.catchCause((error) => Effect.logError("Failed to notify Session execution failure", error)),
               ),
         ),
         Effect.asVoid,

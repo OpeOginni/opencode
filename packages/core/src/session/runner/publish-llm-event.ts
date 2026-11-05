@@ -117,6 +117,7 @@ export const createLLMEventPublisher = (bus: Pick<Bus.Interface, "publish">, inp
   let outputStarted = false
   let stepFailure: SessionError.Error | undefined
   let stepSettlement: StepRecord["finish"]
+  let publicationFailed = false
 
   const startAssistant = Effect.fnUntraced(function* () {
     if (stepStarted) return assistantMessageID
@@ -351,17 +352,25 @@ export const createLLMEventPublisher = (bus: Pick<Bus.Interface, "publish">, inp
     const tool = tools.get(id)
     if (!tool || tool.settled) return false
     tool.settled = true
-    yield* bus.publish(SessionEvent.Tool.Failed, {
-      sessionID: input.sessionID,
-      assistantMessageID,
-      id,
-      error:
-        tool.name === "subagent" && error.type === "aborted" && typeof tool.progress?.sessionID === "string"
-          ? { ...error, message: `${error.message} (sessionID: ${tool.progress.sessionID})` }
-          : error,
-      ...failureSnapshot(tool, metadata),
-      executed: tool.providerExecuted,
-    })
+    yield* bus
+      .publish(SessionEvent.Tool.Failed, {
+        sessionID: input.sessionID,
+        assistantMessageID,
+        id,
+        error:
+          tool.name === "subagent" && error.type === "aborted" && typeof tool.progress?.sessionID === "string"
+            ? { ...error, message: `${error.message} (sessionID: ${tool.progress.sessionID})` }
+            : error,
+        ...failureSnapshot(tool, metadata),
+        executed: tool.providerExecuted,
+      })
+      .pipe(
+        Effect.onError(() =>
+          Effect.sync(() => {
+            publicationFailed = true
+          }),
+        ),
+      )
     return true
   })
 
@@ -567,14 +576,22 @@ export const createLLMEventPublisher = (bus: Pick<Bus.Interface, "publish">, inp
     tool.settled = true
     const content = result.content
     if (!isReadonlyArrayNonEmpty(content)) return yield* Effect.die(new Error(`Tool execution has no content: ${id}`))
-    yield* bus.publish(SessionEvent.Tool.Success, {
-      sessionID: input.sessionID,
-      assistantMessageID,
-      id,
-      content,
-      ...(result.metadata === undefined ? {} : { metadata: result.metadata }),
-      executed: tool.providerExecuted,
-    })
+    yield* bus
+      .publish(SessionEvent.Tool.Success, {
+        sessionID: input.sessionID,
+        assistantMessageID,
+        id,
+        content,
+        ...(result.metadata === undefined ? {} : { metadata: result.metadata }),
+        executed: tool.providerExecuted,
+      })
+      .pipe(
+        Effect.onError(() =>
+          Effect.sync(() => {
+            publicationFailed = true
+          }),
+        ),
+      )
   })
 
   return {
@@ -588,6 +605,7 @@ export const createLLMEventPublisher = (bus: Pick<Bus.Interface, "publish">, inp
     failUnsettledTools,
     failIncompleteTools,
     hasStarted: () => stepStarted,
+    hasFailedPublication: () => publicationFailed,
     /** Immutable snapshot of everything recorded for this step so far. */
     record: (): StepRecord => ({
       outputStarted,
