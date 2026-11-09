@@ -1,7 +1,7 @@
 export * as Credential from "./credential.js"
 
-import { asc, desc, eq, type SQL } from "drizzle-orm"
-import { Cause, Context, Effect, Fiber, Layer, Schema } from "effect"
+import { asc, desc, eq, getTableColumns, sql, type SQL } from "drizzle-orm"
+import { Cause, Context, Effect, Fiber, Layer, Option, Schema } from "effect"
 import { Credential } from "@opencode/schema/credential"
 import { CredentialLegacy } from "@opencode/schema/credential-legacy"
 import { Integration } from "@opencode/schema/integration"
@@ -78,29 +78,50 @@ const layer = Layer.effect(
     const scope = yield* Effect.scope
     const pending = new Map<ID, Fiber.Fiber<OAuth | undefined, unknown>>()
     // Rows written before v2.1 may carry the old key credential shape.
-    const decode = Schema.decodeUnknownSync(CredentialLegacy.Value)
-    const stored = (row: typeof CredentialTable.$inferSelect) => {
+    const decode = Schema.decodeUnknownOption(Schema.fromJsonString(CredentialLegacy.Value))
+    // Read raw text so one malformed JSON value cannot fail Drizzle's mapping of the entire result.
+    const fields = { ...getTableColumns(CredentialTable), value: sql<string>`${CredentialTable.value}` }
+    const stored = (row: Omit<typeof CredentialTable.$inferSelect, "value"> & { value: string }) => {
       if (!row.integration_id) return
+      const value = Option.getOrUndefined(decode(row.value))
+      if (!value) return
       return new Info({
         id: row.id,
         integrationID: row.integration_id,
         label: row.label,
-        value: decode(row.value),
+        value,
       })
     }
-    const storedRows = (rows: ReadonlyArray<typeof CredentialTable.$inferSelect>) =>
-      rows.flatMap((row) => {
-        const credential = stored(row)
-        return credential ? [credential] : []
-      })
+    const storedRows = Effect.fnUntraced(function* (
+      rows: ReadonlyArray<Omit<typeof CredentialTable.$inferSelect, "value"> & { value: string }>,
+    ) {
+      const decoded = rows.map((row) => ({ row, credential: stored(row) }))
+      const invalid = decoded.filter((item) => item.row.integration_id && !item.credential)
+      const selected = new Map(rows.map((row) => [row.integration_id, row.id]))
+      const blocked = new Set(
+        invalid
+          .filter((item) => selected.get(item.row.integration_id) === item.row.id)
+          .map((item) => item.row.integration_id),
+      )
+      yield* Effect.forEach(invalid, (item) =>
+        Effect.logWarning("Stored credential is invalid; remove this login and reconnect the integration", {
+          credentialID: item.row.id,
+          integrationID: item.row.integration_id,
+        }),
+      )
+      // Do not silently select an older account when the selected login is unreadable.
+      return decoded.flatMap((item) =>
+        item.credential && !blocked.has(item.row.integration_id) ? [item.credential] : [],
+      )
+    })
     const rows = (where?: SQL) =>
       db
-        .select()
+        .select(fields)
         .from(CredentialTable)
         .where(where)
         .orderBy(asc(CredentialTable.active), asc(CredentialTable.time_created), asc(CredentialTable.id))
         .all()
-        .pipe(Effect.orDie, Effect.map(storedRows))
+        .pipe(Effect.orDie, Effect.flatMap(storedRows))
     type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
     const currentActive = (tx: Transaction, integrationID: Integration.ID) =>
       tx
@@ -147,8 +168,18 @@ const layer = Layer.effect(
       all: () => rows(),
       list: Effect.fn("Credential.list")((integrationID) => rows(eq(CredentialTable.integration_id, integrationID))),
       get: Effect.fn("Credential.get")(function* (id) {
-        const row = yield* db.select().from(CredentialTable).where(eq(CredentialTable.id, id)).get().pipe(Effect.orDie)
-        return row ? stored(row) : undefined
+        const row = yield* db
+          .select(fields)
+          .from(CredentialTable)
+          .where(eq(CredentialTable.id, id))
+          .get()
+          .pipe(Effect.orDie)
+        if (!row?.integration_id) return undefined
+        const credential = stored(row)
+        if (credential) return credential
+        return yield* Effect.die(
+          new Error(`Stored credential ${id} for ${row.integration_id} is invalid; remove this login and reconnect`),
+        )
       }),
       create: Effect.fn("Credential.create")(function* (input) {
         const credential = new Info({
@@ -208,7 +239,11 @@ const layer = Layer.effect(
         const integrationID = yield* db
           .transaction((tx) =>
             Effect.gen(function* () {
-              const credential = yield* tx.select().from(CredentialTable).where(eq(CredentialTable.id, id)).get()
+              const credential = yield* tx
+                .select({ integration_id: CredentialTable.integration_id })
+                .from(CredentialTable)
+                .where(eq(CredentialTable.id, id))
+                .get()
               if (!credential?.integration_id) return
               const active = yield* currentActive(tx, credential.integration_id)
               if (active?.id === id) return
@@ -263,7 +298,11 @@ const layer = Layer.effect(
         const removed = yield* db
           .transaction((tx) =>
             Effect.gen(function* () {
-              const credential = yield* tx.select().from(CredentialTable).where(eq(CredentialTable.id, id)).get()
+              const credential = yield* tx
+                .select({ integration_id: CredentialTable.integration_id })
+                .from(CredentialTable)
+                .where(eq(CredentialTable.id, id))
+                .get()
               if (!credential) return
               const active = credential.integration_id ? yield* currentActive(tx, credential.integration_id) : undefined
               yield* tx.delete(CredentialTable).where(eq(CredentialTable.id, id)).run()

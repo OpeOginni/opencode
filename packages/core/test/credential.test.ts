@@ -1,6 +1,6 @@
 import { describe, expect } from "bun:test"
 import { eq, sql } from "drizzle-orm"
-import { Effect } from "effect"
+import { Cause, Effect, Exit, Logger } from "effect"
 import { Bus } from "@opencode/core/bus"
 import { Credential } from "@opencode/core/credential"
 import { CredentialTable } from "@opencode/core/credential/sql"
@@ -70,6 +70,64 @@ describe("Credential", () => {
         metadata: { imported: true, resourceName: "answered" },
       })
     }),
+  )
+
+  const malformed = [
+    { name: "invalid JSON", value: "fake-bare-key" },
+    { name: "a JSON string", value: JSON.stringify("fake-bare-key") },
+    { name: "an invalid credential object", value: JSON.stringify({ type: "unknown", key: "fake-bare-key" }) },
+  ]
+  malformed.forEach((fixture) =>
+    it.effect(`isolates ${fixture.name} without changing stored logins or exposing secrets`, () =>
+      Effect.gen(function* () {
+        const credentials = yield* Credential.Service
+        const db = (yield* Database.Service).db
+        const healthy = yield* credentials.create({
+          integrationID: Integration.ID.make("openai"),
+          value: Credential.Key.make({ type: "key", key: "fake-healthy-key" }),
+        })
+        const older = yield* credentials.create({
+          integrationID: Integration.ID.make("openrouter"),
+          value: Credential.Key.make({ type: "key", key: "fake-older-key" }),
+        })
+        yield* db.update(CredentialTable).set({ active: false }).where(eq(CredentialTable.id, older.id)).run()
+        yield* db.run(
+          sql`INSERT INTO credential (id, integration_id, label, value, active, time_created, time_updated) VALUES ('cred_malformed', 'openrouter', 'Broken login', ${fixture.value}, 1, 0, 0)`,
+        )
+
+        const logs: unknown[] = []
+        yield* Effect.gen(function* () {
+          expect(yield* credentials.all()).toEqual([healthy])
+          expect(yield* credentials.list(healthy.integrationID)).toEqual([healthy])
+          expect(yield* credentials.list(older.integrationID)).toEqual([])
+        }).pipe(
+          Effect.provideService(Logger.CurrentLoggers, new Set([Logger.make((entry) => logs.push(entry.message))])),
+        )
+        expect(logs).toContainEqual([
+          "Stored credential is invalid; remove this login and reconnect the integration",
+          { credentialID: "cred_malformed", integrationID: "openrouter" },
+        ])
+        expect(JSON.stringify(logs)).not.toContain("fake-bare-key")
+
+        const broken = yield* credentials.get(Credential.ID.make("cred_malformed")).pipe(Effect.exit)
+        expect(Exit.isFailure(broken)).toBeTrue()
+        if (Exit.isFailure(broken)) {
+          expect(Cause.pretty(broken.cause)).toContain("cred_malformed for openrouter is invalid")
+          expect(Cause.pretty(broken.cause)).not.toContain("fake-bare-key")
+        }
+        expect(yield* db.get<{ value: string }>(sql`SELECT value FROM credential WHERE id = 'cred_malformed'`)).toEqual(
+          {
+            value: fixture.value,
+          },
+        )
+
+        yield* credentials.activate(older.id)
+        expect(yield* credentials.list(older.integrationID)).toEqual([older])
+        yield* credentials.remove(Credential.ID.make("cred_malformed"))
+        expect(yield* credentials.list(older.integrationID)).toEqual([older])
+        expect(yield* credentials.get(healthy.id)).toEqual(healthy)
+      }),
+    ),
   )
 
   it.effect("publishes global events only for observable credential mutations", () =>
